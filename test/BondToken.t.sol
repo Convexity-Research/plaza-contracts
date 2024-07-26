@@ -14,6 +14,11 @@ contract BondTokenTest is Test {
   address private user = address(0x4);
   address private user2 = address(0x5);
 
+  /**
+   * @dev Sets up the testing environment.
+   * Deploys the BondToken contract and a proxy, then initializes them.
+   * Grants the minter and governance roles and mints initial tokens.
+   */
   function setUp() public {
     vm.startPrank(deployer);
     // Deploy and initialize BondToken
@@ -31,11 +36,17 @@ contract BondTokenTest is Test {
     token.mint(minter, 1000);
     vm.stopPrank();
 
+    // Increase the indexed asset period for testing
     vm.startPrank(governance);
     token.increaseIndexedAssetPeriod(200);
     vm.stopPrank();
   }
-function testMinting() public {
+
+  /**
+   * @dev Tests minting of tokens by an address with MINTER_ROLE.
+   * Asserts that the user's balance is updated correctly.
+   */
+  function testMinting() public {
     uint256 initialBalance = token.balanceOf(minter);
     uint256 mintAmount = 500;
 
@@ -47,10 +58,13 @@ function testMinting() public {
     assertEq(token.balanceOf(minter), initialBalance);
   }
 
+  /**
+   * @dev Tests minting of tokens by an address without MINTER_ROLE.
+   * Expects the transaction to revert.
+   */
   function testMintingWithNoPermission() public {
     uint256 initialBalance = token.balanceOf(user);
 
-     // MINTER_ROLE
     vm.expectRevert();
     vm.startPrank(user);
     token.mint(user, 100);
@@ -59,6 +73,10 @@ function testMinting() public {
     assertEq(token.balanceOf(user), initialBalance);
   }
 
+  /**
+   * @dev Tests burning of tokens by an address with MINTER_ROLE.
+   * Asserts that the minter's balance is decreased correctly.
+   */
   function testBurning() public {
     uint256 initialBalance = token.balanceOf(minter);
     uint256 burnAmount = 100;
@@ -70,10 +88,13 @@ function testMinting() public {
     assertEq(token.balanceOf(minter), initialBalance - burnAmount);
   }
 
+  /**
+   * @dev Tests burning of tokens by an address without MINTER_ROLE.
+   * Expects the transaction to revert.
+   */
   function testBurningWithNoPermission() public {
     uint256 initialBalance = token.balanceOf(user);
 
-    // MINTER_ROLE
     vm.expectRevert();
     vm.startPrank(user);
     token.burn(user, 50);
@@ -82,6 +103,10 @@ function testMinting() public {
     assertEq(token.balanceOf(user), initialBalance);
   }
 
+  /**
+   * @dev Tests increasing the indexed asset period by an address with GOV_ROLE.
+   * Asserts that the globalPool's period and sharesPerToken are updated correctly.
+   */
   function testIncreaseIndexedAssetPeriod() public {
     vm.startPrank(governance);
     token.increaseIndexedAssetPeriod(5000);
@@ -93,14 +118,21 @@ function testMinting() public {
     assertEq(sharesPerToken, 5000);
   }
 
+  /**
+   * @dev Tests increasing the indexed asset period by an address without GOV_ROLE.
+   * Expects the transaction to revert.
+   */
   function testIncreaseIndexedAssetPeriodWithNoPermission() public {
-    // GOV_ROLE
     vm.expectRevert();
     vm.startPrank(user);
     token.increaseIndexedAssetPeriod(5000);
     vm.stopPrank();
   }
 
+  /**
+   * @dev Tests token transfer within the same period without affecting indexed shares.
+   * Asserts that the user's lastUpdatedPeriod and indexedAmountShares remain unchanged.
+   */
   function testTransferSamePeriod() public {
     vm.startPrank(minter);
     token.mint(user, 1000);
@@ -119,6 +151,10 @@ function testMinting() public {
     assertEq(indexedAmountShares, 0);
   }
 
+  /**
+   * @dev Tests token transfer after an indexed asset period increase.
+   * Asserts the updates to user assets and global pool data.
+   */
   function testTransferAfterPeriodIncrease() public {
     vm.startPrank(minter);
     token.mint(user, 1000);
@@ -153,6 +189,10 @@ function testMinting() public {
     assertEq(token.balanceOf(user2), 100);
   }
 
+  /**
+   * @dev Tests token transfer after an indexed asset period increase with both users receiving shares.
+   * Asserts the updates to both users' assets and global pool data.
+   */
   function testTransferAfterPeriodIncreaseBothUsersPaid() public {
     vm.startPrank(minter);
     token.mint(user, 1000);

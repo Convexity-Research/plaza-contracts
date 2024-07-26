@@ -58,22 +58,30 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     // Grant the GOV_ROLE to the governance address
     _grantRole(GOV_ROLE, governance);
   }
-
-  // Mint new tokens. Only addresses with the MINTER_ROLE can call this function
+  /**
+   * @dev Mints new tokens to the specified address.
+   * Can only be called by addresses with the MINTER_ROLE.
+   */
   function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
     _mint(to, amount);
   }
 
-  // Burn tokens from a specified account
+  /**
+   * @dev Burns tokens from the specified account.
+   * Can only be called by addresses with the MINTER_ROLE.
+   */
   function burn(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
     _burn(account, amount);
   }
 
-  // Called after transfer is done
+  /**
+   * @dev Internal function to update user assets after a transfer.
+   * Called during token transfer.
+   */
   function _update(address from, address to, uint256 amount) internal virtual override {
     super._update(from, to, amount);
     
-    // calcs are done with original balance before transfer
+    // Calculate the balances with original amounts before the transfer
     // @todo: check if we can hook beforeTransfer (deprecated)
 
     if (from != address(0)) {
@@ -85,6 +93,10 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     }
   }
 
+  /**
+   * @dev Updates the indexed user assets for a specific user.
+   * Updates the number of shares held by the user based on the current period.
+   */
   function updateIndexedUserAssets(address user, uint256 balance) internal {
     IndexedUserAssets memory userPool = userAssets[user];
     uint256 period = globalPool.currentPeriod;
@@ -100,11 +112,19 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     emit UpdatedUserAssets(user, period, shares);
   }
 
+  /**
+   * @dev Resets the indexed user assets for a specific user.
+   * Resets the last updated period and indexed amount of shares to zero.
+   */
   function resetIndexedUserAssets(address user) internal {
     userAssets[user].lastUpdatedPeriod = globalPool.currentPeriod;
     userAssets[user].indexedAmountShares = 0;
   }
 
+  /**
+   * @dev Increases the current period and updates the shares per token.
+   * Can only be called by addresses with the GOV_ROLE.
+   */
   function increaseIndexedAssetPeriod(uint256 sharesPerToken) public onlyRole(GOV_ROLE) {
     globalPool.previousPoolAmounts.push(
       PoolAmount({
@@ -119,6 +139,10 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     emit IncreasedAssetPeriod(globalPool.currentPeriod, sharesPerToken);
   }
 
+  /**
+   * @dev Authorizes an upgrade to a new implementation.
+   * Can only be called by the owner of the contract.
+   */
   function _authorizeUpgrade(address newImplementation)
     internal
     onlyOwner
