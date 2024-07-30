@@ -14,6 +14,7 @@ contract BondTokenTest is Test {
   address private governance = address(0x3);
   address private user = address(0x4);
   address private user2 = address(0x5);
+  address private distributor = address(0x6);
 
   /**
    * @dev Sets up the testing environment.
@@ -26,7 +27,7 @@ contract BondTokenTest is Test {
     BondToken implementation = new BondToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance)));
+    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor)));
 
     // Attach the BondToken interface to the deployed proxy
     token = BondToken(address(proxy));
@@ -277,5 +278,48 @@ contract BondTokenTest is Test {
     assertEq(lastUpdatedPeriod, 2);
     assertEq(indexedAmountShares, 40);
     assertEq(token.balanceOf(user2), 2100);
+  }
+
+  function testResetIndexedUserAssetsUnauthorized() public {
+    vm.expectRevert();
+    token.resetIndexedUserAssets(user);
+  }
+
+  function testResetIndexedUserAssetsPeriodReset() public {
+    vm.startPrank(governance);
+    token.increaseIndexedAssetPeriod(200);
+    vm.stopPrank();
+
+    vm.startPrank(distributor);
+    token.resetIndexedUserAssets(user);
+    vm.stopPrank();
+
+    (uint256 lastUpdatedPeriod,) = token.userAssets(user);
+    assertEq(lastUpdatedPeriod, 2);
+  }
+
+  function testResetIndexedUserAssetsSharesReset() public {
+    // Issue bond
+    vm.startPrank(minter);
+    token.mint(user, 100);
+
+    // Update period
+    vm.startPrank(governance);
+    token.increaseIndexedAssetPeriod(200);
+
+    // Transfer to another user to update the intermediate balance
+    vm.startPrank(user);
+    token.transfer(user2, 100);
+
+    (uint256 lastUpdatedPeriod, uint256 shares) = token.userAssets(user);
+    assertEq(shares, 2);
+
+    // Execute reset
+    vm.startPrank(distributor);
+    token.resetIndexedUserAssets(user);
+
+    (lastUpdatedPeriod, shares) = token.userAssets(user);
+    assertEq(lastUpdatedPeriod, 2);
+    assertEq(shares, 0);
   }
 }
