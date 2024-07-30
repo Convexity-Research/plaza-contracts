@@ -10,6 +10,7 @@ contract BondTokenScript is Script {
   // @todo: update these
   address private constant minter = address(0);
   address private constant governance = address(0);
+  address private constant distributor = address(0);
 
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
@@ -17,7 +18,7 @@ contract BondTokenScript is Script {
     BondToken implementation = new BondToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance)));
+    ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor)));
 
     // BondToken token = BondToken(address(proxy));
     vm.stopBroadcast();
