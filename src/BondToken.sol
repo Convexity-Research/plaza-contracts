@@ -44,20 +44,24 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     _disableInitializers();
   }
 
-  function initialize(string memory name, string memory symbol, address minter, address governance) initializer public {
+  function initialize(
+    string memory name, 
+    string memory symbol, 
+    address minter, 
+    address governance, 
+    address distributor
+    ) initializer public {
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();
 
-    // Grant ADMIN_ROLE to deployer
+    // Grant the access roles
     _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-
-    // Grant the MINTER_ROLE to the specified minter address
     _grantRole(MINTER_ROLE, minter);
-
-    // Grant the GOV_ROLE to the governance address
     _grantRole(GOV_ROLE, governance);
+    _grantRole(DISTRIBUTOR_ROLE, distributor);
   }
+
   /**
    * @dev Mints new tokens to the specified address.
    * Can only be called by addresses with the MINTER_ROLE.
@@ -72,6 +76,13 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    */
   function burn(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
     _burn(account, amount);
+  }
+
+  /**
+   * @dev Returns the previous pool amounts from the global pool.
+   */
+  function getPreviousPoolAmounts() external view returns (PoolAmount[] memory) {
+    return globalPool.previousPoolAmounts;
   }
 
   /**
