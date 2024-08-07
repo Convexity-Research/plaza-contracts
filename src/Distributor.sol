@@ -6,9 +6,10 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable {
+contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
 
   struct Pool {
     BondToken bondToken;
@@ -45,7 +46,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @param bondToken Address of the BondToken contract associated with the pool.
    * @param sharesToken Address of the ERC20 token used for shares in the pool.
    */
-  function updatePool(address pool, address bondToken, address sharesToken) external onlyRole(GOV_ROLE) {
+  function updatePool(address pool, address bondToken, address sharesToken) external onlyRole(GOV_ROLE) whenNotPaused() {
     pools[pool] = Pool({
       bondToken: BondToken(bondToken),
       sharesToken: sharesToken
@@ -58,7 +59,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * Transfers the calculated shares to the user's address.
    * @param _pool Address of the pool from which to claim shares.
    */
-  function claim(address _pool) external {
+  function claim(address _pool) external whenNotPaused() {
     Pool memory pool = pools[_pool];
     if (address(pool.bondToken) == address(0) || pool.sharesToken == address(0)){
       revert UnsupportedPool();
@@ -82,6 +83,20 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     pool.bondToken.resetIndexedUserAssets(msg.sender);
     emit ClaimedShares(msg.sender, currentPeriod, shares);
+  }
+
+  /**
+   * @dev Pauses contract. Reverts any interaction expect upgrade.
+   */
+  function pause() external onlyRole(GOV_ROLE) {
+    _pause();
+  }
+
+  /**
+   * @dev Unpauses contract.
+   */
+  function unpause() external onlyRole(GOV_ROLE) {
+    _unpause();
   }
 
   /**
