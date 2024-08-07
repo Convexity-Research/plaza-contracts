@@ -30,14 +30,18 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   mapping(address => IndexedUserAssets) public userAssets;
 
-  // Define a constant for the minter role using keccak256 to generate a unique hash
-  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+  bool public paused;
 
-  // Define a constant for the governance role using keccak256 to generate a unique hash
+  // Define a constants for the access roles using keccak256 to generate a unique hash
+  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
   event UpdatedUserAssets(address user, uint256 lastUpdatedPeriod, uint256 indexedAmountShares);
+  event ContractPause(bool paused);
+
+  error ContractPaused();
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -79,6 +83,10 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * Called during token transfer.
    */
   function _update(address from, address to, uint256 amount) internal virtual override {
+    if (paused) {
+      revert ContractPaused();
+    }
+
     if (from != address(0)) {
       updateIndexedUserAssets(from, balanceOf(from));
     }
@@ -113,7 +121,10 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * @dev Resets the indexed user assets for a specific user.
    * Resets the last updated period and indexed amount of shares to zero.
    */
-  function resetIndexedUserAssets(address user) internal {
+  function resetIndexedUserAssets(address user) external onlyRole(DISTRIBUTOR_ROLE) {
+    if (paused) {
+      revert ContractPaused();
+    }
     userAssets[user].lastUpdatedPeriod = globalPool.currentPeriod;
     userAssets[user].indexedAmountShares = 0;
   }
@@ -123,6 +134,10 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * Can only be called by addresses with the GOV_ROLE.
    */
   function increaseIndexedAssetPeriod(uint256 sharesPerToken) public onlyRole(GOV_ROLE) {
+    if (paused) {
+      revert ContractPaused();
+    }
+
     globalPool.previousPoolAmounts.push(
       PoolAmount({
         period: globalPool.currentPeriod,
@@ -134,6 +149,16 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     globalPool.sharesPerToken = sharesPerToken;
 
     emit IncreasedAssetPeriod(globalPool.currentPeriod, sharesPerToken);
+  }
+
+  /**
+   * @dev Updates paused property which will revert any intecation with the contract.
+   * Including transfer, mint, burn, or indexing updates.
+   * It does not prevent contract upgrades
+   */
+  function pause() external onlyRole(GOV_ROLE) {
+    paused = !paused;
+    emit ContractPause(paused);
   }
 
   /**

@@ -42,6 +42,56 @@ contract BondTokenTest is Test {
     vm.stopPrank();
   }
 
+  function testPause() public {
+    // makes sure it starts false
+    assertEq(token.paused(), false);
+
+    // makes sure minting works if not paused
+    vm.startPrank(minter);
+    token.mint(user, 1000);
+
+    // pause contract
+    vm.startPrank(governance);
+    token.pause();
+
+    // check it reverts on minting
+    vm.startPrank(minter);
+    vm.expectRevert(BondToken.ContractPaused.selector);
+    token.mint(user, 1);
+
+    // check it reverts on burning
+    vm.expectRevert(BondToken.ContractPaused.selector);
+    token.burn(user, 1);
+
+    // check it reverts on transfer
+    vm.expectRevert(BondToken.ContractPaused.selector);
+    token.transfer(user, 1);
+
+    // @todo: remove when distributor is merged
+    vm.startPrank(deployer);
+    token.grantRole(keccak256("DISTRIBUTOR_ROLE"), minter);
+    vm.startPrank(minter);
+
+    // check it reverts on reseting indexed user assets
+    vm.expectRevert(BondToken.ContractPaused.selector);
+    token.resetIndexedUserAssets(user);
+
+    // check it reverts on increasing period
+    vm.startPrank(governance);
+    vm.expectRevert(BondToken.ContractPaused.selector);
+    token.increaseIndexedAssetPeriod(0);
+
+    // @todo: check if contract is still upgradable on pause
+    // token._authorizeUpgrade(address(0));
+
+    // unpause contract
+    token.pause();
+
+    // make sure you can now do stuff
+    vm.startPrank(user);
+    token.transfer(user2, 1000);
+  }
+
   /**
    * @dev Tests minting of tokens by an address with MINTER_ROLE.
    * Asserts that the user's balance is updated correctly.
