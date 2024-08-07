@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import "forge-std/Test.sol";
 import "../src/BondToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract BondTokenTest is Test {
   BondToken private token;
@@ -56,15 +57,15 @@ contract BondTokenTest is Test {
 
     // check it reverts on minting
     vm.startPrank(minter);
-    vm.expectRevert(BondToken.ContractPaused.selector);
+    vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
     token.mint(user, 1);
 
     // check it reverts on burning
-    vm.expectRevert(BondToken.ContractPaused.selector);
+    vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
     token.burn(user, 1);
 
     // check it reverts on transfer
-    vm.expectRevert(BondToken.ContractPaused.selector);
+    vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
     token.transfer(user, 1);
 
     // @todo: remove when distributor is merged
@@ -73,19 +74,19 @@ contract BondTokenTest is Test {
     vm.startPrank(minter);
 
     // check it reverts on reseting indexed user assets
-    vm.expectRevert(BondToken.ContractPaused.selector);
+    vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
     token.resetIndexedUserAssets(user);
 
     // check it reverts on increasing period
     vm.startPrank(governance);
-    vm.expectRevert(BondToken.ContractPaused.selector);
+    vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
     token.increaseIndexedAssetPeriod(0);
 
     // @todo: check if contract is still upgradable on pause
     // token._authorizeUpgrade(address(0));
 
     // unpause contract
-    token.pause();
+    token.unpause();
 
     // make sure you can now do stuff
     vm.startPrank(user);

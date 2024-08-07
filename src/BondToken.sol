@@ -4,11 +4,12 @@ pragma solidity ^0.8.26;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
-contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable {
+contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {
   struct PoolAmount {
     uint256 period;
     uint256 amount;
@@ -30,8 +31,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   mapping(address => IndexedUserAssets) public userAssets;
 
-  bool public paused;
-
   // Define a constants for the access roles using keccak256 to generate a unique hash
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
@@ -39,9 +38,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
   event UpdatedUserAssets(address user, uint256 lastUpdatedPeriod, uint256 indexedAmountShares);
-  event ContractPause(bool paused);
-
-  error ContractPaused();
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -82,11 +78,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * @dev Internal function to update user assets after a transfer.
    * Called during token transfer.
    */
-  function _update(address from, address to, uint256 amount) internal virtual override {
-    if (paused) {
-      revert ContractPaused();
-    }
-
+  function _update(address from, address to, uint256 amount) internal virtual override whenNotPaused() {
     if (from != address(0)) {
       updateIndexedUserAssets(from, balanceOf(from));
     }
@@ -121,10 +113,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * @dev Resets the indexed user assets for a specific user.
    * Resets the last updated period and indexed amount of shares to zero.
    */
-  function resetIndexedUserAssets(address user) external onlyRole(DISTRIBUTOR_ROLE) {
-    if (paused) {
-      revert ContractPaused();
-    }
+  function resetIndexedUserAssets(address user) external onlyRole(DISTRIBUTOR_ROLE) whenNotPaused(){
     userAssets[user].lastUpdatedPeriod = globalPool.currentPeriod;
     userAssets[user].indexedAmountShares = 0;
   }
@@ -133,11 +122,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * @dev Increases the current period and updates the shares per token.
    * Can only be called by addresses with the GOV_ROLE.
    */
-  function increaseIndexedAssetPeriod(uint256 sharesPerToken) public onlyRole(GOV_ROLE) {
-    if (paused) {
-      revert ContractPaused();
-    }
-
+  function increaseIndexedAssetPeriod(uint256 sharesPerToken) public onlyRole(GOV_ROLE) whenNotPaused() {
     globalPool.previousPoolAmounts.push(
       PoolAmount({
         period: globalPool.currentPeriod,
@@ -157,8 +142,16 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * It does not prevent contract upgrades
    */
   function pause() external onlyRole(GOV_ROLE) {
-    paused = !paused;
-    emit ContractPause(paused);
+    _pause();
+  }
+
+    /**
+   * @dev Updates paused property which will revert any intecation with the contract.
+   * Including transfer, mint, burn, or indexing updates.
+   * It does not prevent contract upgrades
+   */
+  function unpause() external onlyRole(GOV_ROLE) {
+    _unpause();
   }
 
   /**
