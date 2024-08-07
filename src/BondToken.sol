@@ -79,18 +79,15 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * Called during token transfer.
    */
   function _update(address from, address to, uint256 amount) internal virtual override {
-    super._update(from, to, amount);
-    
-    // Calculate the balances with original amounts before the transfer
-    // @todo: check if we can hook beforeTransfer (deprecated)
-
     if (from != address(0)) {
-      updateIndexedUserAssets(from, balanceOf(from) + amount);
+      updateIndexedUserAssets(from, balanceOf(from));
     }
 
     if (to != address(0)) {
-      updateIndexedUserAssets(to, balanceOf(to) - amount);
+      updateIndexedUserAssets(to, balanceOf(to));
     }
+
+    super._update(from, to, amount);
   }
 
   /**
