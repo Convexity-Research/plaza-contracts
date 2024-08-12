@@ -11,24 +11,43 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+  // uint public constant MINIMUM_LIQUIDITY = 10**3;
+  uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 8000=0.8
+  uint256 private constant POINT_TWO = 200000;
+  uint256 private constant COLLATERAL_THRESHOLD = 1200000;
+  uint256 private constant PRECISION = 1000000;
+  uint256 private constant BOND_TARGET_PRICE = 100;
+
+  // @todo: get price from oracle
+  uint256 private constant ETH_PRICE = 3000;
+
   // Protocol
   DLSP public dlsp;
   uint256 public fee;
 
   // Tokens
-  ERC20 public reserveToken;
+  address public reserveToken;
   BondToken public dToken;
   LeverageToken public lToken;
 
   // Coupon
-  ERC20 public couponToken;
+  address public couponToken;
   uint256 public sharesPerToken;
 
   // Distribution
   uint256 public distributionPeriod;
   uint256 public lastDistributionTime;
 
+  enum TokenType {
+    DEBT,
+    LEVERAGE
+  }
+
+  error MinAmount();
+  error ZeroAmount();
   error AccessDenied();
+  error ZeroDebtSupply();
+  error ZeroLeverageSupply();
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -51,25 +70,78 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     __UUPSUpgradeable_init();
     dlsp = DLSP(_dlsp);
     fee = _fee;
-    reserveToken = ERC20(_reserveToken);
+    reserveToken = _reserveToken;
     dToken = BondToken(_dToken);
     lToken = LeverageToken(_lToken);
-    couponToken = ERC20(_couponToken);
+    couponToken = _couponToken;
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistributionTime = block.timestamp;
   }
 
-  function Issue() external whenNotPaused() {
+  function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+    uint256 amount = getCreateAmount(tokenType, depositAmount, ETH_PRICE);
+    
+    if (amount < minAmount) {
+      revert MinAmount();
+    }
+
+    if (amount == 0) {
+      revert ZeroAmount();
+    }
+
+    if (tokenType == TokenType.DEBT) {
+      // @todo: user its not msg.sender
+      dToken.mint(msg.sender, amount);
+    } else {
+      lToken.mint(msg.sender, amount);
+    }
+
+    return amount;
+  }
+
+  function redeem() external whenNotPaused() {
 
   }
 
-  function Redeem() external whenNotPaused() {
+  function swap() external whenNotPaused() {
 
   }
 
-  function Swap() external whenNotPaused() {
+  function getCreateAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
+    uint256 debtAssetSupply = dToken.totalSupply();
 
+    if (debtAssetSupply == 0) {
+      revert ZeroDebtSupply();
+    }
+
+    uint256 assetSupply = debtAssetSupply;
+    uint256 multiplier = POINT_EIGHT;
+    if (tokenType == TokenType.LEVERAGE) {
+      multiplier = POINT_TWO;
+      assetSupply = lToken.totalSupply();
+    }
+
+    uint256 tvl = ethPrice * ERC20(reserveToken).totalSupply();
+    uint256 collateralLevel = (tvl * PRECISION) / (debtAssetSupply * BOND_TARGET_PRICE);
+    uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
+
+    if (collateralLevel <= COLLATERAL_THRESHOLD) {
+      creationRate = (tvl * multiplier) / assetSupply;
+    } else if (tokenType == TokenType.LEVERAGE) {
+      if (assetSupply == 0) {
+        revert ZeroLeverageSupply();
+      }
+
+      uint256 adjustedValue = tvl - (BOND_TARGET_PRICE * debtAssetSupply);
+      creationRate = (adjustedValue * PRECISION) / assetSupply;
+    }
+    
+    return ((depositAmount * ethPrice * PRECISION) / (creationRate));
+  }
+
+  function setFee(uint256 _fee) external whenNotPaused() onlyRole(dlsp.GOV_ROLE()) {
+    fee = _fee;
   }
 
   /**
