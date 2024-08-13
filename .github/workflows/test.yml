@@ -23,9 +23,10 @@ jobs:
           version: nightly
 
       - name: Run Forge build
+      # forge build --sizes removed for now, but should be in the CI
         run: |
           forge --version
-          forge build --sizes
+          forge build
         id: build
 
       - name: Run Forge tests
