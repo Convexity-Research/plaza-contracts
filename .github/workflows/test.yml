@@ -22,8 +22,8 @@ jobs:
         with:
           version: nightly
 
-      - name: Run Forge build
       # forge build --sizes removed for now, but should be in the CI
+      - name: Run Forge build
         run: |
           forge --version
           forge build
