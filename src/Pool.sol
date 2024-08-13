@@ -12,7 +12,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 
 contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable {
   // uint public constant MINIMUM_LIQUIDITY = 10**3;
-  uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 8000=0.8
+  uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
   uint256 private constant POINT_TWO = 200000;
   uint256 private constant COLLATERAL_THRESHOLD = 1200000;
   uint256 private constant PRECISION = 1000000;
@@ -49,6 +49,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   error ZeroDebtSupply();
   error ZeroLeverageSupply();
 
+  event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
+
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -79,33 +81,45 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     lastDistributionTime = block.timestamp;
   }
 
+  /**
+    * @dev Transfers `depositAmount` of `reserveToken` from the caller, calculates the amount to mint
+    * If the amount is valid, mints the appropriate token (dToken or lToken) to the caller.
+    * 
+    * @param tokenType The type of token to mint (DEBT or LEVERAGE).
+    * @param depositAmount The amount of `reserveToken` to deposit.
+    * @param minAmount The minimum amount of tokens to mint to avoid slippage.
+    * @return The amount of tokens minted.
+    */
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+    // Get amount to mint
     uint256 amount = getCreateAmount(tokenType, depositAmount, ETH_PRICE);
+
+    // @todo: replace with safeTransfer  
+    require(ERC20(reserveToken).transferFrom(msg.sender, address(this), depositAmount), "failed to deposit");
     
+    // Check slippage
     if (amount < minAmount) {
       revert MinAmount();
     }
 
+    // Mint amount should be higher than zero
     if (amount == 0) {
       revert ZeroAmount();
     }
 
+    // Mint tokens
     if (tokenType == TokenType.DEBT) {
-      // @todo: user its not msg.sender
       dToken.mint(msg.sender, amount);
     } else {
       lToken.mint(msg.sender, amount);
     }
 
+    emit TokensCreated(msg.sender, tokenType, depositAmount, amount);
     return amount;
   }
 
-  function redeem() external whenNotPaused() {
-
-  }
-
-  function swap() external whenNotPaused() {
-
+  function simulateCreate(TokenType tokenType, uint256 depositAmount) external view returns(uint256) {
+    return getCreateAmount(tokenType, depositAmount, ETH_PRICE);
   }
 
   function getCreateAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
@@ -122,7 +136,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       assetSupply = lToken.totalSupply();
     }
 
-    uint256 tvl = ethPrice * ERC20(reserveToken).totalSupply();
+    uint256 tvl = ethPrice * ERC20(reserveToken).balanceOf(address(this));
     uint256 collateralLevel = (tvl * PRECISION) / (debtAssetSupply * BOND_TARGET_PRICE);
     uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
 
@@ -138,6 +152,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     }
     
     return ((depositAmount * ethPrice * PRECISION) / (creationRate));
+  }
+
+  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+
+  }
+
+  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+
   }
 
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(dlsp.GOV_ROLE()) {
