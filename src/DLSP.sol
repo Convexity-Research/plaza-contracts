@@ -16,6 +16,7 @@ contract DLSP is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UU
 
   // Define a constants for the access roles using keccak256 to generate a unique hash
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
   struct PoolParams {
     uint256 fee;
@@ -29,7 +30,11 @@ contract DLSP is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UU
   address public governance;
   address public distributor;
 
-  event PoolCreated(address pool);
+  error ZeroDebtAmount();
+  error ZeroReserveAmount();
+  error ZeroLeverageAmount();
+
+  event PoolCreated(address pool, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -48,9 +53,21 @@ contract DLSP is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UU
     _grantRole(GOV_ROLE, _governance);
   }
 
-  // @todo: make it GOV_ROLE
   // @todo: make it payable (to accept native ETH)
-  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount) external whenNotPaused() returns (address) {
+  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
+    // @todo: with this is safer but some cases are not testable (guess that's still good)
+    // if (reserveAmount == 0) {
+    //   revert ZeroReserveAmount();
+    // }
+
+    // if (debtAmount == 0) {
+    //   revert ZeroDebtAmount();
+    // }
+
+    // if (leverageAmount == 0) {
+    //   revert ZeroLeverageAmount();
+    // }
+
     ERC20 reserveToken = ERC20(params.reserveToken);
     string memory reserveSymbol = reserveToken.symbol();
 
@@ -92,12 +109,15 @@ contract DLSP is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UU
       )
     ));
 
+    dToken.grantRole(MINTER_ROLE, pool);
+    lToken.grantRole(MINTER_ROLE, pool);
+
     pools.push(pool);
-    emit PoolCreated(pool);
+    emit PoolCreated(pool, reserveAmount, debtAmount, leverageAmount);
 
     // @todo: make it safeTransferFrom
     // Send seed reserves to pool
-    reserveToken.transferFrom(msg.sender, pool, reserveAmount);
+    require(reserveToken.transferFrom(msg.sender, pool, reserveAmount), "failed to transfer funds");
 
     // Mint seed amounts
     dToken.mint(msg.sender, debtAmount);
