@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import {DLSP} from "../src/DLSP.sol";
-import {Pool} from "../src/pool.sol";
+import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
