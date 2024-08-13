@@ -10,7 +10,6 @@ import {LeverageToken} from "../src/LeverageToken.sol";
 import {Utils} from "../src/lib/Utils.sol";
 
 contract PoolTest is Test {
-  Pool private pool;
   DLSP private dlsp;
   DLSP.PoolParams private params;
 
@@ -1239,9 +1238,210 @@ contract PoolTest is Test {
       uint256 amount = _pool.getCreateAmount(calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].ethPrice);
       assertEq(amount, calcTestCases[i].expectedCreate);
 
+      // I can't set the ETH price will wait until we have oracles so I can mock
+      // amount = _pool.simulateCreate(calcTestCases[i].assetType, calcTestCases[i].inAmount);
+      // assertEq(amount, calcTestCases[i].expectedCreate);
+
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
     }
+  }
+
+  function testGetCreateAmountZeroDebtSupply() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
+
+    vm.expectRevert(Pool.ZeroDebtSupply.selector);
+    _pool.getCreateAmount(Pool.TokenType.DEBT, 10, 3000);
+  }
+
+  function testGetCreateAmountZeroLeverageSupply() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 100000);
+    rToken.approve(address(dlsp), 100000);
+
+    Pool _pool = Pool(dlsp.CreatePool(params, 100000, 10, 0));
+    
+    vm.expectRevert(Pool.ZeroLeverageSupply.selector);
+    _pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 30000000);
+  }
+
+  function testCreate() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    CalcTestCase[10] memory createCases;
+
+    createCases[0] = CalcTestCase({
+        assetType: Pool.TokenType.DEBT,
+        inAmount: 1000,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 1000000000,
+        DebtAssets: 25000000000,
+        LeverageAssets: 1000000000,
+        expectedCreate: 31250,
+        expectedRedeem: 33
+    });
+
+    createCases[1] = CalcTestCase({
+        assetType: Pool.TokenType.DEBT,
+        inAmount: 1250,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 1200456789222,
+        DebtAssets: 25123456789,
+        LeverageAssets: 1321654987,
+        expectedCreate: 37500,
+        expectedRedeem: 33
+    });
+
+    createCases[2] = CalcTestCase({
+        assetType: Pool.TokenType.LEVERAGE,
+        inAmount: 500,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 32000,
+        DebtAssets: 2100000,
+        LeverageAssets: 1200000,
+        expectedCreate: 93750,
+        expectedRedeem: 3
+    });
+
+    createCases[3] = CalcTestCase({
+        assetType: Pool.TokenType.LEVERAGE,
+        inAmount: 1600,
+        ethPrice: 0,
+        TotalUnderlyingAssets: 7000000,
+        DebtAssets: 850000,
+        LeverageAssets: 1300000,
+        expectedCreate: 298,
+        expectedRedeem: 8577
+    });
+
+    createCases[4] = CalcTestCase({
+        assetType: Pool.TokenType.LEVERAGE,
+        inAmount: 3200,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 960000000,
+        DebtAssets: 38400000000,
+        LeverageAssets: 500000000,
+        expectedCreate: 8333,
+        expectedRedeem: 1229
+    });
+
+    createCases[5] = CalcTestCase({
+        assetType: Pool.TokenType.DEBT,
+        inAmount: 7000,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 144000000,
+        DebtAssets: 1440000000,
+        LeverageAssets: 2000000,
+        expectedCreate: 210000,
+        expectedRedeem: 583
+    });
+
+    for (uint256 i = 0; i < createCases.length; i++) {
+      if (createCases[i].inAmount == 0) {
+        continue;
+      }
+
+      // Mint reserve tokens
+      rToken.mint(governance, createCases[i].TotalUnderlyingAssets + createCases[i].inAmount);
+      rToken.approve(address(dlsp), createCases[i].TotalUnderlyingAssets);
+
+      // Create pool and approve deposit amount
+      Pool _pool = Pool(dlsp.CreatePool(params, createCases[i].TotalUnderlyingAssets, createCases[i].DebtAssets, createCases[i].LeverageAssets));
+      rToken.approve(address(_pool), createCases[i].inAmount);
+
+      // Call create and assert minted tokens
+      uint256 amount = _pool.create(createCases[i].assetType, createCases[i].inAmount, 0);
+      assertEq(amount, createCases[i].expectedCreate);
+
+      // Reset reserve state
+      rToken.burn(governance, rToken.balanceOf(governance));
+      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+    }
+  }
+
+  function testCreateMinAmountExactSuccess() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(dlsp), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    rToken.approve(address(_pool), 1000);
+
+    // Call create and assert minted tokens
+    uint256 amount = _pool.create(Pool.TokenType.DEBT, 1000, 30000);
+    assertEq(amount, 30000);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  }
+
+  function testCreateMinAmountError() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(dlsp), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    rToken.approve(address(_pool), 1000);
+
+    // Call create and expect error
+    vm.expectRevert(Pool.MinAmount.selector);
+    _pool.create(Pool.TokenType.DEBT, 1000, 30001);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  }
+
+  function testSetFee() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
+
+    _pool.setFee(100);
+    assertEq(_pool.fee(), 100);
+  }
+
+  function testSetFeeErrorUnauthorized() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
+    vm.stopPrank();
+
+    vm.expectRevert();
+    _pool.setFee(100);
+  }
+
+  function testPause() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
+
+    _pool.pause();
+
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.setFee(0);
+
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.create(Pool.TokenType.DEBT, 0, 0);
+
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.redeem(Pool.TokenType.DEBT, 0, 0);
+
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.swap(Pool.TokenType.DEBT, 0, 0);
+
+    _pool.unpause();
+    _pool.setFee(100);
+    assertEq(_pool.fee(), 100);
   }
 }
