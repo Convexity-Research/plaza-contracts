@@ -70,7 +70,7 @@ contract BondTokenTest is Test {
     token.transfer(user, 1);
 
     // @todo: remove when distributor is merged
-    vm.startPrank(deployer);
+    vm.startPrank(governance);
     token.grantRole(keccak256("DISTRIBUTOR_ROLE"), minter);
     vm.startPrank(minter);
 
