@@ -32,6 +32,7 @@ contract PoolTest is Test {
   }
 
   CalcTestCase[] public calcTestCases;
+  CalcTestCase[] public calcTestCases2;
 
   /**
    * @dev Sets up the testing environment.
@@ -50,6 +51,7 @@ contract PoolTest is Test {
     
     vm.stopPrank();
     initializeTestCases();
+    initializeTestCasesFixedEth();
   }
 
   function initializeTestCases() public {
@@ -62,7 +64,7 @@ contract PoolTest is Test {
         DebtAssets: 25000000000,
         LeverageAssets: 1000000000,
         expectedCreate: 31250,
-        expectedRedeem: 33
+        expectedRedeem: 32
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -117,7 +119,7 @@ contract PoolTest is Test {
         DebtAssets: 25000000000,
         LeverageAssets: 1000000000,
         expectedCreate: 33750,
-        expectedRedeem: 17
+        expectedRedeem: 16
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -139,7 +141,7 @@ contract PoolTest is Test {
         DebtAssets: 25000000000,
         LeverageAssets: 1000000000,
         expectedCreate: 25000,
-        expectedRedeem: 26
+        expectedRedeem: 25
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -150,7 +152,7 @@ contract PoolTest is Test {
         DebtAssets: 25000000000,
         LeverageAssets: 1000000000,
         expectedCreate: 72600,
-        expectedRedeem: 67
+        expectedRedeem: 66
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -172,7 +174,7 @@ contract PoolTest is Test {
         DebtAssets: 25000000000,
         LeverageAssets: 1000000000,
         expectedCreate: 90625,
-        expectedRedeem: 93
+        expectedRedeem: 92
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -205,7 +207,7 @@ contract PoolTest is Test {
         DebtAssets: 25000000000,
         LeverageAssets: 1000000000,
         expectedCreate: 19200,
-        expectedRedeem: 19
+        expectedRedeem: 18
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -327,7 +329,7 @@ contract PoolTest is Test {
         DebtAssets: 25123456789,
         LeverageAssets: 1321654987,
         expectedCreate: 33750,
-        expectedRedeem: 17
+        expectedRedeem: 16
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -349,7 +351,7 @@ contract PoolTest is Test {
         DebtAssets: 25123456789,
         LeverageAssets: 1321654987,
         expectedCreate: 20800,
-        expectedRedeem: 31
+        expectedRedeem: 30
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -360,7 +362,7 @@ contract PoolTest is Test {
         DebtAssets: 25123456789,
         LeverageAssets: 1321654987,
         expectedCreate: 72600,
-        expectedRedeem: 67
+        expectedRedeem: 66
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -415,7 +417,7 @@ contract PoolTest is Test {
         DebtAssets: 25123456789,
         LeverageAssets: 1321654987,
         expectedCreate: 19200,
-        expectedRedeem: 19
+        expectedRedeem: 18
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -459,7 +461,7 @@ contract PoolTest is Test {
         DebtAssets: 25123456789,
         LeverageAssets: 1321654987,
         expectedCreate: 60000,
-        expectedRedeem: 417
+        expectedRedeem: 416
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -504,7 +506,7 @@ contract PoolTest is Test {
         DebtAssets: 3200000,
         LeverageAssets: 1700000,
         expectedCreate: 255000,
-        expectedRedeem: 9
+        expectedRedeem: 8
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -515,7 +517,7 @@ contract PoolTest is Test {
         DebtAssets: 2100000,
         LeverageAssets: 1200000,
         expectedCreate: 93750,
-        expectedRedeem: 3
+        expectedRedeem: 2
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -537,7 +539,7 @@ contract PoolTest is Test {
         DebtAssets: 2700000,
         LeverageAssets: 1800000,
         expectedCreate: 160714,
-        expectedRedeem: 4
+        expectedRedeem: 3
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -570,7 +572,7 @@ contract PoolTest is Test {
         DebtAssets: 2400000,
         LeverageAssets: 1250000,
         expectedCreate: 259433, // @todo: solidity 259433 - go 259434
-        expectedRedeem: 19
+        expectedRedeem: 18
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -603,7 +605,7 @@ contract PoolTest is Test {
         DebtAssets: 3300000,
         LeverageAssets: 1400000,
         expectedCreate: 300000,
-        expectedRedeem: 11
+        expectedRedeem: 10
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -625,7 +627,7 @@ contract PoolTest is Test {
         DebtAssets: 2200000,
         LeverageAssets: 1000000,
         expectedCreate: 100000,
-        expectedRedeem: 4
+        expectedRedeem: 3
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -647,7 +649,7 @@ contract PoolTest is Test {
         DebtAssets: 2700000,
         LeverageAssets: 1200000,
         expectedCreate: 397058, // @todo: solidity 397058 - go 397059
-        expectedRedeem: 51
+        expectedRedeem: 50
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -669,7 +671,7 @@ contract PoolTest is Test {
         DebtAssets: 2600000,
         LeverageAssets: 1100000,
         expectedCreate: 474137, // @todo: solidity 474137 - go 474138
-        expectedRedeem: 53
+        expectedRedeem: 52
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -680,7 +682,7 @@ contract PoolTest is Test {
         DebtAssets: 2300000,
         LeverageAssets: 1400000,
         expectedCreate: 84848,
-        expectedRedeem: 2
+        expectedRedeem: 1
     }));
 
     // Leverage - Above Threshold
@@ -703,7 +705,7 @@ contract PoolTest is Test {
         DebtAssets: 900000,
         LeverageAssets: 1600000,
         expectedCreate: 427, // @todo: solidity 427 - go 428
-        expectedRedeem: 9347
+        expectedRedeem: 9346
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -714,7 +716,7 @@ contract PoolTest is Test {
         DebtAssets: 950000,
         LeverageAssets: 1700000,
         expectedCreate: 640, // @todo: solidity 640 - go 641
-        expectedRedeem: 14051
+        expectedRedeem: 14049
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -758,7 +760,7 @@ contract PoolTest is Test {
         DebtAssets: 1350000,
         LeverageAssets: 1550000,
         expectedCreate: 266,
-        expectedRedeem: 12165
+        expectedRedeem: 12164
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -769,7 +771,7 @@ contract PoolTest is Test {
         DebtAssets: 850000,
         LeverageAssets: 1300000,
         expectedCreate: 298,
-        expectedRedeem: 8577
+        expectedRedeem: 8576
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -835,7 +837,7 @@ contract PoolTest is Test {
         DebtAssets: 8000000000,
         LeverageAssets: 3000000000,
         expectedCreate: 1285,
-        expectedRedeem: 56213
+        expectedRedeem: 56212
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -857,7 +859,7 @@ contract PoolTest is Test {
         DebtAssets: 25000000,
         LeverageAssets: 5000000,
         expectedCreate: 202,
-        expectedRedeem: 79091
+        expectedRedeem: 79090
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -868,7 +870,7 @@ contract PoolTest is Test {
         DebtAssets: 400000000000,
         LeverageAssets: 200000000000,
         expectedCreate: 496,
-        expectedRedeem: 27586
+        expectedRedeem: 27585
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -879,7 +881,7 @@ contract PoolTest is Test {
         DebtAssets: 1000000,
         LeverageAssets: 1500000,
         expectedCreate: 912,
-        expectedRedeem: 2467
+        expectedRedeem: 2466
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -890,7 +892,7 @@ contract PoolTest is Test {
         DebtAssets: 4000000000000,
         LeverageAssets: 2000000000000,
         expectedCreate: 581, // @todo: solidity 581 - go 582
-        expectedRedeem: 14452
+        expectedRedeem: 14451
     }));
 
     // Random Values but Leverage Level = 1.2
@@ -913,7 +915,7 @@ contract PoolTest is Test {
         DebtAssets: 216000000,
         LeverageAssets: 1800000,
         expectedCreate: 37500,
-        expectedRedeem: 28
+        expectedRedeem: 26
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -924,7 +926,7 @@ contract PoolTest is Test {
         DebtAssets: 38400000000,
         LeverageAssets: 500000000,
         expectedCreate: 8333,
-        expectedRedeem: 1229
+        expectedRedeem: 1228
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -935,7 +937,7 @@ contract PoolTest is Test {
         DebtAssets: 1440000000,
         LeverageAssets: 2000000,
         expectedCreate: 87500,
-        expectedRedeem: 583
+        expectedRedeem: 560
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -957,7 +959,7 @@ contract PoolTest is Test {
         DebtAssets: 18000000000,
         LeverageAssets: 500000000,
         expectedCreate: 150000,
-        expectedRedeem: 40
+        expectedRedeem: 38
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -979,7 +981,7 @@ contract PoolTest is Test {
         DebtAssets: 675000000,
         LeverageAssets: 200000000,
         expectedCreate: 57812,
-        expectedRedeem: 247
+        expectedRedeem: 246
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1001,7 +1003,7 @@ contract PoolTest is Test {
         DebtAssets: 22500000000,
         LeverageAssets: 4000000,
         expectedCreate: 90625,
-        expectedRedeem: 97
+        expectedRedeem: 92
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1023,7 +1025,7 @@ contract PoolTest is Test {
         DebtAssets: 2250000000000,
         LeverageAssets: 1500000000,
         expectedCreate: 703125,
-        expectedRedeem: 30
+        expectedRedeem: 28
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1045,7 +1047,7 @@ contract PoolTest is Test {
         DebtAssets: 405000000000,
         LeverageAssets: 250000000,
         expectedCreate: 281250,
-        expectedRedeem: 33
+        expectedRedeem: 32
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1067,7 +1069,7 @@ contract PoolTest is Test {
         DebtAssets: 57600000000,
         LeverageAssets: 600000000,
         expectedCreate: 350000,
-        expectedRedeem: 146
+        expectedRedeem: 140
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1111,7 +1113,7 @@ contract PoolTest is Test {
         DebtAssets: 43200000000,
         LeverageAssets: 300000000,
         expectedCreate: 352500,
-        expectedRedeem: 63
+        expectedRedeem: 62
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1133,7 +1135,7 @@ contract PoolTest is Test {
         DebtAssets: 2250000000000,
         LeverageAssets: 1500000000,
         expectedCreate: 859375,
-        expectedRedeem: 37
+        expectedRedeem: 35
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1144,7 +1146,7 @@ contract PoolTest is Test {
         DebtAssets: 25920000000,
         LeverageAssets: 100000000,
         expectedCreate: 3125,
-        expectedRedeem: 2333
+        expectedRedeem: 2332
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1155,7 +1157,7 @@ contract PoolTest is Test {
         DebtAssets: 405000000000,
         LeverageAssets: 200000000,
         expectedCreate: 393750,
-        expectedRedeem: 47
+        expectedRedeem: 44
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1177,7 +1179,7 @@ contract PoolTest is Test {
         DebtAssets: 1440000000000,
         LeverageAssets: 500000000,
         expectedCreate: 850000,
-        expectedRedeem: 57
+        expectedRedeem: 54
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1199,7 +1201,7 @@ contract PoolTest is Test {
         DebtAssets: 2250000000000,
         LeverageAssets: 1000000000,
         expectedCreate: 1218750,
-        expectedRedeem: 52
+        expectedRedeem: 49
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1210,7 +1212,7 @@ contract PoolTest is Test {
         DebtAssets: 3240000000,
         LeverageAssets: 100000000,
         expectedCreate: 23611,
-        expectedRedeem: 1102
+        expectedRedeem: 1101
     }));
 
     calcTestCases.push(CalcTestCase({
@@ -1221,7 +1223,76 @@ contract PoolTest is Test {
         DebtAssets: 2880000000,
         LeverageAssets: 500000000,
         expectedCreate: 38750,
-        expectedRedeem: 258
+        expectedRedeem: 248
+    }));
+  }
+
+  // eth comes from Pool constant (3000)
+  function initializeTestCasesFixedEth() public {
+    calcTestCases2.push(CalcTestCase({
+        assetType: Pool.TokenType.DEBT,
+        inAmount: 1000,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 1000000000,
+        DebtAssets: 25000000000,
+        LeverageAssets: 1000000000,
+        expectedCreate: 31250,
+        expectedRedeem: 32
+    }));
+
+    calcTestCases2.push(CalcTestCase({
+        assetType: Pool.TokenType.DEBT,
+        inAmount: 1250,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 1200456789222,
+        DebtAssets: 25123456789,
+        LeverageAssets: 1321654987,
+        expectedCreate: 37500,
+        expectedRedeem: 41
+    }));
+
+    calcTestCases2.push(CalcTestCase({
+        assetType: Pool.TokenType.LEVERAGE,
+        inAmount: 500,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 32000,
+        DebtAssets: 2100000,
+        LeverageAssets: 1200000,
+        expectedCreate: 93750,
+        expectedRedeem: 2
+    }));
+
+    calcTestCases2.push(CalcTestCase({
+        assetType: Pool.TokenType.LEVERAGE,
+        inAmount: 1600,
+        ethPrice: 0,
+        TotalUnderlyingAssets: 7000000,
+        DebtAssets: 850000,
+        LeverageAssets: 1300000,
+        expectedCreate: 298,
+        expectedRedeem: 8580
+    }));
+
+    calcTestCases2.push(CalcTestCase({
+        assetType: Pool.TokenType.LEVERAGE,
+        inAmount: 3200,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 960000000,
+        DebtAssets: 38400000000,
+        LeverageAssets: 500000000,
+        expectedCreate: 8333,
+        expectedRedeem: 1228
+    }));
+
+    calcTestCases2.push(CalcTestCase({
+        assetType: Pool.TokenType.DEBT,
+        inAmount: 7000,
+        ethPrice: 0, // not used
+        TotalUnderlyingAssets: 144000000,
+        DebtAssets: 1440000000,
+        LeverageAssets: 2000000,
+        expectedCreate: 210000,
+        expectedRedeem: 233
     }));
   }
 
@@ -1272,90 +1343,22 @@ contract PoolTest is Test {
     vm.startPrank(governance);
     Token rToken = Token(params.reserveToken);
 
-    CalcTestCase[10] memory createCases;
-
-    createCases[0] = CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
-        inAmount: 1000,
-        ethPrice: 0, // not used
-        TotalUnderlyingAssets: 1000000000,
-        DebtAssets: 25000000000,
-        LeverageAssets: 1000000000,
-        expectedCreate: 31250,
-        expectedRedeem: 33
-    });
-
-    createCases[1] = CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
-        inAmount: 1250,
-        ethPrice: 0, // not used
-        TotalUnderlyingAssets: 1200456789222,
-        DebtAssets: 25123456789,
-        LeverageAssets: 1321654987,
-        expectedCreate: 37500,
-        expectedRedeem: 33
-    });
-
-    createCases[2] = CalcTestCase({
-        assetType: Pool.TokenType.LEVERAGE,
-        inAmount: 500,
-        ethPrice: 0, // not used
-        TotalUnderlyingAssets: 32000,
-        DebtAssets: 2100000,
-        LeverageAssets: 1200000,
-        expectedCreate: 93750,
-        expectedRedeem: 3
-    });
-
-    createCases[3] = CalcTestCase({
-        assetType: Pool.TokenType.LEVERAGE,
-        inAmount: 1600,
-        ethPrice: 0,
-        TotalUnderlyingAssets: 7000000,
-        DebtAssets: 850000,
-        LeverageAssets: 1300000,
-        expectedCreate: 298,
-        expectedRedeem: 8577
-    });
-
-    createCases[4] = CalcTestCase({
-        assetType: Pool.TokenType.LEVERAGE,
-        inAmount: 3200,
-        ethPrice: 0, // not used
-        TotalUnderlyingAssets: 960000000,
-        DebtAssets: 38400000000,
-        LeverageAssets: 500000000,
-        expectedCreate: 8333,
-        expectedRedeem: 1229
-    });
-
-    createCases[5] = CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
-        inAmount: 7000,
-        ethPrice: 0, // not used
-        TotalUnderlyingAssets: 144000000,
-        DebtAssets: 1440000000,
-        LeverageAssets: 2000000,
-        expectedCreate: 210000,
-        expectedRedeem: 583
-    });
-
-    for (uint256 i = 0; i < createCases.length; i++) {
-      if (createCases[i].inAmount == 0) {
+    for (uint256 i = 0; i < calcTestCases2.length; i++) {
+      if (calcTestCases2[i].inAmount == 0) {
         continue;
       }
 
       // Mint reserve tokens
-      rToken.mint(governance, createCases[i].TotalUnderlyingAssets + createCases[i].inAmount);
-      rToken.approve(address(dlsp), createCases[i].TotalUnderlyingAssets);
+      rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets + calcTestCases2[i].inAmount);
+      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(dlsp.CreatePool(params, createCases[i].TotalUnderlyingAssets, createCases[i].DebtAssets, createCases[i].LeverageAssets));
-      rToken.approve(address(_pool), createCases[i].inAmount);
+      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
+      rToken.approve(address(_pool), calcTestCases2[i].inAmount);
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.create(createCases[i].assetType, createCases[i].inAmount, 0);
-      assertEq(amount, createCases[i].expectedCreate);
+      uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
+      assertEq(amount, calcTestCases2[i].expectedCreate);
 
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
@@ -1399,6 +1402,97 @@ contract PoolTest is Test {
     // Call create and expect error
     vm.expectRevert(Pool.MinAmount.selector);
     _pool.create(Pool.TokenType.DEBT, 1000, 30001);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  }
+
+  function testGetRedeemAmount() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
+      rToken.approve(address(dlsp), calcTestCases[i].TotalUnderlyingAssets);
+
+      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+
+      uint256 amount = _pool.getRedeemAmount(calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].ethPrice);
+      assertEq(amount, calcTestCases[i].expectedRedeem);
+
+      // I can't set the ETH price will wait until we have oracles so I can mock
+      // amount = _pool.simulateRedeem(calcTestCases[i].assetType, calcTestCases[i].inAmount);
+      // assertEq(amount, calcTestCases[i].expectedRedeem);
+
+      // Reset reserve state
+      rToken.burn(governance, rToken.balanceOf(governance));
+      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+    }
+  }
+
+  function testRedeem() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    for (uint256 i = 0; i < calcTestCases2.length; i++) {
+      if (calcTestCases2[i].inAmount == 0) {
+        continue;
+      }
+
+      // Mint reserve tokens
+      rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets);
+      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
+
+      // Create pool and approve deposit amount
+      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
+
+      // Call create and assert minted tokens
+      uint256 amount = _pool.redeem(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
+      assertEq(amount, calcTestCases2[i].expectedRedeem);
+
+      // Reset reserve state
+      rToken.burn(governance, rToken.balanceOf(governance));
+      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+    }
+  }
+
+  function testRedeemMinAmountExactSuccess() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(dlsp), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    rToken.approve(address(_pool), 1000);
+
+    // Call create and assert minted tokens
+    uint256 amount = _pool.redeem(Pool.TokenType.DEBT, 1000, 33);
+    assertEq(amount, 33);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  }
+
+  function testRedeemMinAmountError() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(dlsp), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    rToken.approve(address(_pool), 1000);
+
+    // Call create and expect error
+    vm.expectRevert(Pool.MinAmount.selector);
+    _pool.redeem(Pool.TokenType.DEBT, 1000, 34);
 
     // Reset reserve state
     rToken.burn(governance, rToken.balanceOf(governance));
