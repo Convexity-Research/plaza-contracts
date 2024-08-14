@@ -105,7 +105,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    */
   function _authorizeUpgrade(address newImplementation)
     internal
-    onlyOwner
+    onlyRole(GOV_ROLE)
     override
   {}
 }
