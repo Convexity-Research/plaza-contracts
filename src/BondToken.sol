@@ -56,6 +56,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     __UUPSUpgradeable_init();
 
     // Grant the access roles
+    _grantRole(DEFAULT_ADMIN_ROLE, governance);
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
     _grantRole(DISTRIBUTOR_ROLE, distributor);
