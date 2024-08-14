@@ -245,7 +245,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
     uint256 mintAmount = simulateSwap(tokenType, depositAmount);
 
-    if (minAmount <= mintAmount) {
+    if (mintAmount < minAmount) {
       revert MinAmount();
     }
 
