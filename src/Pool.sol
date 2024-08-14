@@ -93,7 +93,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     */
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
     // Get amount to mint
-    uint256 amount = getCreateAmount(tokenType, depositAmount, ETH_PRICE);
+    uint256 amount = simulateCreate(tokenType, depositAmount);
 
     // @todo: replace with safeTransfer  
     require(ERC20(reserveToken).transferFrom(msg.sender, address(this), depositAmount), "failed to deposit");
@@ -119,13 +119,24 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return amount;
   }
 
-  function simulateCreate(TokenType tokenType, uint256 depositAmount) external view returns(uint256) {
-    return getCreateAmount(tokenType, depositAmount, ETH_PRICE);
+  function simulateCreate(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
+    return getCreateAmount(
+      tokenType,
+      depositAmount,
+      dToken.totalSupply(),
+      lToken.totalSupply(),
+      ERC20(reserveToken).balanceOf(address(this)),
+      ETH_PRICE
+    );
   }
 
-  function getCreateAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
-    uint256 debtSupply = dToken.totalSupply();
-
+  function getCreateAmount(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 debtSupply, 
+    uint256 levSupply, 
+    uint256 poolReserves, 
+    uint256 ethPrice) public pure returns(uint256) {
     if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
@@ -134,10 +145,10 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 multiplier = POINT_EIGHT;
     if (tokenType == TokenType.LEVERAGE) {
       multiplier = POINT_TWO;
-      assetSupply = lToken.totalSupply();
+      assetSupply = levSupply;
     }
 
-    uint256 tvl = ethPrice * ERC20(reserveToken).balanceOf(address(this));
+    uint256 tvl = ethPrice * poolReserves;
     uint256 collateralLevel = (tvl * PRECISION) / (debtSupply * BOND_TARGET_PRICE);
     uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
 
@@ -157,7 +168,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
     // Get amount to mint
-    uint256 reserveAmount = getRedeemAmount(tokenType, depositAmount, ETH_PRICE);
+    uint256 reserveAmount = simulateRedeem(tokenType, depositAmount);
 
     // Check slippage
     if (reserveAmount < minAmount) {
@@ -180,18 +191,29 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return reserveAmount;
   }
 
-  function simulateRedeem(TokenType tokenType, uint256 depositAmount) external view whenNotPaused() returns(uint256) {
-    return getRedeemAmount(tokenType, depositAmount, ETH_PRICE);
+  function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+    return getRedeemAmount(
+      tokenType,
+      depositAmount,
+      dToken.totalSupply(),
+      lToken.totalSupply(),
+      ERC20(reserveToken).balanceOf(address(this)),
+      ETH_PRICE
+    );
   }
 
-  function getRedeemAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
-    uint256 debtSupply = dToken.totalSupply();
-
+  function getRedeemAmount(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 debtSupply,
+    uint256 levSupply,
+    uint256 poolReserves,
+    uint256 ethPrice) public pure returns(uint256) {
     if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
 
-    uint256 tvl = ethPrice * ERC20(reserveToken).balanceOf(address(this));
+    uint256 tvl = ethPrice * poolReserves;
     uint256 assetSupply = debtSupply;
     uint256 multiplier = POINT_EIGHT;
 
@@ -200,7 +222,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
     if (tokenType == TokenType.LEVERAGE) {
       multiplier = POINT_TWO;
-      assetSupply = lToken.totalSupply();
+      assetSupply = levSupply;
       collateralLevel = (tvl * PRECISION) / (debtSupply * BOND_TARGET_PRICE);
 
       if (assetSupply == 0) {
@@ -222,6 +244,39 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
 
+  }
+
+  function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+    uint256 debtSupply = dToken.totalSupply();
+    uint256 levSupply = lToken.totalSupply();
+    uint256 poolReserves = ERC20(reserveToken).totalSupply();
+    TokenType createType = TokenType.DEBT;
+
+    uint256 redeemAmount = getRedeemAmount(
+      tokenType,
+      depositAmount,
+      debtSupply,
+      levSupply,
+      poolReserves,
+      ETH_PRICE
+    );
+    
+    poolReserves = poolReserves - redeemAmount;
+    if (tokenType == TokenType.DEBT) {
+      createType = TokenType.LEVERAGE;
+      debtSupply = debtSupply - depositAmount; 
+    } else {
+      levSupply = levSupply - depositAmount; 
+    }
+
+    return getCreateAmount(
+      createType,
+      redeemAmount,
+      debtSupply,
+      levSupply,
+      poolReserves,
+      ETH_PRICE
+    );
   }
 
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(dlsp.GOV_ROLE()) {

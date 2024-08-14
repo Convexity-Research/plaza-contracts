@@ -1306,7 +1306,14 @@ contract PoolTest is Test {
 
       Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
 
-      uint256 amount = _pool.getCreateAmount(calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].ethPrice);
+      uint256 amount = _pool.getCreateAmount(
+        calcTestCases[i].assetType, 
+        calcTestCases[i].inAmount,
+        calcTestCases[i].DebtAssets,
+        calcTestCases[i].LeverageAssets,
+        calcTestCases[i].TotalUnderlyingAssets,
+        calcTestCases[i].ethPrice
+      );
       assertEq(amount, calcTestCases[i].expectedCreate);
 
       // I can't set the ETH price will wait until we have oracles so I can mock
@@ -1320,23 +1327,15 @@ contract PoolTest is Test {
   }
 
   function testGetCreateAmountZeroDebtSupply() public {
-    vm.startPrank(governance);
-    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
-
+    Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroDebtSupply.selector);
-    _pool.getCreateAmount(Pool.TokenType.DEBT, 10, 3000);
+    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000);
   }
 
   function testGetCreateAmountZeroLeverageSupply() public {
-    vm.startPrank(governance);
-    Token rToken = Token(params.reserveToken);
-    rToken.mint(governance, 100000);
-    rToken.approve(address(dlsp), 100000);
-
-    Pool _pool = Pool(dlsp.CreatePool(params, 100000, 10, 0));
-    
+    Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroLeverageSupply.selector);
-    _pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 30000000);
+    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000);
   }
 
   function testCreate() public {
@@ -1418,7 +1417,14 @@ contract PoolTest is Test {
 
       Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
 
-      uint256 amount = _pool.getRedeemAmount(calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].ethPrice);
+      uint256 amount = _pool.getRedeemAmount(
+        calcTestCases[i].assetType, 
+        calcTestCases[i].inAmount, 
+        calcTestCases[i].DebtAssets, 
+        calcTestCases[i].LeverageAssets, 
+        calcTestCases[i].TotalUnderlyingAssets, 
+        calcTestCases[i].ethPrice
+      );
       assertEq(amount, calcTestCases[i].expectedRedeem);
 
       // I can't set the ETH price will wait until we have oracles so I can mock
