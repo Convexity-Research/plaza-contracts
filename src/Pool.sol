@@ -123,13 +123,13 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function getCreateAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
-    uint256 debtAssetSupply = dToken.totalSupply();
+    uint256 debtSupply = dToken.totalSupply();
 
-    if (debtAssetSupply == 0) {
+    if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
 
-    uint256 assetSupply = debtAssetSupply;
+    uint256 assetSupply = debtSupply;
     uint256 multiplier = POINT_EIGHT;
     if (tokenType == TokenType.LEVERAGE) {
       multiplier = POINT_TWO;
@@ -137,7 +137,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     }
 
     uint256 tvl = ethPrice * ERC20(reserveToken).balanceOf(address(this));
-    uint256 collateralLevel = (tvl * PRECISION) / (debtAssetSupply * BOND_TARGET_PRICE);
+    uint256 collateralLevel = (tvl * PRECISION) / (debtSupply * BOND_TARGET_PRICE);
     uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
 
     if (collateralLevel <= COLLATERAL_THRESHOLD) {
@@ -147,11 +147,11 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
         revert ZeroLeverageSupply();
       }
 
-      uint256 adjustedValue = tvl - (BOND_TARGET_PRICE * debtAssetSupply);
+      uint256 adjustedValue = tvl - (BOND_TARGET_PRICE * debtSupply);
       creationRate = (adjustedValue * PRECISION) / assetSupply;
     }
     
-    return ((depositAmount * ethPrice * PRECISION) / (creationRate));
+    return (depositAmount * ethPrice * PRECISION) / creationRate;
   }
 
   function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
@@ -162,8 +162,40 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return getRedeemAmount(tokenType, depositAmount, ETH_PRICE);
   }
 
-  function getRedeemAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
+  function getRedeemAmount(TokenType tokenType, uint256 redeemAmount, uint256 ethPrice) public view returns(uint256) {
+    uint256 debtSupply = dToken.totalSupply();
+
+    if (debtSupply == 0) {
+      revert ZeroDebtSupply();
+    }
+
+    uint256 tvl = ethPrice * ERC20(reserveToken).balanceOf(address(this));
+    uint256 assetSupply = debtSupply;
+    uint256 multiplier = POINT_EIGHT;
+
+    // @todo: is '100' the BOND_TARGET_PRICE?
+    uint256 collateralLevel = (tvl - (redeemAmount * 100)) / ((debtSupply - redeemAmount) * BOND_TARGET_PRICE);
+
+    if (tokenType == TokenType.LEVERAGE) {
+      multiplier = POINT_TWO;
+      assetSupply = lToken.totalSupply();
+      collateralLevel = tvl / (debtSupply * BOND_TARGET_PRICE);
+
+      if (assetSupply == 0) {
+        revert ZeroLeverageSupply();
+      }
+    }
     
+    uint256 redeemRate = BOND_TARGET_PRICE * PRECISION;
+    
+    if (collateralLevel <= COLLATERAL_THRESHOLD) {
+      redeemRate = (tvl * multiplier) / assetSupply;
+    } else if (tokenType == TokenType.LEVERAGE) {
+      // @todo: is this BOND_TARGET_PRICE?
+      redeemRate = (tvl - (debtSupply * 100)) / assetSupply;
+    }
+    
+    return (redeemAmount * redeemRate * PRECISION) / ethPrice;
   }
 
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
