@@ -50,6 +50,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   error ZeroLeverageSupply();
 
   event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
+  event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -155,14 +156,35 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+    // Get amount to mint
+    uint256 reserveAmount = getRedeemAmount(tokenType, depositAmount, ETH_PRICE);
 
+    // Check slippage
+    if (reserveAmount < minAmount) {
+      revert MinAmount();
+    }
+
+    // Reserve amount should be higher than zero
+    if (reserveAmount == 0) {
+      revert ZeroAmount();
+    }
+
+    // Burn tokens
+    if (tokenType == TokenType.DEBT) {
+      dToken.burn(msg.sender, depositAmount);
+    } else {
+      lToken.burn(msg.sender, depositAmount);
+    }
+
+    emit TokensRedeemed(msg.sender, tokenType, depositAmount, reserveAmount);
+    return reserveAmount;
   }
 
   function simulateRedeem(TokenType tokenType, uint256 depositAmount) external view whenNotPaused() returns(uint256) {
     return getRedeemAmount(tokenType, depositAmount, ETH_PRICE);
   }
 
-  function getRedeemAmount(TokenType tokenType, uint256 redeemAmount, uint256 ethPrice) public view returns(uint256) {
+  function getRedeemAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
     uint256 debtSupply = dToken.totalSupply();
 
     if (debtSupply == 0) {
@@ -174,12 +196,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 multiplier = POINT_EIGHT;
 
     // @todo: is '100' the BOND_TARGET_PRICE?
-    uint256 collateralLevel = (tvl - (redeemAmount * 100)) / ((debtSupply - redeemAmount) * BOND_TARGET_PRICE);
+    uint256 collateralLevel = ((tvl - (depositAmount * 100)) * PRECISION) / ((debtSupply - depositAmount) * BOND_TARGET_PRICE);
 
     if (tokenType == TokenType.LEVERAGE) {
       multiplier = POINT_TWO;
       assetSupply = lToken.totalSupply();
-      collateralLevel = tvl / (debtSupply * BOND_TARGET_PRICE);
+      collateralLevel = (tvl * PRECISION) / (debtSupply * BOND_TARGET_PRICE);
 
       if (assetSupply == 0) {
         revert ZeroLeverageSupply();
@@ -187,15 +209,15 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     }
     
     uint256 redeemRate = BOND_TARGET_PRICE * PRECISION;
-    
+
     if (collateralLevel <= COLLATERAL_THRESHOLD) {
-      redeemRate = (tvl * multiplier) / assetSupply;
+      redeemRate = ((tvl * multiplier) / assetSupply);
     } else if (tokenType == TokenType.LEVERAGE) {
       // @todo: is this BOND_TARGET_PRICE?
-      redeemRate = (tvl - (debtSupply * 100)) / assetSupply;
+      redeemRate = ((tvl - (debtSupply * 100)) / assetSupply) * PRECISION;
     }
     
-    return (redeemAmount * redeemRate * PRECISION) / ethPrice;
+    return ((depositAmount * redeemRate) / ethPrice) / PRECISION;
   }
 
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
