@@ -243,7 +243,21 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+    uint256 mintAmount = simulateSwap(tokenType, depositAmount);
 
+    if (minAmount <= mintAmount) {
+      revert MinAmount();
+    }
+
+    if (tokenType == TokenType.DEBT) {
+      dToken.burn(msg.sender, depositAmount);
+      lToken.mint(msg.sender, mintAmount);
+    } else {
+      lToken.burn(msg.sender, depositAmount);
+      dToken.mint(msg.sender, mintAmount);
+    }
+    
+    return mintAmount;
   }
 
   function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
