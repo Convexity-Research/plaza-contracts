@@ -158,6 +158,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   }
 
+  function simulateRedeem(TokenType tokenType, uint256 depositAmount) external view whenNotPaused() returns(uint256) {
+    return getRedeemAmount(tokenType, depositAmount, ETH_PRICE);
+  }
+
+  function getRedeemAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
+    
+  }
+
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
 
   }
