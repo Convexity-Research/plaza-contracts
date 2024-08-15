@@ -32,6 +32,7 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
 
     // Grant the access roles
     _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+    _grantRole(DEFAULT_ADMIN_ROLE, governance);
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
   }
