@@ -534,7 +534,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 45000,
         DebtAssets: 2800000,
         LeverageAssets: 1600000,
-        expectedCreate: 355555, // @todo: solidity 355555 - go 355556
+        expectedCreate: 355555,
         expectedRedeem: 11,
         expectedSwap: 0
     }));
@@ -570,7 +570,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 68000,
         DebtAssets: 3500000,
         LeverageAssets: 1450000,
-        expectedCreate: 319852, // @todo: solidity 319852 - go 319853
+        expectedCreate: 319852,
         expectedRedeem: 28,
         expectedSwap: 0
     }));
@@ -618,7 +618,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 53000,
         DebtAssets: 2400000,
         LeverageAssets: 1250000,
-        expectedCreate: 259433, // @todo: solidity 259433 - go 259434
+        expectedCreate: 259433,
         expectedRedeem: 18,
         expectedSwap: 0
     }));
@@ -642,7 +642,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 45000,
         DebtAssets: 2900000,
         LeverageAssets: 1600000,
-        expectedCreate: 515555, // @todo: solidity 515555 - go 515556
+        expectedCreate: 515555,
         expectedRedeem: 16,
         expectedSwap: 0
     }));
@@ -702,7 +702,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 68000,
         DebtAssets: 2700000,
         LeverageAssets: 1200000,
-        expectedCreate: 397058, // @todo: solidity 397058 - go 397059
+        expectedCreate: 397058,
         expectedRedeem: 50,
         expectedSwap: 0
     }));
@@ -726,7 +726,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 58000,
         DebtAssets: 2600000,
         LeverageAssets: 1100000,
-        expectedCreate: 474137, // @todo: solidity 474137 - go 474138
+        expectedCreate: 474137,
         expectedRedeem: 52,
         expectedSwap: 0
     }));
@@ -751,7 +751,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 6000000,
         DebtAssets: 900000,
         LeverageAssets: 1400000,
-        expectedCreate: 351, // @todo: solidity 351 - go 352
+        expectedCreate: 351,
         expectedRedeem: 6396,
         expectedSwap: 0
     }));
@@ -763,7 +763,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 7500000,
         DebtAssets: 900000,
         LeverageAssets: 1600000,
-        expectedCreate: 427, // @todo: solidity 427 - go 428
+        expectedCreate: 427,
         expectedRedeem: 9346,
         expectedSwap: 0
     }));
@@ -775,7 +775,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 8000000,
         DebtAssets: 950000,
         LeverageAssets: 1700000,
-        expectedCreate: 640, // @todo: solidity 640 - go 641
+        expectedCreate: 640,
         expectedRedeem: 14049,
         expectedSwap: 0
     }));
@@ -847,7 +847,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 8000000,
         DebtAssets: 950000,
         LeverageAssets: 1700000,
-        expectedCreate: 639, // @todo: solidity 639 - go 640
+        expectedCreate: 639,
         expectedRedeem: 14068,
         expectedSwap: 0
     }));
@@ -895,7 +895,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 3000000,
         DebtAssets: 1200000,
         LeverageAssets: 2000000,
-        expectedCreate: 4697, // @todo: solidity 4697 - go 4698
+        expectedCreate: 4697,
         expectedRedeem: 10430,
         expectedSwap: 0
     }));
@@ -967,7 +967,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 10000000000000,
         DebtAssets: 4000000000000,
         LeverageAssets: 2000000000000,
-        expectedCreate: 581, // @todo: solidity 581 - go 582
+        expectedCreate: 581,
         expectedRedeem: 14451,
         expectedSwap: 0
     }));
@@ -980,7 +980,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 2880000000,
         DebtAssets: 172800000000,
         LeverageAssets: 1400000000,
-        expectedCreate: 12152, // @todo: solidity 12152 - go 12153
+        expectedCreate: 12152,
         expectedRedeem: 2057,
         expectedSwap: 0
     }));
@@ -1100,7 +1100,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 1800000000,
         DebtAssets: 90000000000,
         LeverageAssets: 500000000,
-        expectedCreate: 1666, // @todo: solidity 1666 - go 1667
+        expectedCreate: 1666,
         expectedRedeem: 864,
         expectedSwap: 0
     }));
@@ -1124,7 +1124,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 288000000,
         DebtAssets: 5760000000,
         LeverageAssets: 500000000,
-        expectedCreate: 45138, // @todo: solidity 45138 - go 45139
+        expectedCreate: 45138,
         expectedRedeem: 599,
         expectedSwap: 0
     }));
@@ -1196,7 +1196,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 108000000,
         DebtAssets: 3240000000,
         LeverageAssets: 5000000,
-        expectedCreate: 740, // @todo: solidity 740 - go 741
+        expectedCreate: 740,
         expectedRedeem: 13824,
         expectedSwap: 0
     }));
@@ -1268,7 +1268,7 @@ contract PoolTest is Test {
         TotalUnderlyingAssets: 720000000,
         DebtAssets: 28800000000,
         LeverageAssets: 300000000,
-        expectedCreate: 6666, // @todo: solidity 6666 - go 6667
+        expectedCreate: 6666,
         expectedRedeem: 1536,
         expectedSwap: 0
     }));
