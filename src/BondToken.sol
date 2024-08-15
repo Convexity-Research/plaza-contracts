@@ -57,6 +57,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
     // Grant the access roles
     _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+    _grantRole(DEFAULT_ADMIN_ROLE, governance);
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
     _grantRole(DISTRIBUTOR_ROLE, distributor);
@@ -171,7 +172,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    */
   function _authorizeUpgrade(address newImplementation)
     internal
-    onlyOwner
+    onlyRole(GOV_ROLE)
     override
   {}
 }
