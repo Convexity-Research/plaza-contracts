@@ -33,7 +33,6 @@ contract PoolTest is Test {
   }
 
   CalcTestCase[] public calcTestCases;
-  CalcTestCase[] public calcTestCases2;
 
   /**
    * @dev Sets up the testing environment.
@@ -51,11 +50,12 @@ contract PoolTest is Test {
     params.distributionPeriod = 0;
     
     vm.stopPrank();
-    initializeTestCases();
-    initializeTestCasesFixedEth();
   }
 
   function initializeTestCases() public {
+    // Reset test cases
+    delete calcTestCases;
+
     // Debt - Below Threshold
     calcTestCases.push(CalcTestCase({
         assetType: Pool.TokenType.DEBT,
@@ -1334,9 +1334,32 @@ contract PoolTest is Test {
     }));
   }
 
+  function initializeRealisticTestCases() public {
+    // Reset test cases
+    delete calcTestCases;
+
+    // Debt - Below Threshold
+    calcTestCases.push(CalcTestCase({
+      assetType: Pool.TokenType.DEBT,
+      inAmount: 1000,
+      ethPrice: 3000,
+      TotalUnderlyingAssets: 1000000000,
+      DebtAssets: 25000000000,
+      LeverageAssets: 1000000000,
+      expectedCreate: 31250,
+      expectedRedeem: 32,
+      expectedSwap: 0
+    }));
+    // Debt - Above Threshold
+    // Leverage - Below Threshold
+    // Leverage - Above Threshold
+    // Random Values but Leverage Level = 1.2
+  }
+
   // eth comes from Pool constant (3000)
   function initializeTestCasesFixedEth() public {
-    calcTestCases2.push(CalcTestCase({
+    delete calcTestCases;
+    calcTestCases.push(CalcTestCase({
         assetType: Pool.TokenType.DEBT,
         inAmount: 1000,
         ethPrice: 0, // not used
@@ -1348,7 +1371,7 @@ contract PoolTest is Test {
         expectedSwap: 160
     }));
 
-    calcTestCases2.push(CalcTestCase({
+    calcTestCases.push(CalcTestCase({
         assetType: Pool.TokenType.DEBT,
         inAmount: 1250,
         ethPrice: 0, // not used
@@ -1360,7 +1383,7 @@ contract PoolTest is Test {
         expectedSwap: 0
     }));
 
-    calcTestCases2.push(CalcTestCase({
+    calcTestCases.push(CalcTestCase({
         assetType: Pool.TokenType.LEVERAGE,
         inAmount: 500,
         ethPrice: 0, // not used
@@ -1372,7 +1395,7 @@ contract PoolTest is Test {
         expectedSwap: 164
     }));
 
-    calcTestCases2.push(CalcTestCase({
+    calcTestCases.push(CalcTestCase({
         assetType: Pool.TokenType.LEVERAGE,
         inAmount: 1600,
         ethPrice: 0,
@@ -1384,7 +1407,7 @@ contract PoolTest is Test {
         expectedSwap: 257400
     }));
 
-    calcTestCases2.push(CalcTestCase({
+    calcTestCases.push(CalcTestCase({
         assetType: Pool.TokenType.LEVERAGE,
         inAmount: 3200,
         ethPrice: 0, // not used
@@ -1396,7 +1419,7 @@ contract PoolTest is Test {
         expectedSwap: 61400
     }));
 
-    calcTestCases2.push(CalcTestCase({
+    calcTestCases.push(CalcTestCase({
         assetType: Pool.TokenType.DEBT,
         inAmount: 7000,
         ethPrice: 0, // not used
@@ -1410,6 +1433,8 @@ contract PoolTest is Test {
   }
 
   function testGetCreateAmount() public {
+    initializeTestCases();
+    
     vm.startPrank(governance);
     Token rToken = Token(params.reserveToken);
 
@@ -1452,25 +1477,26 @@ contract PoolTest is Test {
   }
 
   function testCreate() public {
+    initializeTestCasesFixedEth();
     vm.startPrank(governance);
     Token rToken = Token(params.reserveToken);
 
-    for (uint256 i = 0; i < calcTestCases2.length; i++) {
-      if (calcTestCases2[i].inAmount == 0) {
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      if (calcTestCases[i].inAmount == 0) {
         continue;
       }
 
       // Mint reserve tokens
-      rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets + calcTestCases2[i].inAmount);
-      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets + calcTestCases[i].inAmount);
+      rToken.approve(address(dlsp), calcTestCases[i].TotalUnderlyingAssets);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
-      rToken.approve(address(_pool), calcTestCases2[i].inAmount);
+      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
-      assertEq(amount, calcTestCases2[i].expectedCreate);
+      uint256 amount = _pool.create(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
+      assertEq(amount, calcTestCases[i].expectedCreate);
 
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
@@ -1521,6 +1547,8 @@ contract PoolTest is Test {
   }
 
   function testGetRedeemAmount() public {
+    initializeTestCases();
+    
     vm.startPrank(governance);
     Token rToken = Token(params.reserveToken);
 
@@ -1551,24 +1579,26 @@ contract PoolTest is Test {
   }
 
   function testRedeem() public {
+    initializeTestCasesFixedEth();
+
     vm.startPrank(governance);
     Token rToken = Token(params.reserveToken);
 
-    for (uint256 i = 0; i < calcTestCases2.length; i++) {
-      if (calcTestCases2[i].inAmount == 0) {
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      if (calcTestCases[i].inAmount == 0) {
         continue;
       }
 
       // Mint reserve tokens
-      rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets);
-      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
+      rToken.approve(address(dlsp), calcTestCases[i].TotalUnderlyingAssets);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
+      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.redeem(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
-      assertEq(amount, calcTestCases2[i].expectedRedeem);
+      uint256 amount = _pool.redeem(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
+      assertEq(amount, calcTestCases[i].expectedRedeem);
 
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
@@ -1619,31 +1649,33 @@ contract PoolTest is Test {
   }
 
   function testSwap() public {
+    initializeTestCasesFixedEth();
+
     vm.startPrank(governance);
     Token rToken = Token(params.reserveToken);
 
-    for (uint256 i = 0; i < calcTestCases2.length; i++) {
-      if (calcTestCases2[i].inAmount == 0) {
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      if (calcTestCases[i].inAmount == 0) {
         continue;
       }
 
       // Mint reserve tokens
-      rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets);
-      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
+      rToken.approve(address(dlsp), calcTestCases[i].TotalUnderlyingAssets);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
+      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.swap(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
-      assertEq(amount, calcTestCases2[i].expectedSwap);
+      uint256 amount = _pool.swap(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
+      assertEq(amount, calcTestCases[i].expectedSwap);
 
-      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets + amount);
+      if (calcTestCases[i].assetType == Pool.TokenType.DEBT) {
+        assertEq(_pool.dToken().totalSupply(), calcTestCases[i].DebtAssets - calcTestCases[i].inAmount);
+        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets + amount);
       } else {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets - calcTestCases2[i].inAmount);
+        assertEq(_pool.dToken().totalSupply(), calcTestCases[i].DebtAssets + amount);
+        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets - calcTestCases[i].inAmount);
       }
 
       // Reset reserve state
