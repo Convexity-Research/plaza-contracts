@@ -18,7 +18,7 @@ contract BondTokenScript is Script {
     BondToken implementation = new BondToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor)));
+    new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor)));
 
     // BondToken token = BondToken(address(proxy));
     vm.stopBroadcast();

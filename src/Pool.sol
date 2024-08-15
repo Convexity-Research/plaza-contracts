@@ -1,0 +1,200 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.26;
+
+import {DLSP} from "./DLSP.sol";
+import {BondToken} from "./BondToken.sol";
+import {LeverageToken} from "./LeverageToken.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+
+contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+  // uint public constant MINIMUM_LIQUIDITY = 10**3;
+  uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
+  uint256 private constant POINT_TWO = 200000;
+  uint256 private constant COLLATERAL_THRESHOLD = 1200000;
+  uint256 private constant PRECISION = 1000000;
+  uint256 private constant BOND_TARGET_PRICE = 100;
+
+  // @todo: get price from oracle
+  uint256 private constant ETH_PRICE = 3000;
+
+  // Protocol
+  DLSP public dlsp;
+  uint256 public fee;
+
+  // Tokens
+  address public reserveToken;
+  BondToken public dToken;
+  LeverageToken public lToken;
+
+  // Coupon
+  address public couponToken;
+  uint256 public sharesPerToken;
+
+  // Distribution
+  uint256 public distributionPeriod;
+  uint256 public lastDistributionTime;
+
+  enum TokenType {
+    DEBT,
+    LEVERAGE
+  }
+
+  error MinAmount();
+  error ZeroAmount();
+  error AccessDenied();
+  error ZeroDebtSupply();
+  error ZeroLeverageSupply();
+
+  event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
+
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  /**
+   * @dev Initializes the contract with the governance address and sets up roles.
+   * This function is called once during deployment or upgrading to initialize state variables.
+   */
+  function initialize(
+    address _dlsp,
+    uint256 _fee,
+    address _reserveToken,
+    address _dToken,
+    address _lToken,
+    address _couponToken,
+    uint256 _sharesPerToken,
+    uint256 _distributionPeriod) initializer public {
+    __UUPSUpgradeable_init();
+    dlsp = DLSP(_dlsp);
+    fee = _fee;
+    reserveToken = _reserveToken;
+    dToken = BondToken(_dToken);
+    lToken = LeverageToken(_lToken);
+    couponToken = _couponToken;
+    sharesPerToken = _sharesPerToken;
+    distributionPeriod = _distributionPeriod;
+    lastDistributionTime = block.timestamp;
+  }
+
+  /**
+    * @dev Transfers `depositAmount` of `reserveToken` from the caller, calculates the amount to mint
+    * If the amount is valid, mints the appropriate token (dToken or lToken) to the caller.
+    * 
+    * @param tokenType The type of token to mint (DEBT or LEVERAGE).
+    * @param depositAmount The amount of `reserveToken` to deposit.
+    * @param minAmount The minimum amount of tokens to mint to avoid slippage.
+    * @return The amount of tokens minted.
+    */
+  function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+    // Get amount to mint
+    uint256 amount = getCreateAmount(tokenType, depositAmount, ETH_PRICE);
+
+    // @todo: replace with safeTransfer  
+    require(ERC20(reserveToken).transferFrom(msg.sender, address(this), depositAmount), "failed to deposit");
+    
+    // Check slippage
+    if (amount < minAmount) {
+      revert MinAmount();
+    }
+
+    // Mint amount should be higher than zero
+    if (amount == 0) {
+      revert ZeroAmount();
+    }
+
+    // Mint tokens
+    if (tokenType == TokenType.DEBT) {
+      dToken.mint(msg.sender, amount);
+    } else {
+      lToken.mint(msg.sender, amount);
+    }
+
+    emit TokensCreated(msg.sender, tokenType, depositAmount, amount);
+    return amount;
+  }
+
+  function simulateCreate(TokenType tokenType, uint256 depositAmount) external view returns(uint256) {
+    return getCreateAmount(tokenType, depositAmount, ETH_PRICE);
+  }
+
+  function getCreateAmount(TokenType tokenType, uint256 depositAmount, uint256 ethPrice) public view returns(uint256) {
+    uint256 debtAssetSupply = dToken.totalSupply();
+
+    if (debtAssetSupply == 0) {
+      revert ZeroDebtSupply();
+    }
+
+    uint256 assetSupply = debtAssetSupply;
+    uint256 multiplier = POINT_EIGHT;
+    if (tokenType == TokenType.LEVERAGE) {
+      multiplier = POINT_TWO;
+      assetSupply = lToken.totalSupply();
+    }
+
+    uint256 tvl = ethPrice * ERC20(reserveToken).balanceOf(address(this));
+    uint256 collateralLevel = (tvl * PRECISION) / (debtAssetSupply * BOND_TARGET_PRICE);
+    uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
+
+    if (collateralLevel <= COLLATERAL_THRESHOLD) {
+      creationRate = (tvl * multiplier) / assetSupply;
+    } else if (tokenType == TokenType.LEVERAGE) {
+      if (assetSupply == 0) {
+        revert ZeroLeverageSupply();
+      }
+
+      uint256 adjustedValue = tvl - (BOND_TARGET_PRICE * debtAssetSupply);
+      creationRate = (adjustedValue * PRECISION) / assetSupply;
+    }
+    
+    return ((depositAmount * ethPrice * PRECISION) / (creationRate));
+  }
+
+  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+
+  }
+
+  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+
+  }
+
+  function setFee(uint256 _fee) external whenNotPaused() onlyRole(dlsp.GOV_ROLE()) {
+    fee = _fee;
+  }
+
+  /**
+   * @dev Pauses contract. Reverts any interaction expect upgrade.
+   */
+  function pause() external onlyRole(dlsp.GOV_ROLE()) {
+    _pause();
+  }
+
+  /**
+   * @dev Unpauses contract.
+   */
+  function unpause() external onlyRole(dlsp.GOV_ROLE()) {
+    _unpause();
+  }
+
+  modifier onlyRole(bytes32 role) {
+    if (!dlsp.hasRole(role, msg.sender)) {
+      revert AccessDenied();
+    }
+    _;
+  }
+
+  // @todo: owner will be DLSP, make sure we can upgrade
+  /**
+   * @dev Authorizes an upgrade to a new implementation.
+   * Can only be called by the owner of the contract.
+   */
+  function _authorizeUpgrade(address newImplementation)
+    internal
+    onlyOwner
+    override
+  {}
+}
