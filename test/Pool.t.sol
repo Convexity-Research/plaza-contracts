@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import {DLSP} from "../src/DLSP.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -10,8 +10,8 @@ import {LeverageToken} from "../src/LeverageToken.sol";
 import {Utils} from "../src/lib/Utils.sol";
 
 contract PoolTest is Test {
-  DLSP private dlsp;
-  DLSP.PoolParams private params;
+  PoolFactory private poolFactory;
+  PoolFactory.PoolParams private params;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
@@ -43,7 +43,7 @@ contract PoolTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
-    dlsp = DLSP(Utils.deploy(address(new DLSP()), abi.encodeCall(DLSP.initialize, (governance))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance))));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
@@ -1415,9 +1415,9 @@ contract PoolTest is Test {
 
     for (uint256 i = 0; i < calcTestCases.length; i++) {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
-      rToken.approve(address(dlsp), calcTestCases[i].TotalUnderlyingAssets);
+      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
 
       uint256 amount = _pool.getCreateAmount(
         calcTestCases[i].assetType, 
@@ -1462,10 +1462,10 @@ contract PoolTest is Test {
 
       // Mint reserve tokens
       rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets + calcTestCases2[i].inAmount);
-      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
+      rToken.approve(address(poolFactory), calcTestCases2[i].TotalUnderlyingAssets);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
       rToken.approve(address(_pool), calcTestCases2[i].inAmount);
 
       // Call create and assert minted tokens
@@ -1484,10 +1484,10 @@ contract PoolTest is Test {
 
     // Mint reserve tokens
     rToken.mint(governance, 10000001000);
-    rToken.approve(address(dlsp), 10000000000);
+    rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
@@ -1505,10 +1505,10 @@ contract PoolTest is Test {
 
     // Mint reserve tokens
     rToken.mint(governance, 10000001000);
-    rToken.approve(address(dlsp), 10000000000);
+    rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
     rToken.approve(address(_pool), 1000);
 
     // Call create and expect error
@@ -1526,9 +1526,9 @@ contract PoolTest is Test {
 
     for (uint256 i = 0; i < calcTestCases.length; i++) {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
-      rToken.approve(address(dlsp), calcTestCases[i].TotalUnderlyingAssets);
+      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
 
       uint256 amount = _pool.getRedeemAmount(
         calcTestCases[i].assetType, 
@@ -1561,10 +1561,10 @@ contract PoolTest is Test {
 
       // Mint reserve tokens
       rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets);
-      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
+      rToken.approve(address(poolFactory), calcTestCases2[i].TotalUnderlyingAssets);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       // Call create and assert minted tokens
       uint256 amount = _pool.redeem(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
@@ -1582,10 +1582,10 @@ contract PoolTest is Test {
 
     // Mint reserve tokens
     rToken.mint(governance, 10000001000);
-    rToken.approve(address(dlsp), 10000000000);
+    rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
@@ -1603,10 +1603,10 @@ contract PoolTest is Test {
 
     // Mint reserve tokens
     rToken.mint(governance, 10000001000);
-    rToken.approve(address(dlsp), 10000000000);
+    rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(dlsp.CreatePool(params, 10000000000, 10000, 10000));
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
     rToken.approve(address(_pool), 1000);
 
     // Call create and expect error
@@ -1629,10 +1629,10 @@ contract PoolTest is Test {
 
       // Mint reserve tokens
       rToken.mint(governance, calcTestCases2[i].TotalUnderlyingAssets);
-      rToken.approve(address(dlsp), calcTestCases2[i].TotalUnderlyingAssets);
+      rToken.approve(address(poolFactory), calcTestCases2[i].TotalUnderlyingAssets);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(dlsp.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       // Call create and assert minted tokens
       uint256 amount = _pool.swap(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
@@ -1654,7 +1654,7 @@ contract PoolTest is Test {
 
   function testSetFee() public {
     vm.startPrank(governance);
-    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
 
     _pool.setFee(100);
     assertEq(_pool.fee(), 100);
@@ -1662,7 +1662,7 @@ contract PoolTest is Test {
 
   function testSetFeeErrorUnauthorized() public {
     vm.startPrank(governance);
-    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
     vm.stopPrank();
 
     vm.expectRevert();
@@ -1671,7 +1671,7 @@ contract PoolTest is Test {
 
   function testPause() public {
     vm.startPrank(governance);
-    Pool _pool = Pool(dlsp.CreatePool(params, 0, 0, 0));
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
 
     _pool.pause();
 
