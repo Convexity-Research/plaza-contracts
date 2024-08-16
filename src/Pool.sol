@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {DLSP} from "./DLSP.sol";
+import {PoolFactory} from "./PoolFactory.sol";
 import {BondToken} from "./BondToken.sol";
 import {LeverageToken} from "./LeverageToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -22,7 +22,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   uint256 private constant ETH_PRICE = 3000;
 
   // Protocol
-  DLSP public dlsp;
+  PoolFactory public poolFactory;
   uint256 public fee;
 
   // Tokens
@@ -62,7 +62,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * This function is called once during deployment or upgrading to initialize state variables.
    */
   function initialize(
-    address _dlsp,
+    address _poolFactory,
     uint256 _fee,
     address _reserveToken,
     address _dToken,
@@ -71,7 +71,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 _sharesPerToken,
     uint256 _distributionPeriod) initializer public {
     __UUPSUpgradeable_init();
-    dlsp = DLSP(_dlsp);
+    poolFactory = PoolFactory(_poolFactory);
     fee = _fee;
     reserveToken = _reserveToken;
     dToken = BondToken(_dToken);
@@ -293,32 +293,32 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     );
   }
 
-  function setFee(uint256 _fee) external whenNotPaused() onlyRole(dlsp.GOV_ROLE()) {
+  function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
     fee = _fee;
   }
 
   /**
    * @dev Pauses contract. Reverts any interaction expect upgrade.
    */
-  function pause() external onlyRole(dlsp.GOV_ROLE()) {
+  function pause() external onlyRole(poolFactory.GOV_ROLE()) {
     _pause();
   }
 
   /**
    * @dev Unpauses contract.
    */
-  function unpause() external onlyRole(dlsp.GOV_ROLE()) {
+  function unpause() external onlyRole(poolFactory.GOV_ROLE()) {
     _unpause();
   }
 
   modifier onlyRole(bytes32 role) {
-    if (!dlsp.hasRole(role, msg.sender)) {
+    if (!poolFactory.hasRole(role, msg.sender)) {
       revert AccessDenied();
     }
     _;
   }
 
-  // @todo: owner will be DLSP, make sure we can upgrade
+  // @todo: owner will be PoolFactory, make sure we can upgrade
   /**
    * @dev Authorizes an upgrade to a new implementation.
    * Can only be called by the owner of the contract.
