@@ -54,7 +54,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
   }
 
   // @todo: make it payable (to accept native ETH)
-  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
+  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount, address dtoken, address ltoken) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
     // @todo: with this is safer but some cases are not testable (guess that's still good)
     // if (reserveAmount == 0) {
     //   revert ZeroReserveAmount();
@@ -69,30 +69,32 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     // }
 
     ERC20 reserveToken = ERC20(params.reserveToken);
-    string memory reserveSymbol = reserveToken.symbol();
+    // string memory reserveSymbol = reserveToken.symbol();
 
     // Deploy Bond token
-    BondToken dToken = BondToken(Utils.deploy(address(new BondToken()), abi.encodeCall(
-      BondToken.initialize, 
-      (
-        string.concat("Bond", reserveSymbol),
-        string.concat("BOND-", reserveSymbol),
-        address(this),
-        governance,
-        distributor
-      )
-    )));
+    // BondToken dToken = BondToken(Utils.deploy(address(new BondToken()), abi.encodeCall(
+    //   BondToken.initialize, 
+    //   (
+    //     string.concat("Bond", reserveSymbol),
+    //     string.concat("BOND-", reserveSymbol),
+    //     address(this),
+    //     governance,
+    //     distributor
+    //   )
+    // )));
+    BondToken dToken = BondToken(dtoken);
 
     // Deploy Leverage token
-    LeverageToken lToken = LeverageToken(Utils.deploy(address(new LeverageToken()), abi.encodeCall(
-      LeverageToken.initialize, 
-      (
-        string.concat("Leverage", reserveSymbol),
-        string.concat("LVRG-", reserveSymbol),
-        address(this),
-        governance
-      )
-    )));
+    // LeverageToken lToken = LeverageToken(Utils.deploy(address(new LeverageToken()), abi.encodeCall(
+    //   LeverageToken.initialize, 
+    //   (
+    //     string.concat("Leverage", reserveSymbol),
+    //     string.concat("LVRG-", reserveSymbol),
+    //     address(this),
+    //     governance
+    //   )
+    // )));
+    LeverageToken lToken = LeverageToken(ltoken);
 
     // Deploy pool contract
     address pool = Utils.deploy(address(new Pool()), abi.encodeCall(
