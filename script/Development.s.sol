@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {Script, console2} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
@@ -13,7 +13,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 contract DevelopmentScript is Script {
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-    
+
     address dToken = Utils.deploy(address(new BondToken()), abi.encodeCall(
       BondToken.initialize, 
       (
@@ -51,12 +51,24 @@ contract DevelopmentScript is Script {
     params.sharesPerToken = 50000000;
     params.distributionPeriod = 7776000;
 
+    Token(params.reserveToken).mint(msg.sender, reserveAmount);
+    Token(params.reserveToken).approve(address(factory), reserveAmount);
+
+    // @todo: not for prod
+    BondToken(dToken).grantRole(BondToken(dToken).MINTER_ROLE(), address(factory));
+    BondToken(lToken).grantRole(BondToken(lToken).MINTER_ROLE(), address(factory));
+
+    // @todo: not for prod
+    BondToken(dToken).grantRole(BondToken(dToken).GOV_ROLE(), address(factory));
+    BondToken(lToken).grantRole(BondToken(lToken).GOV_ROLE(), address(factory));
+
+    // @todo: not for prod
+    BondToken(dToken).grantRole(BondToken(dToken).DEFAULT_ADMIN_ROLE(), address(factory));
+    BondToken(lToken).grantRole(BondToken(lToken).DEFAULT_ADMIN_ROLE(), address(factory));
+
     pool = factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount, dToken, lToken);
 
-    // set minter roles
-    BondToken(dToken).grantRole(BondToken(dToken).MINTER_ROLE(), pool);
-    BondToken(lToken).grantRole(BondToken(lToken).MINTER_ROLE(), pool);
-
+    console.log("pool pool pool", pool);
     vm.stopBroadcast();
   }
 }

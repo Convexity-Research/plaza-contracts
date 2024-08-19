@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+// @todo: remove
+import {Token} from "../test/mocks/Token.sol";
+
 import {PoolFactory} from "./PoolFactory.sol";
 import {BondToken} from "./BondToken.sol";
 import {LeverageToken} from "./LeverageToken.sol";
@@ -81,6 +84,11 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistributionTime = block.timestamp;
+  }
+
+  // @todo: remove
+  function mintEth(uint256 amount) public {
+    Token(reserveToken).mint(msg.sender, amount);
   }
 
   /**
