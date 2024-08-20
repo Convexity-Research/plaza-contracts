@@ -51,6 +51,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event TokensSwapped(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -256,7 +257,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       lToken.burn(msg.sender, depositAmount);
       dToken.mint(msg.sender, mintAmount);
     }
-    
+
+    emit TokensSwapped(msg.sender, tokenType, depositAmount, mintAmount);
     return mintAmount;
   }
 
