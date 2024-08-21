@@ -36,7 +36,6 @@ contract DevelopmentScript is Script {
       )
     ));
 
-    console.log(address(this), deployerAddress);
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
       (deployerAddress)
@@ -69,18 +68,8 @@ contract DevelopmentScript is Script {
     BondToken(dToken).grantRole(BondToken(dToken).DEFAULT_ADMIN_ROLE(), address(factory));
     BondToken(lToken).grantRole(BondToken(lToken).DEFAULT_ADMIN_ROLE(), address(factory));
 
-    console.log("1balance bond: ", BondToken(dToken).balanceOf(deployerAddress));
-    console.log("1reserve balance self: ", Token(params.reserveToken).balanceOf(deployerAddress));
-
     pool = factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount, dToken, lToken);
-
-    console.log("balance bond: ", BondToken(dToken).balanceOf(deployerAddress));
-    console.log("reserve balance: ", Token(params.reserveToken).balanceOf(pool));
-    console.log("reserve balance self: ", Token(params.reserveToken).balanceOf(deployerAddress));
-    console.log("pool address:", factory.pools(0));
-
-    console.log("pool pool pool", pool);
-
+    
     vm.stopBroadcast();
   }
 }

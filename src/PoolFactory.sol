@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-// @todo: remove
-import "forge-std/Console.sol";
-
 import {Pool} from "./Pool.sol";
 import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -52,7 +49,6 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     __UUPSUpgradeable_init();
 
     governance = _governance;
-    console.log(governance);
     _grantRole(GOV_ROLE, _governance);
   }
 
