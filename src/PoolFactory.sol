@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+// @todo: remove
+import "forge-std/Console.sol";
+
 import {Pool} from "./Pool.sol";
 import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -12,8 +15,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
-
+contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {  
   // Define a constants for the access roles using keccak256 to generate a unique hash
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -50,6 +52,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     __UUPSUpgradeable_init();
 
     governance = _governance;
+    console.log(governance);
     _grantRole(GOV_ROLE, _governance);
   }
 
@@ -111,7 +114,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       )
     ));
 
-    dToken.grantRole(MINTER_ROLE, pool);
+    //dToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
 
     pools.push(pool);
@@ -119,7 +122,9 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     // @todo: make it safeTransferFrom
     // Send seed reserves to pool
-    require(reserveToken.transferFrom(msg.sender, pool, reserveAmount), "failed to transfer funds");
+    if (!reserveToken.transferFrom(msg.sender, pool, reserveAmount)) {
+      revert("failed to transfer funds");
+    }
 
     // Mint seed amounts
     dToken.mint(msg.sender, debtAmount);
