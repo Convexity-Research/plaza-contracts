@@ -196,6 +196,11 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       lToken.burn(msg.sender, depositAmount);
     }
 
+    // @todo: replace with safeTransfer
+    if (!ERC20(reserveToken).transfer(msg.sender, reserveAmount)) {
+      revert("not enough funds");
+    }
+
     emit TokensRedeemed(msg.sender, tokenType, depositAmount, reserveAmount);
     return reserveAmount;
   }
