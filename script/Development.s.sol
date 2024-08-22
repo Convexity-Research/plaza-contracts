@@ -42,8 +42,8 @@ contract DevelopmentScript is Script {
     )));
 
     address pool;
-    uint256 reserveAmount = 1000000000000000000000;
-    uint256 debtAmount = 1000000000000000000000000000000;
+    uint256 reserveAmount = 1000000000000000000000000;
+    uint256 debtAmount = 25000000000000000000000000;
     uint256 leverageAmount = 1000000000000000000000000;
 
     PoolFactory.PoolParams memory params;

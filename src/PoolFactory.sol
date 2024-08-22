@@ -110,7 +110,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       )
     ));
 
-    //dToken.grantRole(MINTER_ROLE, pool);
+    dToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
 
     pools.push(pool);
