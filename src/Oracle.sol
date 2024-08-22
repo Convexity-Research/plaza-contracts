@@ -22,21 +22,10 @@ contract Oracle {
       revert NoPriceFound();
     }
 
-    // uint256 decimals = uint256(AggregatorV3Interface(ETH_PRICE_FEED).decimals());
-    // if (decimals > 2) {
-    //   // Adjust the price to have only 2 decimals
-    //   uint256 factor = 10**(decimals - 2);
-    //   answer = answer / int256(factor);
-    // }
-
     return uint256(answer);
   }
 
   function getOracleDecimals(address quote) public view returns(uint8 decimals) {
-    decimals = AggregatorV3Interface(ETH_PRICE_FEED).decimals();
-    // if (decimals > 2){
-    //   return 2;
-    // }
-    return decimals;
+    return AggregatorV3Interface(ETH_PRICE_FEED).decimals();
   }
 }
