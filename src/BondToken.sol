@@ -56,8 +56,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     __UUPSUpgradeable_init();
 
     // Grant the access roles
-    _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-    _grantRole(DEFAULT_ADMIN_ROLE, governance);
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
     _grantRole(DISTRIBUTOR_ROLE, distributor);
@@ -146,6 +144,25 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     globalPool.sharesPerToken = sharesPerToken;
 
     emit IncreasedAssetPeriod(globalPool.currentPeriod, sharesPerToken);
+  }
+
+  /**
+    * @dev Grants `role` to `account`.
+    * If `account` had not been already granted `role`, emits a {RoleGranted}
+    * event.
+    * May emit a {RoleGranted} event.
+    */
+  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _grantRole(role, account);
+  }
+
+  /**
+    * @dev Revokes `role` from `account`.
+    * If `account` had been granted `role`, emits a {RoleRevoked} event.
+    * May emit a {RoleRevoked} event.
+    */
+  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _revokeRole(role, account);
   }
 
   /**
