@@ -79,7 +79,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       string.concat("Bond", reserveSymbol),
       string.concat("BOND-", reserveSymbol),
       address(this),
-      governance,
+      address(this),
       distributor
     ));
 
@@ -88,7 +88,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       string.concat("Leverage", reserveSymbol),
       string.concat("LVRG-", reserveSymbol),
       address(this),
-      governance
+      address(this)
     ));
 
     // Deploy pool contract
@@ -108,6 +108,14 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     dToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
+    
+    // set token governance
+    dToken.grantRole(GOV_ROLE, governance);
+    lToken.grantRole(GOV_ROLE, governance);
+
+    // remove governance from factory
+    dToken.revokeRole(GOV_ROLE, address(this));
+    lToken.revokeRole(GOV_ROLE, address(this));
 
     pools.push(pool);
     poolsLength = poolsLength + 1;
