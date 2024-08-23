@@ -48,10 +48,13 @@ contract PoolFactoryTest is Test {
     rToken.mint(governance, 10000000000);
     rToken.approve(address(poolFactory), 10000000000);
 
+    uint256 startLength = poolFactory.poolsLength();
+
     // Create pool and approve deposit amount
     Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 20000));
-    rToken.approve(address(_pool), 1000);
+    uint256 endLength = poolFactory.poolsLength();
 
+    assertEq(1, endLength-startLength);
     assertEq(rToken.totalSupply(), 10000000000);
     assertEq(_pool.dToken().totalSupply(), 10000);
     assertEq(_pool.lToken().totalSupply(), 20000);

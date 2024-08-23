@@ -26,6 +26,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
   }
 
   address[] public pools;
+  uint256 public poolsLength;
   address public governance;
   address public distributor;
 
@@ -114,6 +115,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     lToken.grantRole(MINTER_ROLE, pool);
 
     pools.push(pool);
+    poolsLength = poolsLength + 1;
     emit PoolCreated(pool, reserveAmount, debtAmount, leverageAmount);
 
     // @todo: make it safeTransferFrom
