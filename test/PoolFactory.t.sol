@@ -2,12 +2,13 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import {PoolFactory} from "../src/PoolFactory.sol";
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
-import {BondToken} from "../src/BondToken.sol";
-import {LeverageToken} from "../src/LeverageToken.sol";
 import {Utils} from "../src/lib/Utils.sol";
+import {BondToken} from "../src/BondToken.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
+import {LeverageToken} from "../src/LeverageToken.sol";
+import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
@@ -30,7 +31,8 @@ contract PoolFactoryTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance))));
+    address tokenDeployer = address(new TokenDeployer());
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer))));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));

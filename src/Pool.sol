@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-// @todo: remove
+// @todo: remove - used for faucet
 import {Token} from "../test/mocks/Token.sol";
 
 import {PoolFactory} from "./PoolFactory.sol";

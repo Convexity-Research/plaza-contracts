@@ -3,8 +3,9 @@ pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
 import {Utils} from "./lib/Utils.sol";
-import {BondToken} from "../src/BondToken.sol";
-import {LeverageToken} from "../src/LeverageToken.sol";
+import {BondToken} from "./BondToken.sol";
+import {LeverageToken} from "./LeverageToken.sol";
+import {TokenDeployer} from "./utils/TokenDeployer.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -29,6 +30,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
   uint256 public poolsLength;
   address public governance;
   address public distributor;
+  TokenDeployer private tokenDeployer;
 
   error ZeroDebtAmount();
   error ZeroReserveAmount();
@@ -46,15 +48,16 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * This function is called once during deployment or upgrading to initialize state variables.
    * @param _governance Address of the governance account that will have the GOV_ROLE.
    */
-  function initialize(address _governance) initializer public {
+  function initialize(address _governance, address _tokenDeployer) initializer public {
     __UUPSUpgradeable_init();
 
+    tokenDeployer = TokenDeployer(_tokenDeployer);
     governance = _governance;
     _grantRole(GOV_ROLE, _governance);
   }
 
   // @todo: make it payable (to accept native ETH)
-  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount, address dtoken, address ltoken) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
+  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
     // @todo: with this is safer but some cases are not testable (guess that's still good)
     // if (reserveAmount == 0) {
     //   revert ZeroReserveAmount();
@@ -69,32 +72,24 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     // }
 
     ERC20 reserveToken = ERC20(params.reserveToken);
-    // string memory reserveSymbol = reserveToken.symbol();
-
+    string memory reserveSymbol = reserveToken.symbol();
+    
     // Deploy Bond token
-    // BondToken dToken = BondToken(Utils.deploy(address(new BondToken()), abi.encodeCall(
-    //   BondToken.initialize, 
-    //   (
-    //     string.concat("Bond", reserveSymbol),
-    //     string.concat("BOND-", reserveSymbol),
-    //     address(this),
-    //     governance,
-    //     distributor
-    //   )
-    // )));
-    BondToken dToken = BondToken(dtoken);
+    BondToken dToken = BondToken(tokenDeployer.deployDebtToken(
+      string.concat("Bond", reserveSymbol),
+      string.concat("BOND-", reserveSymbol),
+      address(this),
+      governance,
+      distributor
+    ));
 
     // Deploy Leverage token
-    // LeverageToken lToken = LeverageToken(Utils.deploy(address(new LeverageToken()), abi.encodeCall(
-    //   LeverageToken.initialize, 
-    //   (
-    //     string.concat("Leverage", reserveSymbol),
-    //     string.concat("LVRG-", reserveSymbol),
-    //     address(this),
-    //     governance
-    //   )
-    // )));
-    LeverageToken lToken = LeverageToken(ltoken);
+    LeverageToken lToken = LeverageToken(tokenDeployer.deployLeverageToken(
+      string.concat("Leverage", reserveSymbol),
+      string.concat("LVRG-", reserveSymbol),
+      address(this),
+      governance
+    ));
 
     // Deploy pool contract
     address pool = Utils.deploy(address(new Pool()), abi.encodeCall(
