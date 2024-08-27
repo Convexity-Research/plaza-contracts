@@ -30,10 +30,10 @@ contract DevelopmentScript is Script {
 
     PoolFactory.PoolParams memory params;
     params.fee = 0;
-    params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
+    params.reserveToken = address(new Token("Wrapped Fake ETH", "WETH"));
     params.sharesPerToken = 50000000;
     params.distributionPeriod = 7776000;
-    params.couponToken = address(0);
+    params.couponToken = address(new Token("Fake USDC", "USDC"));
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
