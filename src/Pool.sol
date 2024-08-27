@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-// @todo: remove - used for faucet
-import {Token} from "../test/mocks/Token.sol";
-
 import {PoolFactory} from "./PoolFactory.sol";
 import {Oracle} from "./Oracle.sol";
 import {BondToken} from "./BondToken.sol";
@@ -90,19 +87,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     distributionPeriod = _distributionPeriod;
     lastDistributionTime = block.timestamp;
   }
-
-  // @todo: remove before mainnet
-  function faucet() public {
-    Token(reserveToken).mint(msg.sender, 1 ether);
-    Token(couponToken).mint(msg.sender, 5000 ether);
-  }
   
-  // @todo: remove before mainnet
-  function faucet(uint256 amountReserve, uint256 amountCoupon) public {
-    Token(reserveToken).mint(msg.sender, amountReserve);
-    Token(couponToken).mint(msg.sender, amountCoupon);
-  }
-
   /**
     * @dev Transfers `depositAmount` of `reserveToken` from the caller, calculates the amount to mint
     * If the amount is valid, mints the appropriate token (dToken or lToken) to the caller.

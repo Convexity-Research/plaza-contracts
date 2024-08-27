@@ -10,9 +10,12 @@ import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-
 contract DevelopmentScript is Script {
+
+  // Arbitrum Sepolia addresses
+  address public constant reserveToken = address(0xDc00b8C3857320B2ba9A069cFcB8Cd01788FEea7);
+  address public constant couponToken = address(0x4FCE2AFA415Ff70794d2CC6F7820Ea09dC876a7b);
+
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
@@ -34,10 +37,10 @@ contract DevelopmentScript is Script {
 
     PoolFactory.PoolParams memory params;
     params.fee = 0;
-    params.reserveToken = address(new Token("Wrapped Fake ETH", "WETH"));
+    params.reserveToken = reserveToken;
     params.sharesPerToken = 50000000;
     params.distributionPeriod = 7776000;
-    params.couponToken = address(new Token("Fake USDC", "USDC"));
+    params.couponToken = couponToken;
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
