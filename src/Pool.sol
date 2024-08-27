@@ -45,6 +45,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     LEVERAGE
   }
 
+  struct PoolInfo {
+    uint256 reserve;
+    uint256 debtSupply;
+    uint256 levSupply;
+  }
+
   error MinAmount();
   error ZeroAmount();
   error AccessDenied();
@@ -314,6 +320,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       poolReserves,
       getOraclePrice(address(0))
     );
+  }
+
+  function getPoolInfo() external view returns (PoolInfo memory info) {
+    info = PoolInfo({
+      reserve: ERC20(reserveToken).balanceOf(address(this)),
+      debtSupply: dToken.totalSupply(),
+      levSupply: lToken.totalSupply()
+    });
   }
 
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
