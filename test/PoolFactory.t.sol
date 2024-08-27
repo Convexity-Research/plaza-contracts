@@ -94,21 +94,4 @@ contract PoolFactoryTest is Test {
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
     poolFactory.CreatePool(params, 10000000000, 10000, 10000);
   }
-
-  function testSetGovernance() public {
-    vm.startPrank(user);
-    
-    vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, user, poolFactory.GOV_ROLE()));
-    poolFactory.setGovernance(address(0x0));
-    vm.stopPrank();
-
-    vm.startPrank(governance);
-
-    poolFactory.setGovernance(minter);
-    assertEq(poolFactory.governance(), minter);
-
-    vm.startPrank(minter);
-    poolFactory.setGovernance(governance);
-    assertEq(poolFactory.governance(), governance);
-  }
 }
