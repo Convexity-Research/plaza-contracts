@@ -1732,6 +1732,40 @@ contract PoolTest is Test {
     assertEq(info.levSupply, 10000);
   }
 
+  function testSetDistributionPeriod() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
+
+    _pool.setDistributionPeriod(100);
+    assertEq(_pool.distributionPeriod(), 100);
+  }
+
+  function testSetDistributionPeriodErrorUnauthorized() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
+    vm.stopPrank();
+
+    vm.expectRevert();
+    _pool.setDistributionPeriod(100);
+  }
+
+  function testSetCouponToken() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
+
+    _pool.setCouponToken(address(0x420));
+    assertEq(_pool.couponToken(), address(0x420));
+  }
+
+  function testSetCouponTokenErrorUnauthorized() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
+    vm.stopPrank();
+
+    vm.expectRevert();
+    _pool.setCouponToken(address(0x420));
+  }
+
   function testSetFee() public {
     vm.startPrank(governance);
     Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
