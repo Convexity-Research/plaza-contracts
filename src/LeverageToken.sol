@@ -31,8 +31,6 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
     __UUPSUpgradeable_init();
 
     // Grant the access roles
-    _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-    _grantRole(DEFAULT_ADMIN_ROLE, governance);
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
   }
@@ -59,6 +57,25 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
    */
   function _update(address from, address to, uint256 amount) internal virtual override whenNotPaused() {
     super._update(from, to, amount);
+  }
+
+  /**
+    * @dev Grants `role` to `account`.
+    * If `account` had not been already granted `role`, emits a {RoleGranted}
+    * event.
+    * May emit a {RoleGranted} event.
+    */
+  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _grantRole(role, account);
+  }
+
+  /**
+    * @dev Revokes `role` from `account`.
+    * If `account` had been granted `role`, emits a {RoleRevoked} event.
+    * May emit a {RoleRevoked} event.
+    */
+  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _revokeRole(role, account);
   }
 
   /**

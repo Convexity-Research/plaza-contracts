@@ -9,6 +9,7 @@ import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
+import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
 contract PoolTest is Test {
   PoolFactory private poolFactory;
@@ -48,7 +49,8 @@ contract PoolTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance))));
+    address tokenDeployer = address(new TokenDeployer());
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer))));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
