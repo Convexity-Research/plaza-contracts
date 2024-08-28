@@ -56,6 +56,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event TokensSwapped(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+  event CouponTokenChanged(address oldToken, address newToken);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -310,6 +312,20 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       debtSupply: dToken.totalSupply(),
       levSupply: lToken.totalSupply()
     });
+  }
+
+  function setDistributionPeriod(uint256 _distributionPeriod) external onlyRole(poolFactory.GOV_ROLE()) {
+    uint256 oldPeriod = distributionPeriod;
+    distributionPeriod = _distributionPeriod;
+
+    emit DistributionPeriodChanged(oldPeriod, _distributionPeriod);
+  }
+
+  function setCouponToken(address token) external onlyRole(poolFactory.GOV_ROLE()) {
+    address oldToken = couponToken;
+    couponToken = token;
+
+    emit CouponTokenChanged(oldToken, token);
   }
 
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
