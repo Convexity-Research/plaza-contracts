@@ -81,11 +81,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     lastDistributionTime = block.timestamp;
   }
 
-  // @todo: remove
-  function mintEth(uint256 amount) public {
-    Token(reserveToken).mint(msg.sender, amount);
-  }
-
   /**
     * @dev Transfers `depositAmount` of `reserveToken` from the caller, calculates the amount to mint
     * If the amount is valid, mints the appropriate token (dToken or lToken) to the caller.
