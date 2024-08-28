@@ -45,6 +45,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 reserve;
     uint256 debtSupply;
     uint256 levSupply;
+    uint256 sharesPerToken;
+    uint256 currentPeriod;
   }
 
   error MinAmount();
@@ -307,13 +309,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function getPoolInfo() external view returns (PoolInfo memory info) {
+    (uint256 currentPeriod, uint256 sharesPerToken) = dToken.globalPool();
+
     info = PoolInfo({
       reserve: ERC20(reserveToken).balanceOf(address(this)),
       debtSupply: dToken.totalSupply(),
-      levSupply: lToken.totalSupply()
+      levSupply: lToken.totalSupply(),
+      sharesPerToken: sharesPerToken,
+      currentPeriod: currentPeriod
     });
   }
-
+  
   function setDistributionPeriod(uint256 _distributionPeriod) external onlyRole(poolFactory.GOV_ROLE()) {
     uint256 oldPeriod = distributionPeriod;
     distributionPeriod = _distributionPeriod;
