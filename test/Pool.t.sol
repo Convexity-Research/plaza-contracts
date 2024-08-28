@@ -1468,9 +1468,26 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
       rToken.approve(address(_pool), calcTestCases2[i].inAmount);
 
+      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      uint256 startReserveBalance = rToken.balanceOf(governance);
+
       // Call create and assert minted tokens
       uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
       assertEq(amount, calcTestCases2[i].expectedCreate);
+
+      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      uint256 endReserveBalance = rToken.balanceOf(governance);
+      assertEq(calcTestCases2[i].inAmount, startReserveBalance-endReserveBalance);
+
+      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
+        assertEq(amount, endBondBalance-startBondBalance);
+        assertEq(0, endLevBalance-startLevBalance);
+      } else {
+        assertEq(0, endBondBalance-startBondBalance);
+        assertEq(amount, endLevBalance-startLevBalance);
+      }
 
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
@@ -1566,9 +1583,26 @@ contract PoolTest is Test {
       // Create pool and approve deposit amount
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
+      uint256 startBalance = rToken.balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+
       // Call create and assert minted tokens
       uint256 amount = _pool.redeem(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
       assertEq(amount, calcTestCases2[i].expectedRedeem);
+
+      uint256 endBalance = rToken.balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      assertEq(amount, endBalance-startBalance);
+
+      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
+        assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
+        assertEq(0, endLevBalance-startLevBalance);
+      } else {
+        assertEq(0, endBondBalance-startBondBalance);
+        assertEq(calcTestCases2[i].inAmount, startLevBalance-endLevBalance);
+      }
 
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
@@ -1634,16 +1668,30 @@ contract PoolTest is Test {
       // Create pool and approve deposit amount
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
+      uint256 startBalance = rToken.balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+
       // Call create and assert minted tokens
       uint256 amount = _pool.swap(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
       assertEq(amount, calcTestCases2[i].expectedSwap);
 
+      uint256 endBalance = rToken.balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+
+      assertEq(0, startBalance-endBalance);
+
       if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
         assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets + amount);
+        assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
+        assertEq(amount, endLevBalance-startLevBalance);
       } else {
         assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets - calcTestCases2[i].inAmount);
+        assertEq(calcTestCases2[i].inAmount, startLevBalance-endLevBalance);
+        assertEq(amount, endBondBalance-startBondBalance);
       }
 
       // Reset reserve state
