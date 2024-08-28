@@ -1720,6 +1720,23 @@ contract PoolTest is Test {
     }
   }
 
+  function testGetPoolInfo() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 10000000000);
+    rToken.approve(address(poolFactory), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
+    
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.reserve, 10000000000);
+    assertEq(info.debtSupply, 10000);
+    assertEq(info.levSupply, 10000);
+  }
+
   function testSetFee() public {
     vm.startPrank(governance);
     Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
