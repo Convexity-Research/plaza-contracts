@@ -38,6 +38,8 @@ contract PoolTest is Test {
   CalcTestCase[] public calcTestCases2;
 
   address private constant ETH_PRICE_FEED = 0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165;
+  uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
+  uint256 private constant CHAINLINK_DECIMAL = 8;
 
   /**
    * @dev Sets up the testing environment.
@@ -64,7 +66,7 @@ contract PoolTest is Test {
 
     // Set oracle price
     mockPriceFeed = MockPriceFeed(ETH_PRICE_FEED);
-    mockPriceFeed.setMockPrice(3000 * 10**8, 8);
+    mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
     
     vm.stopPrank();
     initializeTestCases();
@@ -1441,7 +1443,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets,
         calcTestCases[i].LeverageAssets,
         calcTestCases[i].TotalUnderlyingAssets,
-        calcTestCases[i].ethPrice * 10**8
+        calcTestCases[i].ethPrice * CHAINLINK_DECIMAL_PRECISION,
+        CHAINLINK_DECIMAL
       );
       assertEq(amount, calcTestCases[i].expectedCreate);
 
@@ -1458,13 +1461,13 @@ contract PoolTest is Test {
   function testGetCreateAmountZeroDebtSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroDebtSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000);
+    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000, CHAINLINK_DECIMAL);
   }
 
   function testGetCreateAmountZeroLeverageSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroLeverageSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * 10**8);
+    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * CHAINLINK_DECIMAL_PRECISION, CHAINLINK_DECIMAL);
   }
 
   function testCreate() public {
@@ -1569,7 +1572,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets, 
         calcTestCases[i].LeverageAssets, 
         calcTestCases[i].TotalUnderlyingAssets, 
-        calcTestCases[i].ethPrice * 10**8
+        calcTestCases[i].ethPrice * CHAINLINK_DECIMAL_PRECISION,
+        CHAINLINK_DECIMAL
       );
       assertEq(amount, calcTestCases[i].expectedRedeem);
 
