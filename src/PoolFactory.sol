@@ -133,11 +133,24 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     return pool;
   }
+  
+  /**
+    * @dev Grants `role` to `account`.
+    * If `account` had not been already granted `role`, emits a {RoleGranted}
+    * event.
+    * May emit a {RoleGranted} event.
+    */
+  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _grantRole(role, account);
+  }
 
-  function setGovernance(address _governance) external onlyRole(GOV_ROLE) {
-    _grantRole(GOV_ROLE, _governance);
-    _revokeRole(GOV_ROLE, governance);
-    governance = _governance;
+  /**
+    * @dev Revokes `role` from `account`.
+    * If `account` had been granted `role`, emits a {RoleRevoked} event.
+    * May emit a {RoleRevoked} event.
+    */
+  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _revokeRole(role, account);
   }
 
   /**

@@ -23,6 +23,10 @@ contract DevelopmentScript is Script {
       (deployerAddress, tokenDeployer)
     )));
 
+    // @todo: remove - marion address
+    factory.grantRole(factory.GOV_ROLE(), 0x11cba1EFf7a308Ac2cF6a6Ac2892ca33fabc3398);
+    factory.grantRole(factory.GOV_ROLE(), 0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd);
+
     address pool;
     uint256 reserveAmount = 1000000000000000000000000;
     uint256 debtAmount = 25000000000000000000000000;

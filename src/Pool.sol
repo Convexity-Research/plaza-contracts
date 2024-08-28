@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Token} from "../test/mocks/Token.sol";
+
 import {BondToken} from "./BondToken.sol";
 import {PoolFactory} from "./PoolFactory.sol";
 import {OracleReader} from "./OracleReader.sol";
@@ -79,6 +81,18 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistributionTime = block.timestamp;
+  }
+
+  // @todo: remove before mainnet
+  function faucet() public {
+    Token(reserveToken).mint(msg.sender, 1 ether);
+    Token(couponToken).mint(msg.sender, 5000 ether);
+  }
+  
+  // @todo: remove before mainnet
+  function faucet(uint256 amountReserve, uint256 amountCoupon) public {
+    Token(reserveToken).mint(msg.sender, amountReserve);
+    Token(couponToken).mint(msg.sender, amountCoupon);
   }
 
   /**
