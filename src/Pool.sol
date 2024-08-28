@@ -34,7 +34,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Distribution
   uint256 public distributionPeriod;
-  uint256 public lastDistributionTime;
+  uint256 public lastDistribution;
 
   enum TokenType {
     DEBT,
@@ -47,6 +47,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 levSupply;
     uint256 sharesPerToken;
     uint256 currentPeriod;
+    uint256 lastDistribution;
   }
 
   error MinAmount();
@@ -86,7 +87,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     lToken = LeverageToken(_lToken);
     couponToken = _couponToken;
     distributionPeriod = _distributionPeriod;
-    lastDistributionTime = block.timestamp;
+    lastDistribution = block.timestamp;
   }
 
   /**
@@ -316,7 +317,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       debtSupply: dToken.totalSupply(),
       levSupply: lToken.totalSupply(),
       sharesPerToken: sharesPerToken,
-      currentPeriod: currentPeriod
+      currentPeriod: currentPeriod,
+      lastDistribution: lastDistribution
     });
   }
   
