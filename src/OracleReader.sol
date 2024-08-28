@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
-contract Oracle {
+contract OracleReader {
 
   // arbitrum sepolia
   address private constant ETH_PRICE_FEED = 0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165;
@@ -25,7 +25,7 @@ contract Oracle {
     return uint256(answer);
   }
 
-  function getOracleDecimals(address quote) public view returns(uint8 decimals) {
-    return AggregatorV3Interface(ETH_PRICE_FEED).decimals();
+  function getOracleDecimals(address quote) public view returns(uint256 decimals) {
+    return uint256(AggregatorV3Interface(ETH_PRICE_FEED).decimals());
   }
 }
