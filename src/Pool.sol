@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Token} from "../test/mocks/Token.sol";
+
 import {BondToken} from "./BondToken.sol";
 import {PoolFactory} from "./PoolFactory.sol";
 import {OracleReader} from "./OracleReader.sol";
