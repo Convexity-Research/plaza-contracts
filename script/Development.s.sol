@@ -31,8 +31,8 @@ contract DevelopmentScript is Script {
     PoolFactory.PoolParams memory params;
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
-    params.sharesPerToken = 50000000;
-    params.distributionPeriod = 7776000;
+    params.sharesPerToken = 2500000;
+    params.distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
     params.couponToken = address(0);
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
