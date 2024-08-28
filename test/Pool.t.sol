@@ -1439,7 +1439,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets,
         calcTestCases[i].LeverageAssets,
         calcTestCases[i].TotalUnderlyingAssets,
-        calcTestCases[i].ethPrice * 10**8
+        calcTestCases[i].ethPrice * 10**8,
+        8
       );
       assertEq(amount, calcTestCases[i].expectedCreate);
 
@@ -1456,13 +1457,13 @@ contract PoolTest is Test {
   function testGetCreateAmountZeroDebtSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroDebtSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000);
+    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000, 8);
   }
 
   function testGetCreateAmountZeroLeverageSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroLeverageSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * 10**8);
+    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * 10**8, 8);
   }
 
   function testCreate() public {
@@ -1550,7 +1551,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets, 
         calcTestCases[i].LeverageAssets, 
         calcTestCases[i].TotalUnderlyingAssets, 
-        calcTestCases[i].ethPrice * 10**8
+        calcTestCases[i].ethPrice * 10**8,
+        8
       );
       assertEq(amount, calcTestCases[i].expectedRedeem);
 
