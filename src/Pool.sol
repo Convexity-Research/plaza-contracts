@@ -31,7 +31,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Coupon
   address public couponToken;
-  uint256 public sharesPerToken;
 
   // Distribution
   uint256 public distributionPeriod;
@@ -74,7 +73,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     address _dToken,
     address _lToken,
     address _couponToken,
-    uint256 _sharesPerToken,
     uint256 _distributionPeriod) initializer public {
     __UUPSUpgradeable_init();
     poolFactory = PoolFactory(_poolFactory);
@@ -83,11 +81,10 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     dToken = BondToken(_dToken);
     lToken = LeverageToken(_lToken);
     couponToken = _couponToken;
-    sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistributionTime = block.timestamp;
   }
-  
+
   /**
     * @dev Transfers `depositAmount` of `reserveToken` from the caller, calculates the amount to mint
     * If the amount is valid, mints the appropriate token (dToken or lToken) to the caller.

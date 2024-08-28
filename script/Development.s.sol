@@ -38,7 +38,6 @@ contract DevelopmentScript is Script {
     PoolFactory.PoolParams memory params;
     params.fee = 0;
     params.reserveToken = reserveToken;
-    params.sharesPerToken = 50000000;
     params.distributionPeriod = 7776000;
     params.couponToken = couponToken;
 
