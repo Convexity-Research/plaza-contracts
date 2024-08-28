@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-// @todo: remove - used for faucet
 import {Token} from "../test/mocks/Token.sol";
 
-import {PoolFactory} from "./PoolFactory.sol";
-import {Oracle} from "./Oracle.sol";
 import {BondToken} from "./BondToken.sol";
 import {PoolFactory} from "./PoolFactory.sol";
+import {OracleReader} from "./OracleReader.sol";
 import {LeverageToken} from "./LeverageToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -15,7 +13,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, Oracle {
+contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, OracleReader {
   // uint public constant MINIMUM_LIQUIDITY = 10**3;
   uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
   uint256 private constant POINT_TWO = 200000;
@@ -147,7 +145,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       dToken.totalSupply(),
       lToken.totalSupply(),
       ERC20(reserveToken).balanceOf(address(this)),
-      getOraclePrice(address(0))
+      getOraclePrice(address(0)),
+      getOracleDecimals(address(0))
     );
   }
 
@@ -157,7 +156,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 debtSupply, 
     uint256 levSupply, 
     uint256 poolReserves, 
-    uint256 ethPrice) public view returns(uint256) {
+    uint256 ethPrice,
+    uint256 oracleDecimals) public pure returns(uint256) {
     if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
@@ -169,7 +169,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       assetSupply = levSupply;
     }
 
-    uint256 oracleDecimals = uint256(getOracleDecimals(address(0)));
     uint256 tvl = ethPrice * poolReserves / (10**oracleDecimals);
     uint256 collateralLevel = (tvl * PRECISION) / (debtSupply * BOND_TARGET_PRICE);
     uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
@@ -225,7 +224,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       dToken.totalSupply(),
       lToken.totalSupply(),
       ERC20(reserveToken).balanceOf(address(this)),
-      getOraclePrice(address(0))
+      getOraclePrice(address(0)),
+      getOracleDecimals(address(0))
     );
   }
 
@@ -235,12 +235,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 debtSupply,
     uint256 levSupply,
     uint256 poolReserves,
-    uint256 ethPrice) public view returns(uint256) {
+    uint256 ethPrice,
+    uint256 oracleDecimals) public pure returns(uint256) {
     if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
 
-    uint256 oracleDecimals = uint256(getOracleDecimals(address(0)));
     uint256 tvl = ethPrice * poolReserves / (10**oracleDecimals);
     uint256 assetSupply = debtSupply;
     uint256 multiplier = POINT_EIGHT;
@@ -301,7 +301,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       debtSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0))
+      getOraclePrice(address(0)),
+      getOracleDecimals(address(0))
     );
     
     poolReserves = poolReserves - redeemAmount;
@@ -318,7 +319,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       debtSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0))
+      getOraclePrice(address(0)),
+      getOracleDecimals(address(0))
     );
   }
 
