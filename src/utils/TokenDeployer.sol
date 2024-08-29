@@ -11,10 +11,11 @@ contract TokenDeployer {
     string memory symbol,
     address minter,
     address governance,
-    address distributor
+    address distributor,
+    uint256 sharesPerToken
     ) external returns(address) {
     return Utils.deploy(address(new BondToken()), abi.encodeCall(
-      BondToken.initialize, (name, symbol, minter, governance, distributor)
+      BondToken.initialize, (name, symbol, minter, governance, distributor, sharesPerToken)
     ));
   }
 

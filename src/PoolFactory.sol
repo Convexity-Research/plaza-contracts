@@ -82,7 +82,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       string.concat("BOND-", reserveSymbol),
       address(this),
       address(this),
-      distributor
+      distributor,
+      params.sharesPerToken
     ));
 
     // Deploy Leverage token

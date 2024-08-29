@@ -26,7 +26,7 @@ contract BondTokenTest is Test {
     BondToken implementation = new BondToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor)));
+    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor, 50*10**18)));
 
     // Attach the BondToken interface to the deployed proxy
     token = BondToken(address(proxy));

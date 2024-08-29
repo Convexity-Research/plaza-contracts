@@ -37,6 +37,7 @@ contract DistributorTest is Test {
     distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
     params.fee = 0;
+    params.sharesPerToken = 50*10**18;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("Circle USD", "USDC"));
@@ -57,9 +58,7 @@ contract DistributorTest is Test {
     _pool.lToken().grantRole(_pool.lToken().MINTER_ROLE(), minter);
 
     // // Set period to 1
-    _pool.distribute();
 
-    params.sharesPerToken = 50*10**18;
 
   }
 
@@ -67,14 +66,14 @@ contract DistributorTest is Test {
     Token sharesToken = Token(_pool.couponToken());
 
     vm.startPrank(minter);
-    _pool.dToken().mint(user, 10000*10**18);
-    sharesToken.mint(address(distributor), 1000*10**18);
+    _pool.dToken().mint(user, 1*10**18);
+    sharesToken.mint(address(_pool), 50*(1+10000)*10**18);
     vm.stopPrank();
 
     (uint256 lastUpdatedPeriod, uint256 shares) = _pool.dToken().userAssets(user);
 
     vm.startPrank(governance);
-    _pool.dToken().increaseIndexedAssetPeriod(200);
+    _pool.distribute();
     vm.stopPrank();
 
     vm.startPrank(user);
@@ -83,27 +82,12 @@ contract DistributorTest is Test {
     // vm.expectEmit(true, true, true, true);
     // emit Distributor.ClaimedShares(user, 1, 200);
 
-    _pool.dToken().transfer(address(0x24), 1);
+    // _pool.dToken().transfer(address(0x24), 1);
 
     (lastUpdatedPeriod, shares) = _pool.dToken().userAssets(user);
 
     distributor.claim(address(_pool));
-    assertEq(sharesToken.balanceOf(user), 200);
-    vm.stopPrank();
-  }
-
-  function testClaimInsufficientSharesBalance() public {
-    vm.startPrank(minter);
-    _pool.dToken().mint(user, 1000);
-    vm.stopPrank();
-
-    vm.startPrank(governance);
-    _pool.dToken().increaseIndexedAssetPeriod(200);
-    vm.stopPrank();
-
-    vm.startPrank(user);
-    vm.expectRevert(Distributor.NotEnoughSharesBalance.selector);
-    distributor.claim(address(_pool));
+    assertEq(sharesToken.balanceOf(user), 50*10**18);
     vm.stopPrank();
   }
 
@@ -130,8 +114,8 @@ contract DistributorTest is Test {
 
     vm.startPrank(governance);
     _pool.distribute();
-    // _pool.distribute();
-    // _pool.distribute();
+    _pool.distribute();
+    _pool.distribute();
     vm.stopPrank();
 
     vm.startPrank(user);

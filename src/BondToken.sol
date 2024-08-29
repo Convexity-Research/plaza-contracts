@@ -50,11 +50,14 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     string memory symbol, 
     address minter, 
     address governance, 
-    address distributor
+    address distributor,
+    uint256 sharesPerToken
     ) initializer public {
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();
+
+    globalPool.sharesPerToken = sharesPerToken;
 
     // Grant the access roles
     _grantRole(MINTER_ROLE, minter);

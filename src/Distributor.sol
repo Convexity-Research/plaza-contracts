@@ -87,6 +87,11 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
       shares += (balance * poolAmounts[i].sharesPerToken) / 10 ** sharesToken.decimals();
     }
 
+
+    if (sharesToken.balanceOf(address(this)) < shares) {
+      revert NotEnoughSharesBalance();
+    }
+
     // check if pool has enough *allocated* shares to distribute
     if (poolInfo.amountToDistribute < shares) {
       revert NotEnoughSharesToDistribute();
@@ -95,10 +100,6 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     // check if the distributor has enough shares tokens as the amount to distribute
     if (sharesToken.balanceOf(address(this)) < poolInfo.amountToDistribute) {
       revert NotEnoughSharesToDistribute();
-    }
-
-    if (sharesToken.balanceOf(address(this)) < shares) {
-      revert NotEnoughSharesBalance();
     }
 
     // @todo: replace with safeTransfer
