@@ -3,6 +3,8 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 
+import {Distributor} from "../src/Distributor.sol";
+
 import {Utils} from "../src/lib/Utils.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -18,9 +20,10 @@ contract DevelopmentScript is Script {
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
     
     address tokenDeployer = address(new TokenDeployer());
+    address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer)
+      (deployerAddress, tokenDeployer, distributor)
     )));
 
     // @todo: remove - marion address

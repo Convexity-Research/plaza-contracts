@@ -14,10 +14,25 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
   // Define a constants for the access roles using keccak256 to generate a unique hash
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant POOL_FACTORY_ROLE = keccak256("POOL_FACTORY_ROLE");
+
+  struct PoolInfo {
+    address couponToken;
+    uint256 amountToDistribute;
+  }
+
+  //map of pool info
+  mapping(address => PoolInfo) public poolInfos;
+
+  mapping(address => uint256) public couponAmountsToDistribute;
 
   error NotEnoughSharesBalance();
   error UnsupportedPool();
+  error NotEnoughSharesToDistribute();
+  error NotEnoughCouponBalance();
+  error PoolAlreadyRegistered();
   event ClaimedShares(address user, uint256 period, uint256 shares);
+  event PoolRegistered(address pool, address couponToken);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -36,6 +51,16 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
   }
 
   /**
+   * @dev Allows the pool factory to register a pool in the distributor.
+   */
+  function registerPool(address _pool, address _couponToken) external onlyRole(POOL_FACTORY_ROLE) {
+    require(_pool != address(0), "Invalid pool address");
+    
+    poolInfos[_pool] = PoolInfo(_couponToken, 0);
+    emit PoolRegistered(_pool, _couponToken);
+  }
+
+  /**
    * @dev Allows a user to claim their shares from a specific pool.
    * Calculates the number of shares based on the user's bond token balance and the shares per token.
    * Transfers the calculated shares to the user's address.
@@ -45,6 +70,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     require(_pool != address(0), UnsupportedPool());
     
     Pool pool = Pool(_pool);
+    PoolInfo storage poolInfo = poolInfos[_pool];
     BondToken dToken = pool.dToken();
     ERC20 sharesToken = ERC20(pool.couponToken());
 
@@ -58,9 +84,19 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     BondToken.PoolAmount[] memory poolAmounts = dToken.getPreviousPoolAmounts();
 
     for (uint256 i = lastUpdatedPeriod; i < currentPeriod; i++) {
-      shares += (balance * poolAmounts[i].sharesPerToken) / 10000;
+      shares += (balance * poolAmounts[i].sharesPerToken) / 10 ** sharesToken.decimals();
     }
-    
+
+    // check if pool has enough *allocated* shares to distribute
+    if (poolInfo.amountToDistribute < shares) {
+      revert NotEnoughSharesToDistribute();
+    }
+
+    // check if the distributor has enough shares tokens as the amount to distribute
+    if (sharesToken.balanceOf(address(this)) < poolInfo.amountToDistribute) {
+      revert NotEnoughSharesToDistribute();
+    }
+
     if (sharesToken.balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
     }
@@ -70,8 +106,30 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
       revert("not enough balance");
     }
 
+    poolInfo.amountToDistribute -= shares;
+    couponAmountsToDistribute[pool.couponToken()] -= shares;
+
     dToken.resetIndexedUserAssets(msg.sender);
     emit ClaimedShares(msg.sender, currentPeriod, shares);
+  }
+
+  /**
+   * @dev Allocates shares to a pool.
+   * @param _pool Address of the pool to allocate shares to.
+   * @param _amountToDistribute Amount of shares to allocate.
+   */
+  function allocate(address _pool, uint256 _amountToDistribute) external {
+    require(_pool != address(0), "Invalid pool address");
+    require(_pool == msg.sender, "Caller must be a registered pool");
+
+    Pool pool = Pool(_pool);
+
+    couponAmountsToDistribute[pool.couponToken()] += _amountToDistribute;
+    poolInfos[_pool].amountToDistribute += _amountToDistribute;
+
+    if (ERC20(pool.couponToken()).balanceOf(address(this)) < couponAmountsToDistribute[pool.couponToken()]) {
+      revert NotEnoughCouponBalance();
+    }
   }
 
   /**

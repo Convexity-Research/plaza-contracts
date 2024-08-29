@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Distributor} from "../src/Distributor.sol";
 import "forge-std/Test.sol";
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
@@ -15,13 +16,13 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 contract PoolFactoryTest is Test {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
+  Distributor private distributor;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
   address private user = address(0x4);
   address private user2 = address(0x5);
-  address private distributor = address(0x6);
 
   /**
    * @dev Sets up the testing environment.
@@ -32,7 +33,13 @@ contract PoolFactoryTest is Test {
     vm.startPrank(deployer);
 
     address tokenDeployer = address(new TokenDeployer());
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer))));
+    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance, tokenDeployer, address(distributor)))));
+
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));

@@ -15,7 +15,6 @@ contract BondTokenTest is Test {
   address private user = address(0x4);
   address private user2 = address(0x5);
   address private distributor = address(0x6);
-
   /**
    * @dev Sets up the testing environment.
    * Deploys the BondToken contract and a proxy, then initializes them.
