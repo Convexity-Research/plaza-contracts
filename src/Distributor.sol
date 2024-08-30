@@ -70,7 +70,6 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     require(_pool != address(0), UnsupportedPool());
     
     Pool pool = Pool(_pool);
-    PoolInfo storage poolInfo = poolInfos[_pool];
     BondToken dToken = pool.dToken();
     ERC20 sharesToken = ERC20(pool.couponToken());
 
@@ -93,6 +92,8 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     if (sharesToken.balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
     }
+
+    PoolInfo memory poolInfo = poolInfos[_pool];
 
     // check if pool has enough *allocated* shares to distribute
     if (poolInfo.amountToDistribute < shares) {
