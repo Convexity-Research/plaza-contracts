@@ -123,7 +123,6 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @param _amountToDistribute Amount of shares to allocate.
    */
   function allocate(address _pool, uint256 _amountToDistribute) external {
-    require(_pool != address(0), "Invalid pool address");
     require(_pool == msg.sender, "Caller must be a registered pool");
 
     Pool pool = Pool(_pool);
