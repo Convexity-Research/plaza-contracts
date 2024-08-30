@@ -1824,7 +1824,9 @@ function testNotEnoughBalanceInPool() public {
     uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**18;
     vm.stopPrank();
 
-
+    vm.startPrank(address(_pool));
+    _pool.dToken().mint(user, initialBalance);
+    vm.stopPrank();
 
     vm.startPrank(minter);
     sharesToken.mint(address(_pool), expectedDistribution);
