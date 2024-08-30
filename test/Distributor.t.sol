@@ -57,10 +57,6 @@ contract DistributorTest is Test {
     _pool.dToken().grantRole(_pool.dToken().DISTRIBUTOR_ROLE(), address(distributor));
     _pool.dToken().grantRole(_pool.dToken().MINTER_ROLE(), minter);
     _pool.lToken().grantRole(_pool.lToken().MINTER_ROLE(), minter);
-
-    // // Set period to 1
-
-
   }
 
   function testClaimShares() public {
@@ -166,7 +162,7 @@ contract DistributorTest is Test {
   }
 
   function testAllocateInvalidPoolAddress() public {
-    vm.expectRevert("Invalid pool address");
+    vm.expectRevert("Caller must be a registered pool");
     distributor.allocate(address(0), 100);
   }
 

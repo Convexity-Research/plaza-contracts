@@ -71,7 +71,8 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     
     Pool pool = Pool(_pool);
     BondToken dToken = pool.dToken();
-    ERC20 sharesToken = ERC20(pool.couponToken());
+    address couponToken = pool.couponToken();
+    ERC20 sharesToken = ERC20(couponToken);
 
     uint8 decimals = sharesToken.decimals();
 
@@ -111,7 +112,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     }
 
     poolInfo.amountToDistribute -= shares;
-    couponAmountsToDistribute[pool.couponToken()] -= shares;
+    couponAmountsToDistribute[couponToken] -= shares;
 
     dToken.resetIndexedUserAssets(msg.sender);
     emit ClaimedShares(msg.sender, currentPeriod, shares);
@@ -132,7 +133,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     couponAmountsToDistribute[couponToken] += _amountToDistribute;
     poolInfos[_pool].amountToDistribute += _amountToDistribute;
 
-    if (ERC20(pool.couponToken()).balanceOf(address(this)) < couponAmountsToDistribute[pool.couponToken()]) {
+    if (ERC20(couponToken).balanceOf(address(this)) < couponAmountsToDistribute[couponToken]) {
       revert NotEnoughCouponBalance();
     }
   }
