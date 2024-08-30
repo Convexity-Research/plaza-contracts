@@ -60,7 +60,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event TokensSwapped(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-
+  event Distributed(uint256 amount);
+  
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -349,6 +350,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
     // @todo: update distributor with the amount to distribute
     distributor.allocate(address(this), couponAmountToDistribute);
+
+    emit Distributed(couponAmountToDistribute);
   }
 
   function getPoolInfo() external view returns (PoolInfo memory info) {
