@@ -74,6 +74,8 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     BondToken dToken = pool.dToken();
     ERC20 sharesToken = ERC20(pool.couponToken());
 
+    uint8 decimals = sharesToken.decimals();
+
     if (address(dToken) == address(0) || address(sharesToken) == address(0)){
       revert UnsupportedPool();
     }
@@ -84,7 +86,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     BondToken.PoolAmount[] memory poolAmounts = dToken.getPreviousPoolAmounts();
 
     for (uint256 i = lastUpdatedPeriod; i < currentPeriod; i++) {
-      shares += (balance * poolAmounts[i].sharesPerToken) / 10 ** sharesToken.decimals();
+      shares += (balance * poolAmounts[i].sharesPerToken) / 10 ** decimals;
     }
 
 
