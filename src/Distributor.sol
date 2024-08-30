@@ -127,7 +127,9 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     Pool pool = Pool(_pool);
 
-    couponAmountsToDistribute[pool.couponToken()] += _amountToDistribute;
+    address couponToken = pool.couponToken();
+
+    couponAmountsToDistribute[couponToken] += _amountToDistribute;
     poolInfos[_pool].amountToDistribute += _amountToDistribute;
 
     if (ERC20(pool.couponToken()).balanceOf(address(this)) < couponAmountsToDistribute[pool.couponToken()]) {
