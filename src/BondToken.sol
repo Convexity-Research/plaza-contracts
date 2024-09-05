@@ -109,18 +109,29 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * Updates the number of shares held by the user based on the current period.
    */
   function updateIndexedUserAssets(address user, uint256 balance) internal {
-    IndexedUserAssets memory userPool = userAssets[user];
+    uint256 shares = getIndexedUserAmount(user, balance);
     uint256 period = globalPool.currentPeriod;
-    uint shares = userAssets[user].indexedAmountShares;
-    
-    for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
-      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10000;
-    }
     
     userAssets[user].indexedAmountShares = shares;
     userAssets[user].lastUpdatedPeriod = period;
 
     emit UpdatedUserAssets(user, period, shares);
+  }
+
+  /**
+   * @dev Returns the indexed amount of shares for a specific user.
+   * Calculates the number of shares based on the current period and the previous pool amounts.
+   */
+  function getIndexedUserAmount(address user, uint256 balance) public view returns(uint256) {
+    IndexedUserAssets memory userPool = userAssets[user];
+    uint256 period = globalPool.currentPeriod;
+    uint256 shares = userAssets[user].indexedAmountShares;
+    
+    for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
+      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10000;
+    }
+
+    return shares;
   }
 
   /**
