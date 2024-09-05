@@ -1,3 +1,4 @@
 @openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 @uniswap/v3-periphery/=lib/v3-periphery/
+@chainlink/contracts/=lib/chainlink/contracts/

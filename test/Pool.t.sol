@@ -2,12 +2,13 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import {PoolFactory} from "../src/PoolFactory.sol";
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
-import {BondToken} from "../src/BondToken.sol";
-import {LeverageToken} from "../src/LeverageToken.sol";
 import {Utils} from "../src/lib/Utils.sol";
+import {BondToken} from "../src/BondToken.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
+import {LeverageToken} from "../src/LeverageToken.sol";
+import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 
 contract PoolTest is Test {
   PoolFactory private poolFactory;
@@ -35,6 +36,10 @@ contract PoolTest is Test {
   CalcTestCase[] public calcTestCases;
   CalcTestCase[] public calcTestCases2;
 
+  address private constant ETH_PRICE_FEED = 0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165;
+  uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
+  uint256 private constant CHAINLINK_DECIMAL = 8;
+
   /**
    * @dev Sets up the testing environment.
    * Deploys the BondToken contract and a proxy, then initializes them.
@@ -49,6 +54,17 @@ contract PoolTest is Test {
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
     params.sharesPerToken = 0;
     params.distributionPeriod = 0;
+
+    // Deploy the mock price feed
+    MockPriceFeed mockPriceFeed = new MockPriceFeed();
+
+    // Use vm.etch to deploy the mock contract at the specific address
+    bytes memory bytecode = address(mockPriceFeed).code;
+    vm.etch(ETH_PRICE_FEED, bytecode);
+
+    // Set oracle price
+    mockPriceFeed = MockPriceFeed(ETH_PRICE_FEED);
+    mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
     
     vm.stopPrank();
     initializeTestCases();
@@ -1425,7 +1441,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets,
         calcTestCases[i].LeverageAssets,
         calcTestCases[i].TotalUnderlyingAssets,
-        calcTestCases[i].ethPrice
+        calcTestCases[i].ethPrice * CHAINLINK_DECIMAL_PRECISION,
+        CHAINLINK_DECIMAL
       );
       assertEq(amount, calcTestCases[i].expectedCreate);
 
@@ -1442,13 +1459,13 @@ contract PoolTest is Test {
   function testGetCreateAmountZeroDebtSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroDebtSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000);
+    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000, CHAINLINK_DECIMAL);
   }
 
   function testGetCreateAmountZeroLeverageSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroLeverageSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000);
+    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * CHAINLINK_DECIMAL_PRECISION, CHAINLINK_DECIMAL);
   }
 
   function testCreate() public {
@@ -1536,7 +1553,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets, 
         calcTestCases[i].LeverageAssets, 
         calcTestCases[i].TotalUnderlyingAssets, 
-        calcTestCases[i].ethPrice
+        calcTestCases[i].ethPrice * CHAINLINK_DECIMAL_PRECISION,
+        CHAINLINK_DECIMAL
       );
       assertEq(amount, calcTestCases[i].expectedRedeem);
 
