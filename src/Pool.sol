@@ -5,6 +5,7 @@ import {Distributor} from "./Distributor.sol";
 import {Token} from "../test/mocks/Token.sol";
 
 import {BondToken} from "./BondToken.sol";
+import {Decimals} from "./lib/Decimals.sol";
 import {PoolFactory} from "./PoolFactory.sol";
 import {OracleReader} from "./OracleReader.sol";
 import {LeverageToken} from "./LeverageToken.sol";
@@ -15,6 +16,8 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, OracleReader {
+  using Decimals for uint256;
+  
   // uint public constant MINIMUM_LIQUIDITY = 10**3;
   uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
   uint256 private constant POINT_TWO = 200000;
