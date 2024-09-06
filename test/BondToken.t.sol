@@ -39,7 +39,7 @@ contract BondTokenTest is Test {
 
     // Increase the indexed asset period for testing
     vm.startPrank(governance);
-    token.increaseIndexedAssetPeriod(200);
+    token.increaseIndexedAssetPeriod(20000);
     vm.stopPrank();
   }
 

@@ -37,6 +37,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 
+  uint256 public constant SHARES_DECIMALS = 6;
+
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
   event UpdatedUserAssets(address user, uint256 lastUpdatedPeriod, uint256 indexedAmountShares);
 
@@ -128,7 +130,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     uint256 shares = userAssets[user].indexedAmountShares;
     
     for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
-      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10000;
+      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10**SHARES_DECIMALS;
     }
 
     return shares;

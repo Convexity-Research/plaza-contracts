@@ -1821,7 +1821,7 @@ function testNotEnoughBalanceInPool() public {
     Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**18;
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.dToken().SHARES_DECIMALS();
     vm.stopPrank();
 
     vm.startPrank(address(_pool));
@@ -1849,7 +1849,7 @@ function testNotEnoughBalanceInPool() public {
 
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**18;
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.dToken().SHARES_DECIMALS();
     vm.stopPrank();
     
     vm.startPrank(address(_pool));
