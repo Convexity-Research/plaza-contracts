@@ -14,4 +14,8 @@ contract Token is ERC20 {
   function burn(address account, uint256 amount) public {
     _burn(account, amount);
   }
+
+  function decimals() public view virtual override returns (uint8) {
+        return 18;
+    }
 }
