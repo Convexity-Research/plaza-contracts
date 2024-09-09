@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 library Decimals {
     /**
      * @dev Converts a token amount to its base unit representation.
@@ -18,7 +20,7 @@ library Decimals {
      * @param decimals The number of decimals the token uses.
      * @return The token amount.
      */
-    function toAmount(uint256 baseUnitAmount, uint8 decimals) internal pure returns (uint256) {
+    function fromBaseUnit(uint256 baseUnitAmount, uint8 decimals) internal pure returns (uint256) {
         return baseUnitAmount * (10 ** decimals);
     }
 
@@ -37,6 +39,18 @@ library Decimals {
         } else {
             return amount;
         }
+    }
+
+    /**
+     * @dev Normalizes a token amount to a specified decimal base.
+     * @param token The ERC20 token.
+     * @param amount The token amount to normalize.
+     * @param toDecimals The target number of decimals.
+     * @return The normalized token amount.
+     */
+    function normalizeTokenAmount(uint256 amount, address token, uint8 toDecimals) internal view returns (uint256) {
+        uint8 decimals = IERC20Metadata(token).decimals();
+        return normalizeAmount(amount, decimals, toDecimals);
     }
 
     /**

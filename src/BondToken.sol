@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
+import {Decimals} from "./lib/Decimals.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -11,6 +12,8 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
 contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {  
+  using Decimals for uint256;
+
   struct PoolAmount {
     uint256 period;
     uint256 amount;
@@ -37,7 +40,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 
-  uint256 public constant SHARES_DECIMALS = 6;
+  uint8 public constant SHARES_DECIMALS = 6;
 
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
   event UpdatedUserAssets(address user, uint256 lastUpdatedPeriod, uint256 indexedAmountShares);
@@ -130,7 +133,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     uint256 shares = userAssets[user].indexedAmountShares;
     
     for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
-      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10**SHARES_DECIMALS;
+      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken).toBaseUnit(SHARES_DECIMALS);
     }
 
     return shares;

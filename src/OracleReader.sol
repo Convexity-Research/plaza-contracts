@@ -25,7 +25,7 @@ contract OracleReader {
     return uint256(answer);
   }
 
-  function getOracleDecimals(address quote) public view returns(uint256 decimals) {
-    return uint256(AggregatorV3Interface(ETH_PRICE_FEED).decimals());
+  function getOracleDecimals(address quote) public view returns(uint8 decimals) {
+    return AggregatorV3Interface(ETH_PRICE_FEED).decimals();
   }
 }
