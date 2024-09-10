@@ -1545,7 +1545,7 @@ contract PoolTest is Test {
       uint256 startReserveBalance = rToken.balanceOf(governance);
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, user2);
+      uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, block.timestamp, user2);
       assertEq(amount, calcTestCases2[i].expectedCreate);
 
       uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(user2);
@@ -1704,7 +1704,7 @@ contract PoolTest is Test {
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.redeem(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, user2);
+      uint256 amount = _pool.redeem(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, block.timestamp, user2);
       assertEq(amount, calcTestCases2[i].expectedRedeem);
 
       uint256 endBalance = rToken.balanceOf(user2);
@@ -1842,7 +1842,7 @@ contract PoolTest is Test {
 
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.swap(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, user2);
+      uint256 amount = _pool.swap(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, block.timestamp, user2);
       assertEq(amount, calcTestCases2[i].expectedSwap);
 
       uint256 endBalance = rToken.balanceOf(governance);

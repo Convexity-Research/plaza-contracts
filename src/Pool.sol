@@ -7,6 +7,7 @@ import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {PoolFactory} from "./PoolFactory.sol";
+import {Validator} from "./utils/Validator.sol";
 import {OracleReader} from "./OracleReader.sol";
 import {LeverageToken} from "./LeverageToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -15,7 +16,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, OracleReader {
+contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, OracleReader, Validator {
   using Decimals for uint256;
   
   // uint public constant MINIMUM_LIQUIDITY = 10**3;
@@ -110,10 +111,15 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
-    return create(tokenType, depositAmount, minAmount, address(0));
+    return create(tokenType, depositAmount, minAmount, block.timestamp, address(0));
   }
 
-  function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount, address onBehalfOf) public whenNotPaused() returns(uint256) {
+  function create(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 minAmount,
+    uint256 deadline,
+    address onBehalfOf) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
     // Get amount to mint
     uint256 amount = simulateCreate(tokenType, depositAmount);
 
@@ -209,10 +215,15 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
-    return redeem(tokenType, depositAmount, minAmount, address(0));
+    return redeem(tokenType, depositAmount, minAmount, block.timestamp, address(0));
   }
 
-  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount, address onBehalfOf) public whenNotPaused() returns(uint256) {
+  function redeem(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 minAmount,
+    uint256 deadline,
+    address onBehalfOf) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
     // Get amount to mint
     uint256 reserveAmount = simulateRedeem(tokenType, depositAmount);
 
@@ -312,10 +323,15 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
-    return swap(tokenType, depositAmount, minAmount, address(0));
+    return swap(tokenType, depositAmount, minAmount, block.timestamp, address(0));
   }
 
-  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount, address onBehalfOf) public whenNotPaused() returns(uint256) {
+  function swap(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 minAmount,
+    uint256 deadline,
+    address onBehalfOf) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
     uint256 mintAmount = simulateSwap(tokenType, depositAmount);
 
     if (mintAmount < minAmount) {
