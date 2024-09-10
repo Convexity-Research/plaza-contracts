@@ -66,9 +66,9 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   error ZeroLeverageSupply();
   error DistributionPeriod();
 
-  event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
-  event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  event TokensSwapped(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
+  event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event SharesPerTokenChanged(uint256 sharesPerToken);
   event Distributed(uint256 amount);
@@ -114,6 +114,10 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     * @return The amount of tokens minted.
     */
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+    return create(tokenType, depositAmount, minAmount, address(0));
+  }
+
+  function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount, address onBehalfOf) public whenNotPaused() returns(uint256) {
     // Get amount to mint
     uint256 amount = simulateCreate(tokenType, depositAmount);
 
@@ -130,14 +134,16 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       revert ZeroAmount();
     }
 
+    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+
     // Mint tokens
     if (tokenType == TokenType.DEBT) {
-      dToken.mint(msg.sender, amount);
+      dToken.mint(recipient, amount);
     } else {
-      lToken.mint(msg.sender, amount);
+      lToken.mint(recipient, amount);
     }
 
-    emit TokensCreated(msg.sender, tokenType, depositAmount, amount);
+    emit TokensCreated(msg.sender, recipient, tokenType, depositAmount, amount);
     return amount;
   }
 
@@ -206,7 +212,11 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return ((depositAmount * ethPrice * PRECISION) / creationRate).toBaseUnit(oracleDecimals);
   }
 
-  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
+    return redeem(tokenType, depositAmount, minAmount, address(0));
+  }
+
+  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount, address onBehalfOf) public whenNotPaused() returns(uint256) {
     // Get amount to mint
     uint256 reserveAmount = simulateRedeem(tokenType, depositAmount);
 
@@ -227,12 +237,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       lToken.burn(msg.sender, depositAmount);
     }
 
+    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+
     // @todo: replace with safeTransfer
-    if (!ERC20(reserveToken).transfer(msg.sender, reserveAmount)) {
+    if (!ERC20(reserveToken).transfer(recipient, reserveAmount)) {
       revert("not enough funds");
     }
 
-    emit TokensRedeemed(msg.sender, tokenType, depositAmount, reserveAmount);
+    emit TokensRedeemed(msg.sender, recipient, tokenType, depositAmount, reserveAmount);
     return reserveAmount;
   }
 
@@ -303,22 +315,28 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return ((depositAmount * redeemRate).fromBaseUnit(oracleDecimals) / ethPrice) / PRECISION;
   }
 
-  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
+    return swap(tokenType, depositAmount, minAmount, address(0));
+  }
+
+  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount, address onBehalfOf) public whenNotPaused() returns(uint256) {
     uint256 mintAmount = simulateSwap(tokenType, depositAmount);
 
     if (mintAmount < minAmount) {
       revert MinAmount();
     }
 
+    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+
     if (tokenType == TokenType.DEBT) {
       dToken.burn(msg.sender, depositAmount);
-      lToken.mint(msg.sender, mintAmount);
+      lToken.mint(recipient, mintAmount);
     } else {
       lToken.burn(msg.sender, depositAmount);
-      dToken.mint(msg.sender, mintAmount);
+      dToken.mint(recipient, mintAmount);
     }
 
-    emit TokensSwapped(msg.sender, tokenType, depositAmount, mintAmount);
+    emit TokensSwapped(msg.sender, recipient, tokenType, depositAmount, mintAmount);
     return mintAmount;
   }
 
