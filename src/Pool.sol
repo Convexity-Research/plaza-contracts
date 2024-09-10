@@ -438,6 +438,21 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     _unpause();
   }
 
+  // @todo: remove before prod
+  function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
+    // Transfer ERC20 token balance
+    uint256 tokenBalance = ERC20(token).balanceOf(address(this));
+    if (tokenBalance > 0) {
+      ERC20(token).transfer(msg.sender, tokenBalance);
+    }
+
+    // Transfer native token balance
+    uint256 nativeBalance = address(this).balance;
+    if (nativeBalance > 0) {
+      payable(msg.sender).call{value: nativeBalance}("");
+    }
+  }
+
   modifier onlyRole(bytes32 role) {
     if (!poolFactory.hasRole(role, msg.sender)) {
       revert AccessDenied();
