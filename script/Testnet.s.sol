@@ -47,7 +47,7 @@ contract DevelopmentScript is Script {
     params.reserveToken = reserveToken;
     params.sharesPerToken = 2500000;
     params.distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
-    params.couponToken = address(0);
+    params.couponToken = couponToken;
 
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
