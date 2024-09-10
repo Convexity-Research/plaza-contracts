@@ -15,8 +15,8 @@ import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 contract DevelopmentScript is Script {
 
   // Arbitrum Sepolia addresses
-  address public constant reserveToken = address(0xDc00b8C3857320B2ba9A069cFcB8Cd01788FEea7);
-  address public constant couponToken = address(0x4FCE2AFA415Ff70794d2CC6F7820Ea09dC876a7b);
+  address public constant reserveToken = address(0xE46230A4963b8bBae8681b5c05F8a22B9469De18);
+  address public constant couponToken = address(0xDA1334a1084170eb1438E0d9d5C8799A07fbA7d3);
 
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
