@@ -1751,7 +1751,9 @@ contract PoolTest is Test {
     Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
 
     _pool.setDistributionPeriod(100);
-    assertEq(_pool.distributionPeriod(), 100);
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.distributionPeriod, 100);
   }
 
   function testSetDistributionPeriodErrorUnauthorized() public {
@@ -1785,7 +1787,9 @@ contract PoolTest is Test {
     Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
 
     _pool.setFee(100);
-    assertEq(_pool.fee(), 100);
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.fee, 100);
   }
 
   function testSetFeeErrorUnauthorized() public {
@@ -1817,7 +1821,9 @@ contract PoolTest is Test {
 
     _pool.unpause();
     _pool.setFee(100);
-    assertEq(_pool.fee(), 100);
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.fee, 100);
   }
 
 function testNotEnoughBalanceInPool() public {

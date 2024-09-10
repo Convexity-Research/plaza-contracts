@@ -24,7 +24,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Protocol
   PoolFactory public poolFactory;
-  uint256 public fee;
+  uint256 private fee;
 
   // Tokens
   address public reserveToken;
@@ -35,9 +35,9 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   address public couponToken;
 
   // Distribution
-  uint256 public sharesPerToken;
-  uint256 public distributionPeriod;
-  uint256 public lastDistribution;
+  uint256 private sharesPerToken;
+  uint256 private distributionPeriod;
+  uint256 private lastDistribution;
 
   enum TokenType {
     DEBT,
@@ -45,12 +45,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   struct PoolInfo {
+    uint256 fee;
     uint256 reserve;
     uint256 debtSupply;
     uint256 levSupply;
     uint256 sharesPerToken;
     uint256 currentPeriod;
     uint256 lastDistribution;
+    uint256 distributionPeriod;
   }
 
   error MinAmount();
@@ -352,6 +354,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     (uint256 currentPeriod, uint256 _sharesPerToken) = dToken.globalPool();
 
     info = PoolInfo({
+      fee: fee,
+      distributionPeriod: distributionPeriod,
       reserve: ERC20(reserveToken).balanceOf(address(this)),
       debtSupply: dToken.totalSupply(),
       levSupply: lToken.totalSupply(),
