@@ -330,7 +330,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
     uint256 debtSupply = dToken.totalSupply();
     uint256 levSupply = lToken.totalSupply();
-    uint256 poolReserves = ERC20(reserveToken).totalSupply();
+    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this));
     TokenType createType = TokenType.DEBT;
 
     uint256 redeemAmount = getRedeemAmount(
