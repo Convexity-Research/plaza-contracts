@@ -15,7 +15,8 @@ contract TokenDeployer {
     uint256 sharesPerToken
     ) external returns(address) {
     return Utils.deploy(address(new BondToken()), abi.encodeCall(
-      BondToken.initialize, (name, symbol, minter, governance, distributor, sharesPerToken)
+      // @todo: figure out naming convention
+      BondToken.initialize, ("Bond ETH", "bondETH", minter, governance, distributor, sharesPerToken)
     ));
   }
 
@@ -25,7 +26,8 @@ contract TokenDeployer {
     address minter,
     address governance) external returns(address) {
     return Utils.deploy(address(new LeverageToken()), abi.encodeCall(
-      LeverageToken.initialize, (name, symbol, minter, governance)
+      // @todo: figure out naming convention
+      LeverageToken.initialize, ("Leverage ETH", "levETH", minter, governance)
     ));
   }
 }
