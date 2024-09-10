@@ -19,6 +19,13 @@ contract DevelopmentScript is Script {
   address public constant couponToken = address(0xDA1334a1084170eb1438E0d9d5C8799A07fbA7d3);
   address public constant ethPriceFeed = address(0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1);
 
+  uint256 private constant distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
+  uint256 private constant reserveAmount = 1_000_000 ether;
+  uint256 private constant debtAmount = 25_000_000 ether;
+  uint256 private constant leverageAmount = 1_000_000 ether;
+  uint256 private constant sharesPerToken = 2_500_000;
+  uint256 private constant fee = 0;
+
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
@@ -37,36 +44,18 @@ contract DevelopmentScript is Script {
     factory.grantRole(factory.GOV_ROLE(), 0x11cba1EFf7a308Ac2cF6a6Ac2892ca33fabc3398);
     factory.grantRole(factory.GOV_ROLE(), 0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd);
 
-    address pool;
-    uint256 reserveAmount = 1000000000000000000000000;
-    uint256 debtAmount = 25000000000000000000000000;
-    uint256 leverageAmount = 1000000000000000000000000;
-
-    PoolFactory.PoolParams memory params;
-    params.fee = 0;
-
-    params.reserveToken = reserveToken;
-    params.sharesPerToken = 2500000;
-    params.distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
-    params.couponToken = couponToken;
-
+    PoolFactory.PoolParams memory params = PoolFactory.PoolParams({
+      fee: fee,
+      reserveToken: reserveToken,
+      sharesPerToken: sharesPerToken,
+      distributionPeriod: distributionPeriod,
+      couponToken: couponToken
+    });
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
 
-    // // @todo: not for prod
-    // BondToken(dToken).grantRole(BondToken(dToken).MINTER_ROLE(), address(factory));
-    // BondToken(lToken).grantRole(BondToken(lToken).MINTER_ROLE(), address(factory));
-
-    // // @todo: not for prod
-    // BondToken(dToken).grantRole(BondToken(dToken).GOV_ROLE(), address(factory));
-    // BondToken(lToken).grantRole(BondToken(lToken).GOV_ROLE(), address(factory));
-
-    // // @todo: not for prod
-    // BondToken(dToken).grantRole(BondToken(dToken).DEFAULT_ADMIN_ROLE(), address(factory));
-    // BondToken(lToken).grantRole(BondToken(lToken).DEFAULT_ADMIN_ROLE(), address(factory));
-
-    pool = factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount);
+    factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount);
     
     vm.stopBroadcast();
   }
