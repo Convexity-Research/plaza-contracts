@@ -41,7 +41,7 @@ contract PoolTest is Test {
 
   address private constant ETH_PRICE_FEED = 0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165;
   uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
-  uint256 private constant CHAINLINK_DECIMAL = 8;
+  uint8 private constant CHAINLINK_DECIMAL = 8;
 
   /**
    * @dev Sets up the testing environment.
