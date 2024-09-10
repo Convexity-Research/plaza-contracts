@@ -65,6 +65,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   event TokensSwapped(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event CouponTokenChanged(address oldToken, address newToken);
+  event SharesPerTokenChanged(uint256 sharesPerToken);
   event Distributed(uint256 amount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -372,6 +373,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     couponToken = token;
 
     emit CouponTokenChanged(oldToken, token);
+  }
+
+  function setSharesPerToken(uint256 _sharesPerToken) external onlyRole(poolFactory.GOV_ROLE()) {
+    sharesPerToken = _sharesPerToken;
+
+    emit SharesPerTokenChanged(sharesPerToken);
   }
 
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
