@@ -15,7 +15,6 @@ contract BondTokenTest is Test {
   address private user = address(0x4);
   address private user2 = address(0x5);
   address private distributor = address(0x6);
-
   /**
    * @dev Sets up the testing environment.
    * Deploys the BondToken contract and a proxy, then initializes them.
@@ -27,7 +26,7 @@ contract BondTokenTest is Test {
     BondToken implementation = new BondToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor)));
+    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor, 50*10**18)));
 
     // Attach the BondToken interface to the deployed proxy
     token = BondToken(address(proxy));

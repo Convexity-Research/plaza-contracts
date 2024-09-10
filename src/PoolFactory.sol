@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Distributor} from "./Distributor.sol";
 import {Pool} from "./Pool.sol";
 import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "./BondToken.sol";
@@ -47,11 +48,12 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * This function is called once during deployment or upgrading to initialize state variables.
    * @param _governance Address of the governance account that will have the GOV_ROLE.
    */
-  function initialize(address _governance, address _tokenDeployer) initializer public {
+  function initialize(address _governance, address _tokenDeployer, address _distributor) initializer public {
     __UUPSUpgradeable_init();
 
     tokenDeployer = TokenDeployer(_tokenDeployer);
     governance = _governance;
+    distributor = _distributor;
     _grantRole(GOV_ROLE, _governance);
   }
 
@@ -79,7 +81,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       string.concat("BOND-", reserveSymbol),
       address(this),
       address(this),
-      distributor
+      distributor,
+      params.sharesPerToken
     ));
 
     // Deploy Leverage token
@@ -104,12 +107,17 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       )
     ));
 
+    Distributor(distributor).registerPool(pool, params.couponToken);
+
     dToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
     
     // set token governance
     dToken.grantRole(GOV_ROLE, governance);
     lToken.grantRole(GOV_ROLE, governance);
+
+    dToken.grantRole(GOV_ROLE, pool);
+    lToken.grantRole(GOV_ROLE, pool);
 
     // remove governance from factory
     dToken.revokeRole(GOV_ROLE, address(this));
