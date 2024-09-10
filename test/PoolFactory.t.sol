@@ -24,6 +24,8 @@ contract PoolFactoryTest is Test {
   address private user = address(0x4);
   address private user2 = address(0x5);
 
+  address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
+
   /**
    * @dev Sets up the testing environment.
    * Deploys the BondToken contract and a proxy, then initializes them.
@@ -34,7 +36,7 @@ contract PoolFactoryTest is Test {
 
     address tokenDeployer = address(new TokenDeployer());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance, tokenDeployer, address(distributor)))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance, tokenDeployer, address(distributor), ethPriceFeed))));
 
     vm.stopPrank();
 

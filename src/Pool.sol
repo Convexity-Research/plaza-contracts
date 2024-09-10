@@ -82,9 +82,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     address _lToken,
     address _couponToken,
     uint256 _sharesPerToken,
-    uint256 _distributionPeriod
+    uint256 _distributionPeriod,
+    address _ethPriceFeed
   ) initializer public {
     __UUPSUpgradeable_init();
+    __OracleReader_init(_ethPriceFeed);
+
     poolFactory = PoolFactory(_poolFactory);
     fee = _fee;
     reserveToken = _reserveToken;
@@ -244,7 +247,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
-    
+
     uint256 debtSupply = dToken.totalSupply()
                           .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
     uint256 levSupply = lToken.totalSupply()
@@ -453,7 +456,10 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     // Transfer native token balance
     uint256 nativeBalance = address(this).balance;
     if (nativeBalance > 0) {
-      payable(msg.sender).call{value: nativeBalance}("");
+      (bool success,) = payable(msg.sender).call{value: nativeBalance}("");
+      if (!success) {
+        return;
+      }
     }
   }
 

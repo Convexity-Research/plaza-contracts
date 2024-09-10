@@ -18,6 +18,7 @@ contract MainnetScript is Script {
   // Arbitrum Sepolia addresses
   address public constant reserveToken = address(0x4200000000000000000000000000000000000006);
   address public constant couponToken = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
+  address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
@@ -27,7 +28,7 @@ contract MainnetScript is Script {
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor)
+      (deployerAddress, tokenDeployer, distributor, ethPriceFeed)
     )));
 
     // Grant pool factory role to factory

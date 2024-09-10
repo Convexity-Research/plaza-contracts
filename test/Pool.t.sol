@@ -41,7 +41,7 @@ contract PoolTest is Test {
   CalcTestCase[] public calcTestCases;
   CalcTestCase[] public calcTestCases2;
 
-  address private constant ETH_PRICE_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
+  address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
   uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
   uint8 private constant CHAINLINK_DECIMAL = 8;
 
@@ -55,7 +55,7 @@ contract PoolTest is Test {
 
     address tokenDeployer = address(new TokenDeployer());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor)))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
@@ -68,10 +68,10 @@ contract PoolTest is Test {
 
     // Use vm.etch to deploy the mock contract at the specific address
     bytes memory bytecode = address(mockPriceFeed).code;
-    vm.etch(ETH_PRICE_FEED, bytecode);
+    vm.etch(ethPriceFeed, bytecode);
 
     // Set oracle price
-    mockPriceFeed = MockPriceFeed(ETH_PRICE_FEED);
+    mockPriceFeed = MockPriceFeed(ethPriceFeed);
     mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
     
     vm.stopPrank();
@@ -93,7 +93,7 @@ contract PoolTest is Test {
   }
 
   function setEthPrice(uint256 price) public {
-    MockPriceFeed mockPriceFeed = MockPriceFeed(ETH_PRICE_FEED);
+    MockPriceFeed mockPriceFeed = MockPriceFeed(ethPriceFeed);
     mockPriceFeed.setMockPrice(int256(price), uint8(CHAINLINK_DECIMAL));
   }
 

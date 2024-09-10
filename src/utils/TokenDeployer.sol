@@ -7,8 +7,8 @@ import {LeverageToken} from "../LeverageToken.sol";
 
 contract TokenDeployer {
   function deployDebtToken(
-    string memory name,
-    string memory symbol,
+    string memory /*name*/,
+    string memory /*symbol*/,
     address minter,
     address governance,
     address distributor,
@@ -21,8 +21,8 @@ contract TokenDeployer {
   }
 
   function deployLeverageToken(
-    string memory name,
-    string memory symbol,
+    string memory /*name*/,
+    string memory /*symbol*/,
     address minter,
     address governance) external returns(address) {
     return Utils.deploy(address(new LeverageToken()), abi.encodeCall(
