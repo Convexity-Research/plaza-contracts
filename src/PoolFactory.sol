@@ -24,6 +24,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     address reserveToken;
     address couponToken;
     uint256 distributionPeriod;
+    uint256 sharesPerToken;
   }
 
   address[] public pools;
@@ -103,6 +104,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
         address(dToken),
         address(lToken),
         params.couponToken,
+        params.sharesPerToken,
         params.distributionPeriod
       )
     ));

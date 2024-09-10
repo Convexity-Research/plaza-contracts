@@ -35,6 +35,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   address public couponToken;
 
   // Distribution
+  uint256 public sharesPerToken;
   uint256 public distributionPeriod;
   uint256 public lastDistribution;
 
@@ -92,6 +93,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     dToken = BondToken(_dToken);
     lToken = LeverageToken(_lToken);
     couponToken = _couponToken;
+    sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistribution = block.timestamp;
   }
@@ -320,14 +322,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function distribute() external whenNotPaused() {
-    if (block.timestamp - lastDistributionTime < distributionPeriod) {
+    if (block.timestamp - lastDistribution < distributionPeriod) {
       revert DistributionPeriod();
     }
 
     Distributor distributor = Distributor(poolFactory.distributor());
 
     //calculate last distribution time
-    lastDistributionTime = block.timestamp + distributionPeriod;
+    lastDistribution = block.timestamp + distributionPeriod;
 
     // calculate the coupon to distribute. all issued bond tokens times the sharesPerToken (this will need to be adjusted when we go cross-chain)
     uint256 couponAmountToDistribute = dToken.totalSupply() * sharesPerToken / 10**ERC20(couponToken).decimals();
@@ -346,13 +348,13 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function getPoolInfo() external view returns (PoolInfo memory info) {
-    (uint256 currentPeriod, uint256 sharesPerToken) = dToken.globalPool();
+    (uint256 currentPeriod, uint256 _sharesPerToken) = dToken.globalPool();
 
     info = PoolInfo({
       reserve: ERC20(reserveToken).balanceOf(address(this)),
       debtSupply: dToken.totalSupply(),
       levSupply: lToken.totalSupply(),
-      sharesPerToken: sharesPerToken,
+      sharesPerToken: _sharesPerToken,
       currentPeriod: currentPeriod,
       lastDistribution: lastDistribution
     });
