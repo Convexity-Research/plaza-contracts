@@ -11,12 +11,13 @@ import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract DevelopmentScript is Script {
+contract MainnetScript is Script {
 
   // Arbitrum Sepolia addresses
-  address public constant reserveToken = address(0xE46230A4963b8bBae8681b5c05F8a22B9469De18);
-  address public constant couponToken = address(0xDA1334a1084170eb1438E0d9d5C8799A07fbA7d3);
+  address public constant reserveToken = address(0x4200000000000000000000000000000000000006);
+  address public constant couponToken = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
 
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
@@ -32,41 +33,22 @@ contract DevelopmentScript is Script {
     // Grant pool factory role to factory
     Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(factory));
 
-    // @todo: remove - marion address
-    factory.grantRole(factory.GOV_ROLE(), 0x11cba1EFf7a308Ac2cF6a6Ac2892ca33fabc3398);
-    factory.grantRole(factory.GOV_ROLE(), 0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd);
+    uint256 reserveAmount = 1000000000000000; // 0.001 ETH
+    uint256 debtAmount = 25000000000000000;
+    uint256 leverageAmount = 1000000000000000;
 
-    address pool;
-    uint256 reserveAmount = 1000000000000000000000000;
-    uint256 debtAmount = 25000000000000000000000000;
-    uint256 leverageAmount = 1000000000000000000000000;
+    PoolFactory.PoolParams memory params = PoolFactory.PoolParams({
+      fee: 0,
+      reserveToken: reserveToken,
+      couponToken: couponToken,
+      sharesPerToken: 2500000,
+      distributionPeriod: 7776000 // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
+    });
 
-    PoolFactory.PoolParams memory params;
-    params.fee = 0;
+    // Approve the factory the seed deposit
+    IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    params.reserveToken = reserveToken;
-    params.sharesPerToken = 2500000;
-    params.distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
-    params.couponToken = address(0);
-
-
-    Token(params.reserveToken).mint(deployerAddress, reserveAmount);
-    Token(params.reserveToken).approve(address(factory), reserveAmount);
-
-    // // @todo: not for prod
-    // BondToken(dToken).grantRole(BondToken(dToken).MINTER_ROLE(), address(factory));
-    // BondToken(lToken).grantRole(BondToken(lToken).MINTER_ROLE(), address(factory));
-
-    // // @todo: not for prod
-    // BondToken(dToken).grantRole(BondToken(dToken).GOV_ROLE(), address(factory));
-    // BondToken(lToken).grantRole(BondToken(lToken).GOV_ROLE(), address(factory));
-
-    // // @todo: not for prod
-    // BondToken(dToken).grantRole(BondToken(dToken).DEFAULT_ADMIN_ROLE(), address(factory));
-    // BondToken(lToken).grantRole(BondToken(lToken).DEFAULT_ADMIN_ROLE(), address(factory));
-
-    pool = factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount);
-    
+    factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount);
     vm.stopBroadcast();
   }
 }
