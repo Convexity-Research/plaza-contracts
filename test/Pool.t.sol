@@ -1746,12 +1746,33 @@ contract PoolTest is Test {
     assertEq(info.levSupply, 10000);
   }
 
+  function testSetDistributionPeriod() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
+
+    _pool.setDistributionPeriod(100);
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.distributionPeriod, 100);
+  }
+
+  function testSetDistributionPeriodErrorUnauthorized() public {
+    vm.startPrank(governance);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
+    vm.stopPrank();
+
+    vm.expectRevert();
+    _pool.setDistributionPeriod(100);
+  }
+
   function testSetFee() public {
     vm.startPrank(governance);
     Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
 
     _pool.setFee(100);
-    assertEq(_pool.fee(), 100);
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.fee, 100);
   }
 
   function testSetFeeErrorUnauthorized() public {
@@ -1783,7 +1804,9 @@ contract PoolTest is Test {
 
     _pool.unpause();
     _pool.setFee(100);
-    assertEq(_pool.fee(), 100);
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.fee, 100);
   }
 
 function testNotEnoughBalanceInPool() public {
