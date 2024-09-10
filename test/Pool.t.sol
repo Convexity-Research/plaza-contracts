@@ -1765,23 +1765,6 @@ contract PoolTest is Test {
     _pool.setDistributionPeriod(100);
   }
 
-  function testSetCouponToken() public {
-    vm.startPrank(governance);
-    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
-
-    _pool.setCouponToken(address(0x420));
-    assertEq(_pool.couponToken(), address(0x420));
-  }
-
-  function testSetCouponTokenErrorUnauthorized() public {
-    vm.startPrank(governance);
-    Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));
-    vm.stopPrank();
-
-    vm.expectRevert();
-    _pool.setCouponToken(address(0x420));
-  }
-
   function testSetFee() public {
     vm.startPrank(governance);
     Pool _pool = Pool(poolFactory.CreatePool(params, 0, 0, 0));

@@ -66,7 +66,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event TokensSwapped(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
-  event CouponTokenChanged(address oldToken, address newToken);
   event SharesPerTokenChanged(uint256 sharesPerToken);
   event Distributed(uint256 amount);
   
@@ -371,14 +370,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
     emit DistributionPeriodChanged(oldPeriod, _distributionPeriod);
   }
-
-  function setCouponToken(address token) external onlyRole(poolFactory.GOV_ROLE()) {
-    address oldToken = couponToken;
-    couponToken = token;
-
-    emit CouponTokenChanged(oldToken, token);
-  }
-
+  
   function setSharesPerToken(uint256 _sharesPerToken) external onlyRole(poolFactory.GOV_ROLE()) {
     sharesPerToken = _sharesPerToken;
 
