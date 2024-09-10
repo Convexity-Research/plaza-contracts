@@ -74,8 +74,6 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     address couponToken = pool.couponToken();
     ERC20 sharesToken = ERC20(couponToken);
 
-    uint8 decimals = sharesToken.decimals();
-
     if (address(dToken) == address(0) || address(sharesToken) == address(0)){
       revert UnsupportedPool();
     }
