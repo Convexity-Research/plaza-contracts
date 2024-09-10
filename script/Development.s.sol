@@ -29,6 +29,9 @@ contract DevelopmentScript is Script {
       (deployerAddress, tokenDeployer, distributor)
     )));
 
+    // Grant pool factory role to factory
+    Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(factory));
+
     // @todo: remove - marion address
     factory.grantRole(factory.GOV_ROLE(), 0x11cba1EFf7a308Ac2cF6a6Ac2892ca33fabc3398);
     factory.grantRole(factory.GOV_ROLE(), 0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd);
