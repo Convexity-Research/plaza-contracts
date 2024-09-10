@@ -259,9 +259,9 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return getRedeemAmount(
       tokenType,
       depositAmount,
-      dToken.totalSupply(),
-      lToken.totalSupply(),
-      ERC20(reserveToken).balanceOf(address(this)),
+      debtSupply,
+      levSupply,
+      poolReserves,
       getOraclePrice(address(0)),
       getOracleDecimals(address(0))
     ).normalizeAmount(COMMON_DECIMALS, ERC20(reserveToken).decimals());
@@ -328,10 +328,18 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
-    uint256 debtSupply = dToken.totalSupply();
-    uint256 levSupply = lToken.totalSupply();
-    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this));
-    TokenType createType = TokenType.DEBT;
+    uint256 debtSupply = dToken.totalSupply()
+                          .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
+    uint256 levSupply = lToken.totalSupply()
+                          .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
+    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this))
+                          .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    if (tokenType == TokenType.LEVERAGE) {
+      depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
+    } else {
+      depositAmount = depositAmount.normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
+    }
 
     uint256 redeemAmount = getRedeemAmount(
       tokenType,
@@ -343,12 +351,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       getOracleDecimals(address(0))
     );
     
+    uint8 assetDecimals = 0;
+    TokenType createType = TokenType.DEBT;
     poolReserves = poolReserves - redeemAmount;
+
     if (tokenType == TokenType.DEBT) {
       createType = TokenType.LEVERAGE;
       debtSupply = debtSupply - depositAmount; 
+      assetDecimals = lToken.decimals();
     } else {
       levSupply = levSupply - depositAmount; 
+      assetDecimals = dToken.decimals();
     }
 
     return getCreateAmount(
@@ -359,7 +372,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       poolReserves,
       getOraclePrice(address(0)),
       getOracleDecimals(address(0))
-    );
+    ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
   function distribute() external whenNotPaused() {
