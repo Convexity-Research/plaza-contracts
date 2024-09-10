@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Distributor} from "../src/Distributor.sol";
 import "forge-std/Test.sol";
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
@@ -15,12 +16,13 @@ contract PoolTest is Test {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
 
+  Distributor private distributor;
+
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
   address private user = address(0x4);
   address private user2 = address(0x5);
-  address private distributor = address(0x6);
 
   struct CalcTestCase {
       Pool.TokenType assetType;
@@ -38,6 +40,8 @@ contract PoolTest is Test {
   CalcTestCase[] public calcTestCases2;
 
   address private constant ETH_PRICE_FEED = 0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165;
+  uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
+  uint256 private constant CHAINLINK_DECIMAL = 8;
 
   /**
    * @dev Sets up the testing environment.
@@ -48,12 +52,14 @@ contract PoolTest is Test {
     vm.startPrank(deployer);
 
     address tokenDeployer = address(new TokenDeployer());
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer))));
+    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor)))));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
-    params.sharesPerToken = 0;
+    params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
+    params.couponToken = address(new Token("USDC", "USDC"));
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();
@@ -64,9 +70,14 @@ contract PoolTest is Test {
 
     // Set oracle price
     mockPriceFeed = MockPriceFeed(ETH_PRICE_FEED);
-    mockPriceFeed.setMockPrice(3000 * 10**8, 8);
+    mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
     
     vm.stopPrank();
+
+    vm.startPrank(governance);
+    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
+    vm.stopPrank();
+
     initializeTestCases();
     initializeTestCasesFixedEth();
   }
@@ -1441,7 +1452,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets,
         calcTestCases[i].LeverageAssets,
         calcTestCases[i].TotalUnderlyingAssets,
-        calcTestCases[i].ethPrice * 10**8
+        calcTestCases[i].ethPrice * CHAINLINK_DECIMAL_PRECISION,
+        CHAINLINK_DECIMAL
       );
       assertEq(amount, calcTestCases[i].expectedCreate);
 
@@ -1458,13 +1470,13 @@ contract PoolTest is Test {
   function testGetCreateAmountZeroDebtSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroDebtSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000);
+    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000, CHAINLINK_DECIMAL);
   }
 
   function testGetCreateAmountZeroLeverageSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroLeverageSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * 10**8);
+    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * CHAINLINK_DECIMAL_PRECISION, CHAINLINK_DECIMAL);
   }
 
   function testCreate() public {
@@ -1569,7 +1581,8 @@ contract PoolTest is Test {
         calcTestCases[i].DebtAssets, 
         calcTestCases[i].LeverageAssets, 
         calcTestCases[i].TotalUnderlyingAssets, 
-        calcTestCases[i].ethPrice * 10**8
+        calcTestCases[i].ethPrice * CHAINLINK_DECIMAL_PRECISION,
+        CHAINLINK_DECIMAL
       );
       assertEq(amount, calcTestCases[i].expectedRedeem);
 
@@ -1772,4 +1785,114 @@ contract PoolTest is Test {
     _pool.setFee(100);
     assertEq(_pool.fee(), 100);
   }
+
+function testNotEnoughBalanceInPool() public {
+    Token rToken = Token(params.reserveToken);
+
+    vm.startPrank(governance);
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
+    vm.stopPrank();
+    Token sharesToken = Token(_pool.couponToken());
+
+    vm.startPrank(minter);
+    // Mint less shares than required
+    sharesToken.mint(address(_pool), 25*10**18);
+    vm.stopPrank();
+
+    vm.startPrank(address(_pool));
+    _pool.dToken().mint(user, 1000*10**18);
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    //@todo figure out how to specify erc20 insufficient balance error
+    vm.expectRevert();
+    _pool.distribute();
+    vm.stopPrank();
+  }
+
+  function testDistribute() public {
+    Token rToken = Token(params.reserveToken);
+
+    vm.startPrank(governance);
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
+    Token sharesToken = Token(_pool.couponToken());
+    uint256 initialBalance = 1000 * 10**18;
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**18;
+    vm.stopPrank();
+
+    vm.startPrank(address(_pool));
+    _pool.dToken().mint(user, initialBalance);
+    vm.stopPrank();
+
+    vm.startPrank(minter);
+    sharesToken.mint(address(_pool), expectedDistribution);
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    _pool.distribute();
+    vm.stopPrank();
+
+    assertEq(sharesToken.balanceOf(address(distributor)), expectedDistribution);
+  }
+
+  function testDistributeMultiplePeriods() public {
+    Token rToken = Token(params.reserveToken);
+
+    vm.startPrank(governance);
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
+
+    Token sharesToken = Token(_pool.couponToken());
+    uint256 initialBalance = 1000 * 10**18;
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**18;
+    vm.stopPrank();
+    
+    vm.startPrank(address(_pool));
+    _pool.dToken().mint(user, initialBalance);
+    vm.stopPrank();
+
+    vm.startPrank(minter);
+    sharesToken.mint(address(_pool), expectedDistribution * 3);
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    _pool.distribute();
+    _pool.distribute();
+    _pool.distribute();
+    vm.stopPrank();
+
+    assertEq(sharesToken.balanceOf(address(distributor)), expectedDistribution * 3);
+  }
+
+  function testDistributeNoShares() public {
+    Token rToken = Token(params.reserveToken);
+
+    vm.startPrank(governance);
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
+    vm.stopPrank();
+    vm.startPrank(governance);
+    vm.expectRevert();
+    _pool.distribute();
+    vm.stopPrank();
+  }
+
+  function testDistributeUnauthorized() public {
+    Token rToken = Token(params.reserveToken);
+
+    vm.startPrank(governance);
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
+    vm.stopPrank();
+    vm.expectRevert();
+    _pool.distribute();
+  }
 }
+
