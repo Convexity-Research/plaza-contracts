@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Distributor} from "./Distributor.sol";
 import {Token} from "../test/mocks/Token.sol";
 
 import {BondToken} from "./BondToken.sol";
@@ -54,11 +55,13 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   error AccessDenied();
   error ZeroDebtSupply();
   error ZeroLeverageSupply();
+  error DistributionPeriod();
 
   event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event TokensSwapped(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-
+  event Distributed(uint256 amount);
+  
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -76,7 +79,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     address _lToken,
     address _couponToken,
     uint256 _sharesPerToken,
-    uint256 _distributionPeriod) initializer public {
+    uint256 _distributionPeriod
+  ) initializer public {
     __UUPSUpgradeable_init();
     poolFactory = PoolFactory(_poolFactory);
     fee = _fee;
@@ -322,6 +326,32 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       getOraclePrice(address(0)),
       getOracleDecimals(address(0))
     );
+  }
+
+  function distribute() external whenNotPaused() {
+    if (block.timestamp - lastDistributionTime < distributionPeriod) {
+      revert DistributionPeriod();
+    }
+
+    Distributor distributor = Distributor(poolFactory.distributor());
+
+    //calculate last distribution time
+    lastDistributionTime = block.timestamp + distributionPeriod;
+
+    // calculate the coupon to distribute. all issued bond tokens times the sharesPerToken (this will need to be adjusted when we go cross-chain)
+    uint256 couponAmountToDistribute = dToken.totalSupply() * sharesPerToken / 10**ERC20(couponToken).decimals();
+
+    // increase the bond token period
+    dToken.increaseIndexedAssetPeriod(sharesPerToken);
+
+    // send the coupon token to the distributor, here we assume that the merchant has already sent the total amount of coupon token to this contract
+    // @todo: replace with safeTransfer
+    ERC20(couponToken).transfer(address(distributor), couponAmountToDistribute);
+
+    // @todo: update distributor with the amount to distribute
+    distributor.allocate(address(this), couponAmountToDistribute);
+
+    emit Distributed(couponAmountToDistribute);
   }
 
   function getPoolInfo() external view returns (PoolInfo memory info) {

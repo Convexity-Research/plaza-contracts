@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Pool} from "./Pool.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -9,7 +10,7 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
-contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {  
   struct PoolAmount {
     uint256 period;
     uint256 amount;
@@ -49,11 +50,14 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     string memory symbol, 
     address minter, 
     address governance, 
-    address distributor
+    address distributor,
+    uint256 sharesPerToken
     ) initializer public {
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();
+
+    globalPool.sharesPerToken = sharesPerToken;
 
     // Grant the access roles
     _grantRole(MINTER_ROLE, minter);

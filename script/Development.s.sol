@@ -3,6 +3,8 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 
+import {Distributor} from "../src/Distributor.sol";
+
 import {Utils} from "../src/lib/Utils.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -18,10 +20,14 @@ contract DevelopmentScript is Script {
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
     
     address tokenDeployer = address(new TokenDeployer());
+    address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer)
+      (deployerAddress, tokenDeployer, distributor)
     )));
+
+    // Grant pool factory role to factory
+    Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(factory));
 
     // @todo: remove - marion address
     factory.grantRole(factory.GOV_ROLE(), 0x11cba1EFf7a308Ac2cF6a6Ac2892ca33fabc3398);
