@@ -23,8 +23,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     uint256 fee;
     address reserveToken;
     address couponToken;
-    uint256 sharesPerToken;
     uint256 distributionPeriod;
+    uint256 sharesPerToken;
   }
 
   address[] public pools;
