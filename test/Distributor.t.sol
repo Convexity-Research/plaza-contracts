@@ -174,8 +174,6 @@ contract DistributorTest is Test {
   }
 
   function testAllocateNotEnoughCouponBalance() public {
-    Token sharesToken = Token(_pool.couponToken());
-
     uint256 allocateAmount = 100*10**18;
 
     vm.startPrank(address(_pool));
