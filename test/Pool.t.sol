@@ -41,7 +41,7 @@ contract PoolTest is Test {
   CalcTestCase[] public calcTestCases;
   CalcTestCase[] public calcTestCases2;
 
-  address private constant ETH_PRICE_FEED = 0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165;
+  address private constant ETH_PRICE_FEED = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
   uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
   uint8 private constant CHAINLINK_DECIMAL = 8;
 
@@ -90,6 +90,11 @@ contract PoolTest is Test {
 
     // Use vm.etch to deploy the mock contract at the specific address
     vm.etch(poolAddress, address(mockPool).code);
+  }
+
+  function setEthPrice(uint256 price) public {
+    MockPriceFeed mockPriceFeed = MockPriceFeed(ETH_PRICE_FEED);
+    mockPriceFeed.setMockPrice(int256(price), uint8(CHAINLINK_DECIMAL));
   }
 
   function initializeTestCases() public {
@@ -2131,5 +2136,35 @@ function testNotEnoughBalanceInPool() public {
     vm.expectRevert();
     _pool.distribute();
   }
+
+  // function testOverflow() public {
+  //   vm.startPrank(governance);
+  //   Token rToken = Token(params.reserveToken);
+
+  //   uint256 reserveAmount = 1000000000000000; // 0.001 ETH
+  //   uint256 debtAmount = 25000000000000000;
+  //   uint256 leverageAmount = 1000000000000000;
+
+  //   rToken.mint(governance, reserveAmount);
+  //   rToken.approve(address(poolFactory), reserveAmount);
+
+  //   Pool _pool = Pool(poolFactory.CreatePool(params, reserveAmount, debtAmount, leverageAmount));
+
+  //   uint256 depositAmount = 50000000000000;
+  //   rToken.mint(governance, depositAmount);
+  //   rToken.approve(address(_pool), depositAmount);
+
+  //   uint256 ethPrice = 235007000000;
+  //   setEthPrice(ethPrice);
+
+  //   uint256 mintedBonds = _pool.create(Pool.TokenType.DEBT, depositAmount / 2, 0);
+  //   uint256 mintedLev = _pool.create(Pool.TokenType.LEVERAGE, depositAmount / 2, 0);
+  //   uint256 swapedBonds = _pool.swap(Pool.TokenType.LEVERAGE, mintedLev, 0);
+  //   uint256 redeemBonds = _pool.redeem(Pool.TokenType.DEBT, mintedBonds+swapedBonds, 0);
+
+  //   // Reset reserve state
+  //   rToken.burn(governance, rToken.balanceOf(governance));
+  //   rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  // }
 }
 
