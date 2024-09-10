@@ -80,7 +80,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     (uint256 currentPeriod,) = dToken.globalPool();
     uint256 balance = dToken.balanceOf(msg.sender);
-    uint256 shares = dToken.getIndexedUserAmount(msg.sender, balance);
+    uint256 shares = dToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
 
     if (sharesToken.balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
