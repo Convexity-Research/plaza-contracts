@@ -37,6 +37,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 
+  uint256 public constant SHARES_DECIMALS = 6;
+
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
   event UpdatedUserAssets(address user, uint256 lastUpdatedPeriod, uint256 indexedAmountShares);
 
@@ -109,18 +111,28 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * Updates the number of shares held by the user based on the current period.
    */
   function updateIndexedUserAssets(address user, uint256 balance) internal {
-    IndexedUserAssets memory userPool = userAssets[user];
     uint256 period = globalPool.currentPeriod;
-    uint shares = userAssets[user].indexedAmountShares;
-    
-    for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
-      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10000;
-    }
+    uint256 shares = getIndexedUserAmount(user, balance, period);
     
     userAssets[user].indexedAmountShares = shares;
     userAssets[user].lastUpdatedPeriod = period;
 
     emit UpdatedUserAssets(user, period, shares);
+  }
+
+  /**
+   * @dev Returns the indexed amount of shares for a specific user.
+   * Calculates the number of shares based on the current period and the previous pool amounts.
+   */
+  function getIndexedUserAmount(address user, uint256 balance, uint256 period) public view returns(uint256) {
+    IndexedUserAssets memory userPool = userAssets[user];
+    uint256 shares = userAssets[user].indexedAmountShares;
+    
+    for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
+      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10**SHARES_DECIMALS;
+    }
+
+    return shares;
   }
 
   /**

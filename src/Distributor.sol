@@ -74,21 +74,13 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     address couponToken = pool.couponToken();
     ERC20 sharesToken = ERC20(couponToken);
 
-    uint8 decimals = sharesToken.decimals();
-
     if (address(dToken) == address(0) || address(sharesToken) == address(0)){
       revert UnsupportedPool();
     }
 
     (uint256 currentPeriod,) = dToken.globalPool();
     uint256 balance = dToken.balanceOf(msg.sender);
-    (uint256 lastUpdatedPeriod, uint256 shares) = dToken.userAssets(msg.sender);
-    BondToken.PoolAmount[] memory poolAmounts = dToken.getPreviousPoolAmounts();
-
-    for (uint256 i = lastUpdatedPeriod; i < currentPeriod; i++) {
-      shares += (balance * poolAmounts[i].sharesPerToken) / 10 ** decimals;
-    }
-
+    uint256 shares = dToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
 
     if (sharesToken.balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();

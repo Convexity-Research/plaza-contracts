@@ -334,7 +334,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     lastDistribution = block.timestamp + distributionPeriod;
 
     // calculate the coupon to distribute. all issued bond tokens times the sharesPerToken (this will need to be adjusted when we go cross-chain)
-    uint256 couponAmountToDistribute = dToken.totalSupply() * sharesPerToken / 10**ERC20(couponToken).decimals();
+    uint256 couponAmountToDistribute = (dToken.totalSupply() * sharesPerToken) / 10**dToken.SHARES_DECIMALS();
 
     // increase the bond token period
     dToken.increaseIndexedAssetPeriod(sharesPerToken);
