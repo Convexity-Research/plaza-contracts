@@ -136,6 +136,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function simulateCreate(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
+    require(depositAmount > 0, ZeroAmount());
 
     uint256 debtSupply = dToken.totalSupply()
                           .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
@@ -242,7 +243,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
-
+    require(depositAmount > 0, ZeroAmount());
+    
     uint256 debtSupply = dToken.totalSupply()
                           .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
     uint256 levSupply = lToken.totalSupply()
@@ -339,6 +341,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+    require(depositAmount > 0, ZeroAmount());
+
     uint256 debtSupply = dToken.totalSupply()
                           .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
     uint256 levSupply = lToken.totalSupply()
