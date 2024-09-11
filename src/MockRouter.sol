@@ -14,7 +14,7 @@ contract Router is OracleReader {
   Token public reserveToken = Token(0xE46230A4963b8bBae8681b5c05F8a22B9469De18);
   Token public couponToken = Token(0xDA1334a1084170eb1438E0d9d5C8799A07fbA7d3);
 
-  function swapAndCreate(address _pool,
+  function swapCreate(address _pool,
     address depositToken,
     Pool.TokenType tokenType,
     uint256 depositAmount,
