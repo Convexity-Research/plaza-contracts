@@ -20,6 +20,13 @@ contract MainnetScript is Script {
   address public constant couponToken = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
+  uint256 private constant distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
+  uint256 private constant reserveAmount = 0.001 ether;
+  uint256 private constant debtAmount = 0.025 ether;
+  uint256 private constant leverageAmount = 0.001 ether;
+  uint256 private constant sharesPerToken = 2_500_000;
+  uint256 private constant fee = 0;
+
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
@@ -34,16 +41,12 @@ contract MainnetScript is Script {
     // Grant pool factory role to factory
     Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(factory));
 
-    uint256 reserveAmount = 1000000000000000; // 0.001 ETH
-    uint256 debtAmount = 25000000000000000;
-    uint256 leverageAmount = 1000000000000000;
-
     PoolFactory.PoolParams memory params = PoolFactory.PoolParams({
-      fee: 0,
+      fee: fee,
       reserveToken: reserveToken,
       couponToken: couponToken,
-      sharesPerToken: 2500000,
-      distributionPeriod: 7776000 // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
+      sharesPerToken: sharesPerToken,
+      distributionPeriod: distributionPeriod
     });
 
     // Approve the factory the seed deposit

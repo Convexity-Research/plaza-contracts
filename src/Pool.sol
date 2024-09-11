@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Distributor} from "./Distributor.sol";
+import {Token} from "../test/mocks/Token.sol";
+
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Distributor} from "./Distributor.sol";
@@ -105,7 +108,16 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     distributionPeriod = _distributionPeriod;
     lastDistribution = block.timestamp;
   }
-  
+
+  /**
+    * @dev Transfers `depositAmount` of `reserveToken` from the caller, calculates the amount to mint
+    * If the amount is valid, mints the appropriate token (dToken or lToken) to the caller.
+    * 
+    * @param tokenType The type of token to mint (DEBT or LEVERAGE).
+    * @param depositAmount The amount of `reserveToken` to deposit.
+    * @param minAmount The minimum amount of tokens to mint to avoid slippage.
+    * @return The amount of tokens minted.
+    */
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
     return create(tokenType, depositAmount, minAmount, block.timestamp, address(0));
   }
