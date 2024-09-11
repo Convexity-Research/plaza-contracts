@@ -31,7 +31,10 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
   uint256 public poolsLength;
   address public governance;
   address public distributor;
+  address private ethPriceFeed;
   TokenDeployer private tokenDeployer;
+
+  // Oracle related
 
   error ZeroDebtAmount();
   error ZeroReserveAmount();
@@ -49,12 +52,13 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * This function is called once during deployment or upgrading to initialize state variables.
    * @param _governance Address of the governance account that will have the GOV_ROLE.
    */
-  function initialize(address _governance, address _tokenDeployer, address _distributor) initializer public {
+  function initialize(address _governance, address _tokenDeployer, address _distributor, address _ethPriceFeed) initializer public {
     __UUPSUpgradeable_init();
 
     tokenDeployer = TokenDeployer(_tokenDeployer);
     governance = _governance;
     distributor = _distributor;
+    ethPriceFeed = _ethPriceFeed;
     _grantRole(GOV_ROLE, _governance);
   }
 
@@ -105,7 +109,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
         address(lToken),
         params.couponToken,
         params.sharesPerToken,
-        params.distributionPeriod
+        params.distributionPeriod,
+        ethPriceFeed
       )
     ));
 

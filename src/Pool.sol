@@ -6,6 +6,7 @@ import {Token} from "../test/mocks/Token.sol";
 
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
+import {Distributor} from "./Distributor.sol";
 import {PoolFactory} from "./PoolFactory.sol";
 import {Validator} from "./utils/Validator.sol";
 import {OracleReader} from "./OracleReader.sol";
@@ -91,9 +92,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     address _lToken,
     address _couponToken,
     uint256 _sharesPerToken,
-    uint256 _distributionPeriod
+    uint256 _distributionPeriod,
+    address _ethPriceFeed
   ) initializer public {
     __UUPSUpgradeable_init();
+    __OracleReader_init(_ethPriceFeed);
+
     poolFactory = PoolFactory(_poolFactory);
     fee = _fee;
     reserveToken = _reserveToken;
@@ -154,6 +158,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function simulateCreate(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
+    require(depositAmount > 0, ZeroAmount());
 
     uint256 debtSupply = dToken.totalSupply()
                           .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
@@ -260,6 +265,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+    require(depositAmount > 0, ZeroAmount());
 
     uint256 debtSupply = dToken.totalSupply()
                           .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
@@ -357,6 +363,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+    require(depositAmount > 0, ZeroAmount());
+
     uint256 debtSupply = dToken.totalSupply()
                           .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
     uint256 levSupply = lToken.totalSupply()
@@ -474,6 +482,24 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    */
   function unpause() external onlyRole(poolFactory.GOV_ROLE()) {
     _unpause();
+  }
+
+  // @todo: remove before prod
+  function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
+    // Transfer ERC20 token balance
+    uint256 tokenBalance = ERC20(token).balanceOf(address(this));
+    if (tokenBalance > 0) {
+      ERC20(token).transfer(msg.sender, tokenBalance);
+    }
+
+    // Transfer native token balance
+    uint256 nativeBalance = address(this).balance;
+    if (nativeBalance > 0) {
+      (bool success,) = payable(msg.sender).call{value: nativeBalance}("");
+      if (!success) {
+        return;
+      }
+    }
   }
 
   modifier onlyRole(bytes32 role) {
