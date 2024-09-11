@@ -27,7 +27,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Protocol
   PoolFactory public poolFactory;
-  uint256 public fee;
+  uint256 private fee;
 
   // Tokens
   address public reserveToken;
@@ -36,11 +36,11 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Coupon
   address public couponToken;
-  uint256 public sharesPerToken;
 
   // Distribution
-  uint256 public distributionPeriod;
-  uint256 public lastDistributionTime;
+  uint256 private sharesPerToken;
+  uint256 private distributionPeriod;
+  uint256 private lastDistribution;
 
   enum TokenType {
     DEBT,
@@ -48,9 +48,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   struct PoolInfo {
+    uint256 fee;
     uint256 reserve;
     uint256 debtSupply;
     uint256 levSupply;
+    uint256 sharesPerToken;
+    uint256 currentPeriod;
+    uint256 lastDistribution;
+    uint256 distributionPeriod;
   }
 
   error MinAmount();
@@ -63,6 +68,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+  event SharesPerTokenChanged(uint256 sharesPerToken);
   event Distributed(uint256 amount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -96,7 +103,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     couponToken = _couponToken;
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
-    lastDistributionTime = block.timestamp;
+    lastDistribution = block.timestamp;
   }
   
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
@@ -394,14 +401,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function distribute() external whenNotPaused() {
-    if (block.timestamp - lastDistributionTime < distributionPeriod) {
+    if (block.timestamp - lastDistribution < distributionPeriod) {
       revert DistributionPeriod();
     }
 
     Distributor distributor = Distributor(poolFactory.distributor());
 
     //calculate last distribution time
-    lastDistributionTime = block.timestamp + distributionPeriod;
+    lastDistribution = block.timestamp + distributionPeriod;
 
     // calculate the coupon to distribute. all issued bond tokens times the sharesPerToken (this will need to be adjusted when we go cross-chain)
     uint256 couponAmountToDistribute = (dToken.totalSupply() * sharesPerToken).toBaseUnit(dToken.SHARES_DECIMALS());
@@ -420,11 +427,31 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   function getPoolInfo() external view returns (PoolInfo memory info) {
+    (uint256 currentPeriod, uint256 _sharesPerToken) = dToken.globalPool();
+
     info = PoolInfo({
+      fee: fee,
+      distributionPeriod: distributionPeriod,
       reserve: ERC20(reserveToken).balanceOf(address(this)),
       debtSupply: dToken.totalSupply(),
-      levSupply: lToken.totalSupply()
+      levSupply: lToken.totalSupply(),
+      sharesPerToken: _sharesPerToken,
+      currentPeriod: currentPeriod,
+      lastDistribution: lastDistribution
     });
+  }
+  
+  function setDistributionPeriod(uint256 _distributionPeriod) external onlyRole(poolFactory.GOV_ROLE()) {
+    uint256 oldPeriod = distributionPeriod;
+    distributionPeriod = _distributionPeriod;
+
+    emit DistributionPeriodChanged(oldPeriod, _distributionPeriod);
+  }
+  
+  function setSharesPerToken(uint256 _sharesPerToken) external onlyRole(poolFactory.GOV_ROLE()) {
+    sharesPerToken = _sharesPerToken;
+
+    emit SharesPerTokenChanged(sharesPerToken);
   }
 
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {

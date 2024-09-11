@@ -45,7 +45,6 @@ contract PoolFactoryTest is Test {
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
-    params.sharesPerToken = 0;
     params.distributionPeriod = 0;
     
     vm.stopPrank();
