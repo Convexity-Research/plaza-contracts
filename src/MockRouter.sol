@@ -19,7 +19,7 @@ contract Router is OracleReader {
     Pool.TokenType tokenType,
     uint256 depositAmount,
     uint256 minAmount) external returns (uint256) {
-    return swapAndCreate(_pool, depositToken, tokenType, depositAmount, minAmount, block.timestamp, msg.sender);
+    return swapCreate(_pool, depositToken, tokenType, depositAmount, minAmount, block.timestamp, msg.sender);
   }
 
   function swapCreate(address _pool,
@@ -28,7 +28,7 @@ contract Router is OracleReader {
     uint256 depositAmount,
     uint256 minAmount,
     uint256 deadline,
-    address onBehalfOf) external returns (uint256) {
+    address onBehalfOf) public returns (uint256) {
     require(depositToken == address(couponToken), "invalid deposit token, only accepts fake USDC");
 
     // Transfer depositAmount of depositToken from user to contract
@@ -48,7 +48,7 @@ contract Router is OracleReader {
     reserveToken.mint(address(this), reserveAmount);
 
     // Approve reserveToken to pool
-    require(reserveToken.approve(pool, reserveAmount), "Approval failed");
+    require(reserveToken.approve(_pool, reserveAmount), "Approval failed");
 
     if (onBehalfOf == address(0)) {
       onBehalfOf = msg.sender;
@@ -72,7 +72,7 @@ contract Router is OracleReader {
     uint256 depositAmount,
     uint256 minAmount,
     uint256 deadline,
-    address onBehalfOf) external returns (uint256) {
+    address onBehalfOf) public returns (uint256) {
     require(redeemToken == address(couponToken), "invalid redeem token, only accepts fake USDC");
 
     // Transfer depositAmount of depositToken from user to contract
@@ -92,7 +92,7 @@ contract Router is OracleReader {
     reserveToken.mint(address(this), reserveAmount);
 
     // Approve reserveToken to pool
-    require(reserveToken.approve(pool, reserveAmount), "Approval failed");
+    require(reserveToken.approve(_pool, reserveAmount), "Approval failed");
 
     if (onBehalfOf == address(0)) {
       onBehalfOf = msg.sender;
