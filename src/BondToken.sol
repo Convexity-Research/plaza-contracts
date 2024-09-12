@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Pool} from "./Pool.sol";
+import {Decimals} from "./lib/Decimals.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -9,7 +11,9 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
-contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {  
+  using Decimals for uint256;
+
   struct PoolAmount {
     uint256 period;
     uint256 amount;
@@ -36,6 +40,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 
+  uint8 public constant SHARES_DECIMALS = 6;
+
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
   event UpdatedUserAssets(address user, uint256 lastUpdatedPeriod, uint256 indexedAmountShares);
 
@@ -49,15 +55,16 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     string memory symbol, 
     address minter, 
     address governance, 
-    address distributor
+    address distributor,
+    uint256 sharesPerToken
     ) initializer public {
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();
 
+    globalPool.sharesPerToken = sharesPerToken;
+
     // Grant the access roles
-    _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-    _grantRole(DEFAULT_ADMIN_ROLE, governance);
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
     _grantRole(DISTRIBUTOR_ROLE, distributor);
@@ -107,18 +114,28 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * Updates the number of shares held by the user based on the current period.
    */
   function updateIndexedUserAssets(address user, uint256 balance) internal {
-    IndexedUserAssets memory userPool = userAssets[user];
     uint256 period = globalPool.currentPeriod;
-    uint shares = userAssets[user].indexedAmountShares;
-    
-    for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
-      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken) / 10000;
-    }
+    uint256 shares = getIndexedUserAmount(user, balance, period);
     
     userAssets[user].indexedAmountShares = shares;
     userAssets[user].lastUpdatedPeriod = period;
 
     emit UpdatedUserAssets(user, period, shares);
+  }
+
+  /**
+   * @dev Returns the indexed amount of shares for a specific user.
+   * Calculates the number of shares based on the current period and the previous pool amounts.
+   */
+  function getIndexedUserAmount(address user, uint256 balance, uint256 period) public view returns(uint256) {
+    IndexedUserAssets memory userPool = userAssets[user];
+    uint256 shares = userAssets[user].indexedAmountShares;
+    
+    for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
+      shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken).toBaseUnit(SHARES_DECIMALS);
+    }
+
+    return shares;
   }
 
   /**
@@ -146,6 +163,25 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     globalPool.sharesPerToken = sharesPerToken;
 
     emit IncreasedAssetPeriod(globalPool.currentPeriod, sharesPerToken);
+  }
+
+  /**
+    * @dev Grants `role` to `account`.
+    * If `account` had not been already granted `role`, emits a {RoleGranted}
+    * event.
+    * May emit a {RoleGranted} event.
+    */
+  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _grantRole(role, account);
+  }
+
+  /**
+    * @dev Revokes `role` from `account`.
+    * If `account` had been granted `role`, emits a {RoleRevoked} event.
+    * May emit a {RoleRevoked} event.
+    */
+  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _revokeRole(role, account);
   }
 
   /**

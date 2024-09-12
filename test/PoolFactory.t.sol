@@ -1,26 +1,30 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Distributor} from "../src/Distributor.sol";
 import "forge-std/Test.sol";
-import {PoolFactory} from "../src/PoolFactory.sol";
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
-import {BondToken} from "../src/BondToken.sol";
-import {LeverageToken} from "../src/LeverageToken.sol";
 import {Utils} from "../src/lib/Utils.sol";
+import {BondToken} from "../src/BondToken.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
+import {LeverageToken} from "../src/LeverageToken.sol";
+import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract PoolFactoryTest is Test {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
+  Distributor private distributor;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
   address private user = address(0x4);
   address private user2 = address(0x5);
-  address private distributor = address(0x6);
+
+  address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
   /**
    * @dev Sets up the testing environment.
@@ -30,11 +34,17 @@ contract PoolFactoryTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance))));
+    address tokenDeployer = address(new TokenDeployer());
+    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance, tokenDeployer, address(distributor), ethPriceFeed))));
+
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
-    params.sharesPerToken = 0;
     params.distributionPeriod = 0;
     
     vm.stopPrank();
@@ -48,10 +58,13 @@ contract PoolFactoryTest is Test {
     rToken.mint(governance, 10000000000);
     rToken.approve(address(poolFactory), 10000000000);
 
+    uint256 startLength = poolFactory.poolsLength();
+
     // Create pool and approve deposit amount
     Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 20000));
-    rToken.approve(address(_pool), 1000);
+    uint256 endLength = poolFactory.poolsLength();
 
+    assertEq(1, endLength-startLength);
     assertEq(rToken.totalSupply(), 10000000000);
     assertEq(_pool.dToken().totalSupply(), 10000);
     assertEq(_pool.lToken().totalSupply(), 20000);
@@ -88,22 +101,5 @@ contract PoolFactoryTest is Test {
     poolFactory.unpause();
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
     poolFactory.CreatePool(params, 10000000000, 10000, 10000);
-  }
-
-  function testSetGovernance() public {
-    vm.startPrank(user);
-    
-    vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, user, poolFactory.GOV_ROLE()));
-    poolFactory.setGovernance(address(0x0));
-    vm.stopPrank();
-
-    vm.startPrank(governance);
-
-    poolFactory.setGovernance(minter);
-    assertEq(poolFactory.governance(), minter);
-
-    vm.startPrank(minter);
-    poolFactory.setGovernance(governance);
-    assertEq(poolFactory.governance(), governance);
   }
 }

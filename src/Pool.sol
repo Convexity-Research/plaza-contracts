@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Distributor} from "./Distributor.sol";
+import {Token} from "../test/mocks/Token.sol";
+
 import {BondToken} from "./BondToken.sol";
+import {Decimals} from "./lib/Decimals.sol";
+import {Distributor} from "./Distributor.sol";
 import {PoolFactory} from "./PoolFactory.sol";
+import {Validator} from "./utils/Validator.sol";
 import {OracleReader} from "./OracleReader.sol";
 import {LeverageToken} from "./LeverageToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -11,17 +17,19 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, OracleReader {
+contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, OracleReader, Validator {
+  using Decimals for uint256;
+  
   // uint public constant MINIMUM_LIQUIDITY = 10**3;
   uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
   uint256 private constant POINT_TWO = 200000;
   uint256 private constant COLLATERAL_THRESHOLD = 1200000;
   uint256 private constant BOND_TARGET_PRICE = 100;
-  uint256 public constant PRECISION = 1000000;
+  uint8 private constant COMMON_DECIMALS = 18;
 
   // Protocol
   PoolFactory public poolFactory;
-  uint256 public fee;
+  uint256 private fee;
 
   // Tokens
   address public reserveToken;
@@ -30,15 +38,26 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Coupon
   address public couponToken;
-  uint256 public sharesPerToken;
 
   // Distribution
-  uint256 public distributionPeriod;
-  uint256 public lastDistributionTime;
+  uint256 private sharesPerToken;
+  uint256 private distributionPeriod;
+  uint256 private lastDistribution;
 
   enum TokenType {
     DEBT,
     LEVERAGE
+  }
+
+  struct PoolInfo {
+    uint256 fee;
+    uint256 reserve;
+    uint256 debtSupply;
+    uint256 levSupply;
+    uint256 sharesPerToken;
+    uint256 currentPeriod;
+    uint256 lastDistribution;
+    uint256 distributionPeriod;
   }
 
   error MinAmount();
@@ -46,10 +65,15 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   error AccessDenied();
   error ZeroDebtSupply();
   error ZeroLeverageSupply();
+  error DistributionPeriod();
 
-  event TokensCreated(address caller, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
-  event TokensRedeemed(address caller, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-
+  event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
+  event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+  event SharesPerTokenChanged(uint256 sharesPerToken);
+  event Distributed(uint256 amount);
+  
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -67,8 +91,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     address _lToken,
     address _couponToken,
     uint256 _sharesPerToken,
-    uint256 _distributionPeriod) initializer public {
+    uint256 _distributionPeriod,
+    address _ethPriceFeed
+  ) initializer public {
     __UUPSUpgradeable_init();
+    __OracleReader_init(_ethPriceFeed);
+
     poolFactory = PoolFactory(_poolFactory);
     fee = _fee;
     reserveToken = _reserveToken;
@@ -77,7 +105,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     couponToken = _couponToken;
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
-    lastDistributionTime = block.timestamp;
+    lastDistribution = block.timestamp;
   }
 
   /**
@@ -90,6 +118,15 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     * @return The amount of tokens minted.
     */
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+    return create(tokenType, depositAmount, minAmount, block.timestamp, address(0));
+  }
+
+  function create(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 minAmount,
+    uint256 deadline,
+    address onBehalfOf) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
     // Get amount to mint
     uint256 amount = simulateCreate(tokenType, depositAmount);
 
@@ -106,27 +143,46 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       revert ZeroAmount();
     }
 
+    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+
     // Mint tokens
     if (tokenType == TokenType.DEBT) {
-      dToken.mint(msg.sender, amount);
+      dToken.mint(recipient, amount);
     } else {
-      lToken.mint(msg.sender, amount);
+      lToken.mint(recipient, amount);
     }
 
-    emit TokensCreated(msg.sender, tokenType, depositAmount, amount);
+    emit TokensCreated(msg.sender, recipient, tokenType, depositAmount, amount);
     return amount;
   }
 
   function simulateCreate(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
+    require(depositAmount > 0, ZeroAmount());
+
+    uint256 debtSupply = dToken.totalSupply()
+                          .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
+    uint256 levSupply = lToken.totalSupply()
+                          .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
+    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this))
+                          .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+    depositAmount = depositAmount.normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    uint8 assetDecimals = 0;
+    if (tokenType == TokenType.LEVERAGE) {
+      assetDecimals = lToken.decimals();
+    } else {
+      assetDecimals = dToken.decimals();
+    }
+
     return getCreateAmount(
       tokenType,
       depositAmount,
-      dToken.totalSupply(),
-      lToken.totalSupply(),
-      ERC20(reserveToken).balanceOf(address(this)),
+      debtSupply,
+      levSupply,
+      poolReserves,
       getOraclePrice(address(0)),
       getOracleDecimals(address(0))
-    );
+    ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
   function getCreateAmount(
@@ -136,7 +192,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 levSupply, 
     uint256 poolReserves, 
     uint256 ethPrice,
-    uint256 oracleDecimals) public pure returns(uint256) {
+    uint8 oracleDecimals) public pure returns(uint256) {
     if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
@@ -148,7 +204,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       assetSupply = levSupply;
     }
 
-    uint256 tvl = ethPrice * poolReserves / (10**oracleDecimals);
+    uint256 tvl = (ethPrice * poolReserves).toBaseUnit(oracleDecimals);
     uint256 collateralLevel = (tvl * PRECISION) / (debtSupply * BOND_TARGET_PRICE);
     uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
 
@@ -163,10 +219,19 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       creationRate = (adjustedValue * PRECISION) / assetSupply;
     }
     
-    return (depositAmount * ethPrice * PRECISION) / creationRate / (10**oracleDecimals);
+    return ((depositAmount * ethPrice * PRECISION) / creationRate).toBaseUnit(oracleDecimals);
   }
 
-  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+  function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
+    return redeem(tokenType, depositAmount, minAmount, block.timestamp, address(0));
+  }
+
+  function redeem(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 minAmount,
+    uint256 deadline,
+    address onBehalfOf) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
     // Get amount to mint
     uint256 reserveAmount = simulateRedeem(tokenType, depositAmount);
 
@@ -187,20 +252,42 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       lToken.burn(msg.sender, depositAmount);
     }
 
-    emit TokensRedeemed(msg.sender, tokenType, depositAmount, reserveAmount);
+    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+
+    // @todo: replace with safeTransfer
+    if (!ERC20(reserveToken).transfer(recipient, reserveAmount)) {
+      revert("not enough funds");
+    }
+
+    emit TokensRedeemed(msg.sender, recipient, tokenType, depositAmount, reserveAmount);
     return reserveAmount;
   }
 
   function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+    require(depositAmount > 0, ZeroAmount());
+
+    uint256 debtSupply = dToken.totalSupply()
+                          .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
+    uint256 levSupply = lToken.totalSupply()
+                          .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
+    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this))
+                          .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    if (tokenType == TokenType.LEVERAGE) {
+      depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
+    } else {
+      depositAmount = depositAmount.normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
+    }
+
     return getRedeemAmount(
       tokenType,
       depositAmount,
-      dToken.totalSupply(),
-      lToken.totalSupply(),
-      ERC20(reserveToken).balanceOf(address(this)),
+      debtSupply,
+      levSupply,
+      poolReserves,
       getOraclePrice(address(0)),
       getOracleDecimals(address(0))
-    );
+    ).normalizeAmount(COMMON_DECIMALS, ERC20(reserveToken).decimals());
   }
 
   function getRedeemAmount(
@@ -210,12 +297,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 levSupply,
     uint256 poolReserves,
     uint256 ethPrice,
-    uint256 oracleDecimals) public pure returns(uint256) {
+    uint8 oracleDecimals) public pure returns(uint256) {
     if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
 
-    uint256 tvl = ethPrice * poolReserves / (10**oracleDecimals);
+    uint256 tvl = (ethPrice * poolReserves).toBaseUnit(oracleDecimals);
     uint256 assetSupply = debtSupply;
     uint256 multiplier = POINT_EIGHT;
 
@@ -241,32 +328,54 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       redeemRate = ((tvl - (debtSupply * 100)) / assetSupply) * PRECISION;
     }
     
-    return ((depositAmount * redeemRate * (10**oracleDecimals)) / ethPrice) / PRECISION;
+    return ((depositAmount * redeemRate).fromBaseUnit(oracleDecimals) / ethPrice) / PRECISION;
   }
 
-  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
+  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
+    return swap(tokenType, depositAmount, minAmount, block.timestamp, address(0));
+  }
+
+  function swap(
+    TokenType tokenType,
+    uint256 depositAmount,
+    uint256 minAmount,
+    uint256 deadline,
+    address onBehalfOf) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
     uint256 mintAmount = simulateSwap(tokenType, depositAmount);
 
     if (mintAmount < minAmount) {
       revert MinAmount();
     }
 
+    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+
     if (tokenType == TokenType.DEBT) {
       dToken.burn(msg.sender, depositAmount);
-      lToken.mint(msg.sender, mintAmount);
+      lToken.mint(recipient, mintAmount);
     } else {
       lToken.burn(msg.sender, depositAmount);
-      dToken.mint(msg.sender, mintAmount);
+      dToken.mint(recipient, mintAmount);
     }
-    
+
+    emit TokensSwapped(msg.sender, recipient, tokenType, depositAmount, mintAmount);
     return mintAmount;
   }
 
   function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
-    uint256 debtSupply = dToken.totalSupply();
-    uint256 levSupply = lToken.totalSupply();
-    uint256 poolReserves = ERC20(reserveToken).totalSupply();
-    TokenType createType = TokenType.DEBT;
+    require(depositAmount > 0, ZeroAmount());
+
+    uint256 debtSupply = dToken.totalSupply()
+                          .normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
+    uint256 levSupply = lToken.totalSupply()
+                          .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
+    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this))
+                          .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    if (tokenType == TokenType.LEVERAGE) {
+      depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
+    } else {
+      depositAmount = depositAmount.normalizeTokenAmount(address(dToken), COMMON_DECIMALS);
+    }
 
     uint256 redeemAmount = getRedeemAmount(
       tokenType,
@@ -278,12 +387,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       getOracleDecimals(address(0))
     );
     
+    uint8 assetDecimals = 0;
+    TokenType createType = TokenType.DEBT;
     poolReserves = poolReserves - redeemAmount;
+
     if (tokenType == TokenType.DEBT) {
       createType = TokenType.LEVERAGE;
       debtSupply = debtSupply - depositAmount; 
+      assetDecimals = lToken.decimals();
     } else {
       levSupply = levSupply - depositAmount; 
+      assetDecimals = dToken.decimals();
     }
 
     return getCreateAmount(
@@ -294,7 +408,61 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       poolReserves,
       getOraclePrice(address(0)),
       getOracleDecimals(address(0))
-    );
+    ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
+  }
+
+  function distribute() external whenNotPaused() {
+    if (block.timestamp - lastDistribution < distributionPeriod) {
+      revert DistributionPeriod();
+    }
+
+    Distributor distributor = Distributor(poolFactory.distributor());
+
+    //calculate last distribution time
+    lastDistribution = block.timestamp + distributionPeriod;
+
+    // calculate the coupon to distribute. all issued bond tokens times the sharesPerToken (this will need to be adjusted when we go cross-chain)
+    uint256 couponAmountToDistribute = (dToken.totalSupply() * sharesPerToken).toBaseUnit(dToken.SHARES_DECIMALS());
+
+    // increase the bond token period
+    dToken.increaseIndexedAssetPeriod(sharesPerToken);
+
+    // send the coupon token to the distributor, here we assume that the merchant has already sent the total amount of coupon token to this contract
+    // @todo: replace with safeTransfer
+    ERC20(couponToken).transfer(address(distributor), couponAmountToDistribute);
+
+    // @todo: update distributor with the amount to distribute
+    distributor.allocate(address(this), couponAmountToDistribute);
+
+    emit Distributed(couponAmountToDistribute);
+  }
+
+  function getPoolInfo() external view returns (PoolInfo memory info) {
+    (uint256 currentPeriod, uint256 _sharesPerToken) = dToken.globalPool();
+
+    info = PoolInfo({
+      fee: fee,
+      distributionPeriod: distributionPeriod,
+      reserve: ERC20(reserveToken).balanceOf(address(this)),
+      debtSupply: dToken.totalSupply(),
+      levSupply: lToken.totalSupply(),
+      sharesPerToken: _sharesPerToken,
+      currentPeriod: currentPeriod,
+      lastDistribution: lastDistribution
+    });
+  }
+  
+  function setDistributionPeriod(uint256 _distributionPeriod) external onlyRole(poolFactory.GOV_ROLE()) {
+    uint256 oldPeriod = distributionPeriod;
+    distributionPeriod = _distributionPeriod;
+
+    emit DistributionPeriodChanged(oldPeriod, _distributionPeriod);
+  }
+  
+  function setSharesPerToken(uint256 _sharesPerToken) external onlyRole(poolFactory.GOV_ROLE()) {
+    sharesPerToken = _sharesPerToken;
+
+    emit SharesPerTokenChanged(sharesPerToken);
   }
 
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
@@ -313,6 +481,24 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    */
   function unpause() external onlyRole(poolFactory.GOV_ROLE()) {
     _unpause();
+  }
+
+  // @todo: remove before prod
+  function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
+    // Transfer ERC20 token balance
+    uint256 tokenBalance = ERC20(token).balanceOf(address(this));
+    if (tokenBalance > 0) {
+      ERC20(token).transfer(msg.sender, tokenBalance);
+    }
+
+    // Transfer native token balance
+    uint256 nativeBalance = address(this).balance;
+    if (nativeBalance > 0) {
+      (bool success,) = payable(msg.sender).call{value: nativeBalance}("");
+      if (!success) {
+        return;
+      }
+    }
   }
 
   modifier onlyRole(bytes32 role) {
