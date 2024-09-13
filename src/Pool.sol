@@ -17,10 +17,15 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
+/**
+ * @title Pool
+ * @dev This contract manages a pool of assets, allowing for the creation, redemption, and swapping of debt and leverage tokens.
+ * It also handles distribution periods and interacts with an oracle for price information.
+ */
 contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, OracleReader, Validator {
   using Decimals for uint256;
   
-  // uint public constant MINIMUM_LIQUIDITY = 10**3;
+  // Constants
   uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
   uint256 private constant POINT_TWO = 200000;
   uint256 private constant COLLATERAL_THRESHOLD = 1200000;
@@ -42,17 +47,23 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Distribution
   uint256 private sharesPerToken;
-  uint256 private distributionPeriod;
-  uint256 private lastDistribution;
+  uint256 private distributionPeriod; // in seconds
+  uint256 private lastDistribution; // timestamp in seconds
 
+  /**
+   * @dev Enum representing the types of tokens that can be created or redeemed.
+   */
   enum TokenType {
-    DEBT,
+    DEBT, // bond
     LEVERAGE
   }
 
+  /**
+   * @dev Struct containing information about the pool's current state.
+   */
   struct PoolInfo {
     uint256 fee;
-    uint256 reserve;
+    uint256 reserve; //underlying token amount
     uint256 debtSupply;
     uint256 levSupply;
     uint256 sharesPerToken;
@@ -61,6 +72,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 distributionPeriod;
   }
 
+  // Custom errors
   error MinAmount();
   error ZeroAmount();
   error AccessDenied();
@@ -68,6 +80,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   error ZeroLeverageSupply();
   error DistributionPeriod();
 
+  // Events
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
@@ -81,8 +94,16 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   /**
-   * @dev Initializes the contract with the governance address and sets up roles.
-   * This function is called once during deployment or upgrading to initialize state variables.
+   * @dev Initializes the contract with the given parameters.
+   * @param _poolFactory Address of the pool factory contract.
+   * @param _fee Fee percentage for the pool.
+   * @param _reserveToken Address of the reserve token.
+   * @param _dToken Address of the bond token.
+   * @param _lToken Address of the leverage token.
+   * @param _couponToken Address of the coupon token.
+   * @param _sharesPerToken Initial shares per bond per distribution period.
+   * @param _distributionPeriod Initial distribution period in seconds.
+   * @param _ethPriceFeed Address of the ETH price feed.
    */
   function initialize(
     address _poolFactory,
@@ -110,18 +131,25 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   /**
-    * @dev Transfers `depositAmount` of `reserveToken` from the caller, calculates the amount to mint
-    * If the amount is valid, mints the appropriate token (dToken or lToken) to the caller.
-    * 
-    * @param tokenType The type of token to mint (DEBT or LEVERAGE).
-    * @param depositAmount The amount of `reserveToken` to deposit.
-    * @param minAmount The minimum amount of tokens to mint to avoid slippage.
-    * @return The amount of tokens minted.
-    */
+   * @dev Creates new tokens by depositing reserve tokens.
+   * @param tokenType The type of token to create (DEBT or LEVERAGE).
+   * @param depositAmount The amount of reserve tokens to deposit.
+   * @param minAmount The minimum amount of new tokens to receive.
+   * @return amount of new tokens created.
+   */
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() returns(uint256) {
     return create(tokenType, depositAmount, minAmount, block.timestamp, address(0));
   }
 
+  /**
+   * @dev Creates new tokens by depositing reserve tokens, with additional parameters for deadline and onBehalfOf for router support.
+   * @param tokenType The type of token to create (DEBT or LEVERAGE).
+   * @param depositAmount The amount of reserve tokens to deposit.
+   * @param minAmount The minimum amount of new tokens to receive.
+   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
+   * @param onBehalfOf The address to receive the new tokens.
+   * @return The amount of new tokens created.
+   */
   function create(
     TokenType tokenType,
     uint256 depositAmount,
@@ -157,6 +185,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return amount;
   }
 
+  /**
+   * @dev Simulates the creation of new tokens without actually minting them.
+   * @param tokenType The type of token to simulate creating (DEBT or LEVERAGE).
+   * @param depositAmount The amount of reserve tokens to simulate depositing.
+   * @return amount of new tokens that would be created.
+   */
   function simulateCreate(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
 
@@ -186,6 +220,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
+  /**
+   * @dev Calculates the amount of new tokens to create based on the current pool state and oracle price.
+   * @param tokenType The type of token to create (DEBT or LEVERAGE).
+   * @param depositAmount The amount of reserve tokens to deposit.
+   * @param debtSupply The current supply of debt tokens.
+   * @param levSupply The current supply of leverage tokens.
+   * @param poolReserves The current amount of reserve tokens in the pool.
+   * @param ethPrice The current ETH price from the oracle.
+   * @param oracleDecimals The number of decimals used by the oracle.
+   * @return amount of new tokens to create.
+   */
   function getCreateAmount(
     TokenType tokenType,
     uint256 depositAmount,
@@ -223,10 +268,26 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return ((depositAmount * ethPrice * PRECISION) / creationRate).toBaseUnit(oracleDecimals);
   }
 
+  /**
+   * @dev Redeems tokens for reserve tokens.
+   * @param tokenType The type of derivative token to redeem (DEBT or LEVERAGE).
+   * @param depositAmount The amount of derivative tokens to redeem.
+   * @param minAmount The minimum amount of reserve tokens to receive.
+   * @return amount of reserve tokens received.
+   */
   function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
     return redeem(tokenType, depositAmount, minAmount, block.timestamp, address(0));
   }
 
+  /**
+   * @dev Redeems tokens for reserve tokens, with additional parameters.
+   * @param tokenType The type of derivative token to redeem (DEBT or LEVERAGE).
+   * @param depositAmount The amount of derivative tokens to redeem.
+   * @param minAmount The minimum amount of reserve tokens to receive.
+   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
+   * @param onBehalfOf The address to receive the reserve tokens.
+   * @return amount of reserve tokens received.
+   */
   function redeem(
     TokenType tokenType,
     uint256 depositAmount,
@@ -236,7 +297,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     // Get amount to mint
     uint256 reserveAmount = simulateRedeem(tokenType, depositAmount);
 
-    // Check slippage
+    // Check whether reserve contains enough funds
     if (reserveAmount < minAmount) {
       revert MinAmount();
     }
@@ -246,7 +307,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       revert ZeroAmount();
     }
 
-    // Burn tokens
+    // Burn derivative tokens
     if (tokenType == TokenType.DEBT) {
       dToken.burn(msg.sender, depositAmount);
     } else {
@@ -264,6 +325,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return reserveAmount;
   }
 
+  /**
+   * @dev Simulates the redemption of tokens without actually burning them.
+   * @param tokenType The type of derivative token to simulate redeeming (DEBT or LEVERAGE).
+   * @param depositAmount The amount of derivative tokens to simulate redeeming.
+   * @return amount of reserve tokens that would be received.
+   */
   function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
 
@@ -291,6 +358,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     ).normalizeAmount(COMMON_DECIMALS, ERC20(reserveToken).decimals());
   }
 
+  /**
+   * @dev Calculates the amount of reserve tokens to be redeemed for a given amount of debt or leverage tokens.
+   * @param tokenType The type of derivative token being redeemed (DEBT or LEVERAGE).
+   * @param depositAmount The amount of derivative tokens being redeemed.
+   * @param debtSupply The total supply of debt tokens.
+   * @param levSupply The total supply of leverage tokens.
+   * @param poolReserves The total amount of reserve tokens in the pool.
+   * @param ethPrice The current ETH price from the oracle.
+   * @param oracleDecimals The number of decimals used by the oracle.
+   * @return amount of reserve tokens to be redeemed.
+   */
   function getRedeemAmount(
     TokenType tokenType,
     uint256 depositAmount,
@@ -298,7 +376,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 levSupply,
     uint256 poolReserves,
     uint256 ethPrice,
-    uint8 oracleDecimals) public pure returns(uint256) {
+    uint8 oracleDecimals
+  ) public pure returns(uint256) {
     if (debtSupply == 0) {
       revert ZeroDebtSupply();
     }
@@ -307,10 +386,11 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 assetSupply = debtSupply;
     uint256 multiplier = POINT_EIGHT;
 
-    // @todo: is '100' the BOND_TARGET_PRICE?
-    uint256 collateralLevel = ((tvl - (depositAmount * 100)) * PRECISION) / ((debtSupply - depositAmount) * BOND_TARGET_PRICE);
-
-    if (tokenType == TokenType.LEVERAGE) {
+    // Calculate the collateral level based on the token type
+    uint256 collateralLevel;
+    if (tokenType == TokenType.DEBT) {
+      collateralLevel = ((tvl - (depositAmount * BOND_TARGET_PRICE)) * PRECISION) / ((debtSupply - depositAmount) * BOND_TARGET_PRICE);
+    } else {
       multiplier = POINT_TWO;
       assetSupply = levSupply;
       collateralLevel = (tvl * PRECISION) / (debtSupply * BOND_TARGET_PRICE);
@@ -320,28 +400,47 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       }
     }
     
-    uint256 redeemRate = BOND_TARGET_PRICE * PRECISION;
-
+    // Calculate the redeem rate based on the collateral level and token type
+    uint256 redeemRate;
     if (collateralLevel <= COLLATERAL_THRESHOLD) {
       redeemRate = ((tvl * multiplier) / assetSupply);
     } else if (tokenType == TokenType.LEVERAGE) {
-      // @todo: is this BOND_TARGET_PRICE?
-      redeemRate = ((tvl - (debtSupply * 100)) / assetSupply) * PRECISION;
+      redeemRate = ((tvl - (debtSupply * BOND_TARGET_PRICE)) / assetSupply) * PRECISION;
+    } else {
+      redeemRate = BOND_TARGET_PRICE * PRECISION;
     }
     
+    // Calculate and return the final redeem amount
     return ((depositAmount * redeemRate).fromBaseUnit(oracleDecimals) / ethPrice) / PRECISION;
   }
 
+  /**
+   * @dev Swaps one token type for another (DEBT for LEVERAGE or vice versa).
+   * @param tokenType The type of derivative token being swapped.
+   * @param depositAmount The amount of derivative tokens to swap.
+   * @param minAmount The minimum amount of derivative tokens to receive in return.
+   * @return amount of derivative tokens received in the swap.
+   */
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() returns(uint256) {
     return swap(tokenType, depositAmount, minAmount, block.timestamp, address(0));
   }
 
+  /**
+   * @dev Swaps one token type for another with additional parameters.
+   * @param tokenType The type of derivative token being swapped.
+   * @param depositAmount The amount of derivative tokens to swap.
+   * @param minAmount The minimum amount of derivative tokens to receive in return.
+   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
+   * @param onBehalfOf The address to receive the swapped derivative tokens.
+   * @return amount of derivative tokens received in the swap.
+   */
   function swap(
     TokenType tokenType,
     uint256 depositAmount,
     uint256 minAmount,
     uint256 deadline,
-    address onBehalfOf) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
+    address onBehalfOf
+  ) public whenNotPaused() checkDeadline(deadline) returns(uint256) {
     uint256 mintAmount = simulateSwap(tokenType, depositAmount);
 
     if (mintAmount < minAmount) {
@@ -362,6 +461,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     return mintAmount;
   }
 
+  /**
+   * @dev Simulates a swap without actually executing it.
+   * @param tokenType The type of derivative token being swapped.
+   * @param depositAmount The amount of derivative tokens to simulate swapping.
+   * @return amount of derivative tokens that would be received in the swap.
+   */
   function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
 
@@ -412,6 +517,10 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
+  /**
+   * @dev Distributes coupon tokens to bond token holders.
+   * Can only be called after the distribution period has passed.
+   */
   function distribute() external whenNotPaused() {
     if (block.timestamp - lastDistribution < distributionPeriod) {
       revert DistributionPeriod();
@@ -419,25 +528,29 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
     Distributor distributor = Distributor(poolFactory.distributor());
 
-    //calculate last distribution time
+    // Calculate last distribution time
     lastDistribution = block.timestamp + distributionPeriod;
 
-    // calculate the coupon to distribute. all issued bond tokens times the sharesPerToken (this will need to be adjusted when we go cross-chain)
+    // Calculate the coupon amount to distribute
     uint256 couponAmountToDistribute = (dToken.totalSupply() * sharesPerToken).toBaseUnit(dToken.SHARES_DECIMALS());
 
-    // increase the bond token period
+    // Increase the bond token period
     dToken.increaseIndexedAssetPeriod(sharesPerToken);
 
-    // send the coupon token to the distributor, here we assume that the merchant has already sent the total amount of coupon token to this contract
+    // Transfer coupon tokens to the distributor
     // @todo: replace with safeTransfer
     ERC20(couponToken).transfer(address(distributor), couponAmountToDistribute);
 
-    // @todo: update distributor with the amount to distribute
+    // Update distributor with the amount to distribute
     distributor.allocate(address(this), couponAmountToDistribute);
 
     emit Distributed(couponAmountToDistribute);
   }
 
+  /**
+   * @dev Returns the current pool information.
+   * @return info A struct containing various pool parameters and balances.
+   */
   function getPoolInfo() external view returns (PoolInfo memory info) {
     (uint256 currentPeriod, uint256 _sharesPerToken) = dToken.globalPool();
 
@@ -453,6 +566,10 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     });
   }
   
+  /**
+   * @dev Sets the distribution period.
+   * @param _distributionPeriod The new distribution period.
+   */
   function setDistributionPeriod(uint256 _distributionPeriod) external onlyRole(poolFactory.GOV_ROLE()) {
     uint256 oldPeriod = distributionPeriod;
     distributionPeriod = _distributionPeriod;
@@ -460,30 +577,43 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     emit DistributionPeriodChanged(oldPeriod, _distributionPeriod);
   }
   
+  /**
+   * @dev Sets the shares per token.
+   * @param _sharesPerToken The new shares per token value.
+   */
   function setSharesPerToken(uint256 _sharesPerToken) external onlyRole(poolFactory.GOV_ROLE()) {
     sharesPerToken = _sharesPerToken;
 
     emit SharesPerTokenChanged(sharesPerToken);
   }
 
+  /**
+   * @dev Sets the fee for the pool.
+   * @param _fee The new fee value.
+   */
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
     fee = _fee;
   }
 
   /**
-   * @dev Pauses contract. Reverts any interaction expect upgrade.
+   * @dev Pauses the contract. Reverts any interaction except upgrade.
    */
   function pause() external onlyRole(poolFactory.GOV_ROLE()) {
     _pause();
   }
 
   /**
-   * @dev Unpauses contract.
+   * @dev Unpauses the contract.
    */
   function unpause() external onlyRole(poolFactory.GOV_ROLE()) {
     _unpause();
   }
 
+  /**
+   * @dev Recovers any ERC20 tokens or native tokens sent to this contract.
+   * @param token The address of the ERC20 token to recover.
+   * @notice This function should be removed before production deployment.
+   */
   // @todo: remove before prod
   function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
     // Transfer ERC20 token balance
@@ -502,6 +632,10 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     }
   }
 
+  /**
+   * @dev Modifier to check if the caller has the specified role.
+   * @param role The role to check for.
+   */
   modifier onlyRole(bytes32 role) {
     if (!poolFactory.hasRole(role, msg.sender)) {
       revert AccessDenied();
@@ -509,11 +643,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     _;
   }
 
-  // @todo: owner will be PoolFactory, make sure we can upgrade
   /**
    * @dev Authorizes an upgrade to a new implementation.
    * Can only be called by the owner of the contract.
+   * @param newImplementation The address of the new implementation.
    */
+  // @todo: owner will be PoolFactory, make sure we can upgrade
   function _authorizeUpgrade(address newImplementation)
     internal
     onlyOwner
