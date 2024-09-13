@@ -24,6 +24,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
   uint256 private constant POINT_TWO = 200000;
   uint256 private constant COLLATERAL_THRESHOLD = 1200000;
+  uint256 private constant PRECISION = 1000000;
   uint256 private constant BOND_TARGET_PRICE = 100;
   uint8 private constant COMMON_DECIMALS = 18;
 
