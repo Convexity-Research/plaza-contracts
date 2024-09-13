@@ -2,11 +2,14 @@
 pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
+import {Trader} from "./Trader.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract Merchant is AccessControl, Pausable {
+// @todo: make it upgradable
+contract Merchant is AccessControl, Pausable, Trader {
+  uint256 private constant PRECISION = 10000;
   // Define a constants for the access roles using keccak256 to generate a unique hash
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
@@ -15,203 +18,241 @@ contract Merchant is AccessControl, Pausable {
     address buy;
     uint256 price;
     uint256 amount;
+    bool filled;
   }
 
-  struct DayMarketData {
-    uint256[10] weightedAverageHighs;
-    uint256[10] weightedAverageLows;
-    uint256[10] volumes;
-  }
-
-  mapping (address => DayMarketData) poolMarketData;
-  mapping (address => uint256) accuredCoupons;
+  mapping (address => LimitOrder[]) public orders;
+  mapping (address => uint256) public ordersTimestamp;
 
   error ZeroPrice();
-  error NoVolumeInfo();
-  error InconsistentMarketData();
+  error UpdateNotRequired();
+  error NoOrdersToExecute();
 
-  constructor() {
+  constructor(address _router) Trader(_router) {
     _setRoleAdmin(GOV_ROLE, GOV_ROLE);
     _grantRole(GOV_ROLE, msg.sender);
   }
+  
+  // this will be called by automation to check if there are any pending orders
+  function hasPendingOrders(address _pool) public view returns(bool) {
+    if (ordersTimestamp[_pool] == 0) {
+      return getLimitOrders(_pool).length > 0;
+    }
 
-  // @todo: remove
-  function mockMarket(address pool) public {
-    DayMarketData memory dayMarketData;
-    dayMarketData.weightedAverageHighs = [uint256(100), uint256(102), uint256(101), uint256(103), uint256(99), uint256(98), uint256(102), uint256(101), uint256(100), uint256(99)];
-    dayMarketData.weightedAverageLows = [uint256(99), uint256(101), uint256(100), uint256(102), uint256(97), uint256(95), uint256(101), uint256(100), uint256(98), uint256(94)];
-    dayMarketData.volumes = [uint256(1000), uint256(1200), uint256(1100), uint256(1300), uint256(1250), uint256(1350), uint256(1400), uint256(5000), uint256(200), uint256(3000)];
-    
-    poolMarketData[pool] = dayMarketData;
+    if (ordersTimestamp[_pool] + 12 hours <= block.timestamp) {
+      return getLimitOrders(_pool).length > 0;
+    }
+
+    return false;
   }
 
-  function placeOrders(address _pool) external {
-    LimitOrder[] memory orders = getLimitOrders(_pool);
+  function updateLimitOrders(address _pool) external {
+    // If 12 hours have not passed, revert
+    if (ordersTimestamp[_pool] + 12 hours > block.timestamp) {
+      revert UpdateNotRequired();
+    }
 
-    uniswapMagic(orders);
+    LimitOrder[] memory limitOrders = getLimitOrders(_pool);
+    // If there are no orders to update, revert
+    if (limitOrders.length == 0) {
+      revert UpdateNotRequired();
+    }
+
+    orders[_pool] = limitOrders;
+    ordersTimestamp[_pool] = block.timestamp;
   }
 
-  function getLimitOrders(address _pool) public view returns(LimitOrder[] memory orders) {
-    mockMarket(_pool);
+  function ordersPriceReached(address _pool) public view returns(bool) {
+    LimitOrder[] memory limitOrders = orders[_pool];
+
+    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
+    for (uint256 i = 0; i < limitOrders.length; i++) {
+      if (limitOrders[i].buy == address(0) || limitOrders[i].filled) {
+        continue;
+      }
+
+      // if price is 0, it means it's a market order
+      if (limitOrders[i].price == 0) {
+        return true;
+      }
+
+      if (limitOrders[i].price <= currentPrice) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function executeOrders(address _pool) external {
+    if (!ordersPriceReached(_pool)) {
+      revert NoOrdersToExecute();
+    }
+
+    // @todo: duplicated checks from ordersPriceReached - refactor
+    LimitOrder[] memory limitOrders = orders[_pool];
+    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
+
+    for (uint256 i = 0; i < limitOrders.length; i++) {
+      if (limitOrders[i].buy == address(0) || limitOrders[i].filled) {
+        continue;
+      }
+
+      // if price is 0, it means it's a market order
+      if (limitOrders[i].price == 0) {
+        limitOrders[i].price = currentPrice;
+
+        swap(_pool, limitOrders[i]);
+        limitOrders[i].filled = true;
+      }
+
+      if (limitOrders[i].price <= currentPrice) {
+        swap(_pool, limitOrders[i]);
+        limitOrders[i].filled = true;
+      }
+    }
+
+    // Update storage
+    orders[_pool] = limitOrders;
+  }
+
+  function getLimitOrders(address _pool) public view returns(LimitOrder[] memory limitOrders) {
     Pool pool = Pool(_pool);
     ERC20 reserveToken = ERC20(pool.reserveToken());
     ERC20 couponToken = ERC20(pool.couponToken());
 
-    uint256 precision = pool.PRECISION();
     uint256 couponAmount = getCouponAmount(_pool);
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
-    uint256 marketDepth = getCurrentMarketDepth(address(reserveToken), address(couponToken));
     uint256 currentPrice = getCurrentPrice(address(reserveToken), address(couponToken));
+    uint256 liquidity = getLiquidity(address(reserveToken), address(couponToken));
     require (currentPrice > 0, ZeroPrice());
 
-    DayMarketData memory market = poolMarketData[_pool];
-    (uint256 averageVolume, uint256 waHighs, uint256 waLows) = processMarketData(market);
-
     if (daysToPayment > 10 || couponAmount == 0) {
-      return orders;
+      return limitOrders;
     }
 
     // It should not happen - something likely wrong
+    // @todo: should we do anything else here?
     assert(poolReserves * currentPrice <= couponAmount);
 
-    if (daysToPayment > 5) {
-      uint256 maxOrder = min((50000 * averageVolume / precision), 
-                        min((200000 * current_market_depth) / precision,
-                        min((100000 * couponAmount / (currentPrice * 1025000)) / precision, 
-                        (poolReserves * 950000) / precision)));
+    limitOrders = new LimitOrder[](5);
+    uint256 maxOrder = 0;
+    uint256 sellAmount = 0;
 
-      uint256 sellAmount = (maxOrder * 100000) / precision;
-      if (currentPrice > waHighs || currentPrice < waLows) {
-        sellAmount = (maxOrder * 200000) / precision;
-      }
+    if (daysToPayment > 5) {
+      maxOrder = min((250 * liquidity / PRECISION),
+                  min((1000 * couponAmount / (currentPrice * 10250)) / PRECISION, 
+                  (poolReserves * 9500) / PRECISION));
+
+      sellAmount = (maxOrder * 2000) / PRECISION;
        
-      for (uint256 i = 0; i < 5; i++) {
-        orders.push(LimitOrder({
+      for (uint256 i = 1; i <= 5; i++) {
+        limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
           sell: address(reserveToken),
-          price: (currentPrice * (1010000 + (10000*i))) / precision,
-          amount: sellAmount
-        }));
+          price: (currentPrice * (PRECISION + (200*i))) / PRECISION,
+          amount: sellAmount,
+          filled: false
+        });
       }
-      return orders;
+      return limitOrders;
     }
 
     if (daysToPayment > 1) {
-      uint256 maxOrder = min((50000 * averageVolume / precision), 
-                        min((200000 * current_market_depth) / precision,
-                        min((200000 * couponAmount / (currentPrice * 1025000)) / precision, 
-                        (poolReserves * 950000) / precision)));
+      maxOrder = min((500 * liquidity / PRECISION),
+                  min((2000 * couponAmount / (currentPrice * 10250)) / PRECISION, 
+                  (poolReserves * 9500) / PRECISION));
 
-      uint256 sellAmount = (maxOrder * 200000) / precision;
+      sellAmount = (maxOrder * 2000) / PRECISION;
        
-      for (uint256 i = 0; i < 5; i++) {
-        orders.push(LimitOrder({
+      for (uint256 i = 1; i <= 5; i++) {
+        limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
           sell: address(reserveToken),
-          price: (currentPrice * (10010000 + (10000*i))) / precision,
-          amount: sellAmount
-        }));
+          price: (currentPrice * (PRECISION + (100*i))) / PRECISION,
+          amount: sellAmount,
+          filled: false
+        });
       }
-      return orders;
+      return limitOrders;
     }
 
     if (daysToPayment > 0) {
-      uint256 maxOrder = min((50000 * averageVolume / precision), 
-                        min((200000 * current_market_depth) / precision,
-                        min((1000000 * couponAmount / (currentPrice * 1025000)) / precision, 
-                        (poolReserves * 950000) / precision)));
+      maxOrder = min((500 * liquidity / PRECISION),
+                  min((couponAmount / (currentPrice * 10250)) / PRECISION, 
+                  (poolReserves * 9500) / PRECISION));
 
-      uint256 sellAmount = (maxOrder * 200000) / precision;
+      sellAmount = (maxOrder * 200000) / PRECISION;
        
-      for (uint256 i = 0; i < 5; i++) {
-        orders.push(LimitOrder({
+      for (uint256 i = 1; i <= 5; i++) {
+        limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
           sell: address(reserveToken),
-          price: (currentPrice * (10010000 + (10000*i))) / precision,
-          amount: sellAmount
-        }));
+          price: (currentPrice * (PRECISION + (10*i))) / PRECISION,
+          amount: sellAmount,
+          filled: false
+        });
       }
-      return orders;
+      return limitOrders;
     }
 
     // Sell what's left
-    uint256 maxOrder = min((50000 * averageVolume / precision), 
-                        min((200000 * current_market_depth) / precision,
-                        min(couponAmount / currentPricen, 
-                        (poolReserves * 950000) / precision)));
+    maxOrder = min((1000 * liquidity / PRECISION),
+                min((couponAmount / currentPrice),
+                (poolReserves * 9500) / PRECISION));
     
-    orders.push(LimitOrder({
+    limitOrders[0] = LimitOrder({
       buy: address(couponToken),
       sell: address(reserveToken),
       price: 0, // zero means market sell
-      amount: maxOrder
-    }));
+      amount: maxOrder,
+      filled: false
+    });
 
-    return orders;
+    return limitOrders;
   }
 
   function min(uint256 a, uint256 b) public pure returns (uint256) {
     return a < b ? a : b;
   }
 
-  function processMarketData(DayMarketData memory market) private returns(uint256 averageVolume, uint256 waHighs, uint256 waLows) {
-    uint256 len = market.volumes.length;
-    
-    require(len == market.weightedAverageHighs.length, InconsistentMarketData());
-    require(len == market.weightedAverageLows.length, InconsistentMarketData());
-    
-    uint256 sumHighs;
-    uint256 sumLows;
-    uint256 sumVolumes;
-    for (uint256 i = 0; i < len; i++) {
-      sumHighs = sumHighs + market.weightedAverageHighs[i];
-      sumLows = sumLows + market.weightedAverageLows[i];
-      sumVolumes = sumVolumes + market.volumes[i];
-    }
-    require(sumVolumes > 0, NoVolumeInfo());
-    
-    averageVolume = sumVolumes / len;
-    waLows = sumHighs / sumVolumes;
-    waLows = sumLows / sumVolumes;
-  }
-
-  function getCurrentPrice(address token0, address token1) public view returns(uint256) {
+  function getCurrentPrice(address /*token0*/, address /*token1*/) public pure returns(uint256) {
     return 3000000000;
-  }
-
-  function getCurrentMarketDepth(address token0, address token1) public view returns(uint256) {
-    return 20000;
   }
 
   function getDaysToPayment(address _pool) public view returns(uint8) {
     Pool pool = Pool(_pool);
+    Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
 
-    // @tood: reading storage twice, use memory
-    if (pool.lastDistributionTime() + pool.distributionPeriod() < block.timestamp) {
+    // @todo: reading storage twice, use memory
+    if (poolInfo.lastDistribution + poolInfo.distributionPeriod < block.timestamp) {
       // @todo: what if last+period < timestamp? bad
       // this shouldn't happen, but what if it does?
       return 0;
     }
     
-    return uint8((pool.lastDistributionTime() + pool.distributionPeriod() - block.timestamp) / 86400);
+    return uint8((poolInfo.lastDistribution + poolInfo.distributionPeriod - block.timestamp) / 86400);
   }
 
   function getCouponAmount(address _pool) public view returns(uint256) {
     Pool pool = Pool(_pool);
-    ERC20 couponToken = ERC20(pool.couponToken());
-    ERC20 bondToken = ERC20(address(pool.dToken()));
-    uint256 sharesPerToken = pool.sharesPerToken();
 
-    return ((bondToken.totalSupply() * sharesPerToken) / pool.PRECISION()) - accuredCoupons[_pool];
+    Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
+    uint256 accuredCoupons = ERC20(pool.couponToken()).balanceOf(_pool);
+
+    return (pool.dToken().totalSupply() * poolInfo.sharesPerToken) - accuredCoupons;
   }
 
   function getPoolReserves(address _pool) public view returns(uint256) {
     Pool pool = Pool(_pool);
     ERC20 reserveToken = ERC20(pool.reserveToken());
 
-    // @todo: Do we need the value in units, USD terms or coupon token terms?
     return reserveToken.balanceOf(_pool);
+  }
+
+  function getLiquidity(address /*reserveToken*/, address /*couponToken*/) public pure returns(uint256) {
+    return 1000000000000000000000000000000;
   }
 
   function pause() external onlyRole(GOV_ROLE) {
