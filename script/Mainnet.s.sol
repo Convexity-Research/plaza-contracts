@@ -22,7 +22,7 @@ contract MainnetScript is Script {
 
   uint256 private constant distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
   uint256 private constant reserveAmount = 0.001 ether;
-  uint256 private constant debtAmount = 0.025 ether;
+  uint256 private constant bondAmount = 0.025 ether;
   uint256 private constant leverageAmount = 0.001 ether;
   uint256 private constant sharesPerToken = 2_500_000;
   uint256 private constant fee = 0;
@@ -52,7 +52,7 @@ contract MainnetScript is Script {
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount);
+    factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
     vm.stopBroadcast();
   }
 }

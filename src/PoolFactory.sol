@@ -44,7 +44,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
   /// @dev Instance of the TokenDeployer contract
   TokenDeployer private tokenDeployer;
 
-  /// @dev Error thrown when debt amount is zero
+  /// @dev Error thrown when bond amount is zero
   error ZeroDebtAmount();
   /// @dev Error thrown when reserve amount is zero
   error ZeroReserveAmount();
@@ -55,10 +55,10 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @dev Emitted when a new pool is created
    * @param pool Address of the newly created pool
    * @param reserveAmount Amount of reserve tokens
-   * @param debtAmount Amount of debt tokens
+   * @param bondAmount Amount of bond tokens
    * @param leverageAmount Amount of leverage tokens
    */
-  event PoolCreated(address pool, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount);
+  event PoolCreated(address pool, uint256 reserveAmount, uint256 bondAmount, uint256 leverageAmount);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -87,18 +87,18 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @dev Creates a new pool with the given parameters
    * @param params Struct containing pool parameters
    * @param reserveAmount Amount of reserve tokens to seed the pool
-   * @param debtAmount Amount of debt tokens to mint
+   * @param bondAmount Amount of bond tokens to mint
    * @param leverageAmount Amount of leverage tokens to mint
    * @return Address of the newly created pool
    */
   // @todo: make it payable (to accept native ETH)
-  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 debtAmount, uint256 leverageAmount) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
+  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 bondAmount, uint256 leverageAmount) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
     // @todo: with this is safer but some cases are not testable (guess that's still good)
     // if (reserveAmount == 0) {
     //   revert ZeroReserveAmount();
     // }
 
-    // if (debtAmount == 0) {
+    // if (bondAmount == 0) {
     //   revert ZeroDebtAmount();
     // }
 
@@ -161,7 +161,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     pools.push(pool);
     poolsLength = poolsLength + 1;
-    emit PoolCreated(pool, reserveAmount, debtAmount, leverageAmount);
+    emit PoolCreated(pool, reserveAmount, bondAmount, leverageAmount);
 
     // @todo: make it safeTransferFrom
     // Send seed reserves to pool
@@ -170,7 +170,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     }
 
     // Mint seed amounts
-    bondToken.mint(msg.sender, debtAmount);
+    bondToken.mint(msg.sender, bondAmount);
     lToken.mint(msg.sender, leverageAmount);
 
     return pool;

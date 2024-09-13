@@ -22,7 +22,7 @@ contract TestnetScript is Script {
 
   uint256 private constant distributionPeriod = 7776000; // 3 months in seconds (90 days * 24 hours * 60 minutes * 60 seconds)
   uint256 private constant reserveAmount = 1_000_000 ether;
-  uint256 private constant debtAmount = 25_000_000 ether;
+  uint256 private constant bondAmount = 25_000_000 ether;
   uint256 private constant leverageAmount = 1_000_000 ether;
   uint256 private constant sharesPerToken = 2_500_000;
   uint256 private constant fee = 0;
@@ -56,7 +56,7 @@ contract TestnetScript is Script {
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
 
-    factory.CreatePool(params, reserveAmount, debtAmount, leverageAmount);
+    factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
     
     vm.stopBroadcast();
   }
