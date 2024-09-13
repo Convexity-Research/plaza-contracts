@@ -3,12 +3,15 @@ pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
 import {Trader} from "./Trader.sol";
+import {Decimals} from "./lib/Decimals.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 // @todo: make it upgradable
 contract Merchant is AccessControl, Pausable, Trader {
+  using Decimals for uint256;
+
   uint256 private constant PRECISION = 10000;
   // Define a constants for the access roles using keccak256 to generate a unique hash
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
@@ -28,7 +31,7 @@ contract Merchant is AccessControl, Pausable, Trader {
   error UpdateNotRequired();
   error NoOrdersToExecute();
 
-  constructor(address _router) Trader(_router) {
+  constructor(address _router, address _quoter, address _factory) Trader(_router, _quoter, _factory) {
     _setRoleAdmin(GOV_ROLE, GOV_ROLE);
     _grantRole(GOV_ROLE, msg.sender);
   }
@@ -217,8 +220,8 @@ contract Merchant is AccessControl, Pausable, Trader {
     return a < b ? a : b;
   }
 
-  function getCurrentPrice(address /*token0*/, address /*token1*/) public pure returns(uint256) {
-    return 3000000000;
+  function getCurrentPrice(address token0, address token1) public pure returns(uint256) {
+    return quote(token0, token1, 1 ether);
   }
 
   function getDaysToPayment(address _pool) public view returns(uint8) {
@@ -249,10 +252,6 @@ contract Merchant is AccessControl, Pausable, Trader {
     ERC20 reserveToken = ERC20(pool.reserveToken());
 
     return reserveToken.balanceOf(_pool);
-  }
-
-  function getLiquidity(address /*reserveToken*/, address /*couponToken*/) public pure returns(uint256) {
-    return 1000000000000000000000000000000;
   }
 
   function pause() external onlyRole(GOV_ROLE) {
