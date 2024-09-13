@@ -6,7 +6,10 @@
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
 [submodule "lib/v3-periphery"]
 	path = lib/v3-periphery
-	url = https://github.com/uniswap/v3-periphery
+	url = https://github.com/Uniswap/v3-periphery
 [submodule "lib/chainlink"]
 	path = lib/chainlink
 	url = https://github.com/smartcontractkit/chainlink
+[submodule "lib/v3-core"]
+	path = lib/v3-core
+	url = https://github.com/Uniswap/v3-core
