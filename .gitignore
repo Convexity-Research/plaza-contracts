@@ -11,8 +11,5 @@ bin/
 # IDE
 .vscode/
 
-# Docs
-docs/
-
 # Dotenv file
 .env
