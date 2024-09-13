@@ -110,7 +110,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     string memory reserveSymbol = reserveToken.symbol();
     
     // Deploy Bond token
-    BondToken dToken = BondToken(tokenDeployer.deployDebtToken(
+    BondToken bondToken = BondToken(tokenDeployer.deployDebtToken(
       string.concat("Bond", reserveSymbol),
       string.concat("bond", reserveSymbol),
       address(this),
@@ -134,7 +134,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
         address(this),
         params.fee,
         params.reserveToken,
-        address(dToken),
+        address(bondToken),
         address(lToken),
         params.couponToken,
         params.sharesPerToken,
@@ -145,18 +145,18 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     Distributor(distributor).registerPool(pool, params.couponToken);
 
-    dToken.grantRole(MINTER_ROLE, pool);
+    bondToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
     
     // set token governance
-    dToken.grantRole(GOV_ROLE, governance);
+    bondToken.grantRole(GOV_ROLE, governance);
     lToken.grantRole(GOV_ROLE, governance);
 
-    dToken.grantRole(GOV_ROLE, pool);
+    bondToken.grantRole(GOV_ROLE, pool);
     lToken.grantRole(GOV_ROLE, pool);
 
     // remove governance from factory
-    dToken.revokeRole(GOV_ROLE, address(this));
+    bondToken.revokeRole(GOV_ROLE, address(this));
     lToken.revokeRole(GOV_ROLE, address(this));
 
     pools.push(pool);
@@ -170,7 +170,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     }
 
     // Mint seed amounts
-    dToken.mint(msg.sender, debtAmount);
+    bondToken.mint(msg.sender, debtAmount);
     lToken.mint(msg.sender, leverageAmount);
 
     return pool;

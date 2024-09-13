@@ -1511,7 +1511,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
       rToken.approve(address(_pool), calcTestCases2[i].inAmount);
 
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       uint256 startReserveBalance = rToken.balanceOf(governance);
 
@@ -1519,7 +1519,7 @@ contract PoolTest is Test {
       uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
       assertEq(amount, calcTestCases2[i].expectedCreate);
 
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       uint256 endReserveBalance = rToken.balanceOf(governance);
       assertEq(calcTestCases2[i].inAmount, startReserveBalance-endReserveBalance);
@@ -1555,7 +1555,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
       rToken.approve(address(_pool), calcTestCases2[i].inAmount);
 
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(user2);
       uint256 startReserveBalance = rToken.balanceOf(governance);
 
@@ -1563,7 +1563,7 @@ contract PoolTest is Test {
       uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, block.timestamp, user2);
       assertEq(amount, calcTestCases2[i].expectedCreate);
 
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(user2);
       uint256 endReserveBalance = rToken.balanceOf(governance);
       assertEq(calcTestCases2[i].inAmount, startReserveBalance-endReserveBalance);
@@ -1756,7 +1756,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       // Call create and assert minted tokens
@@ -1764,7 +1764,7 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedRedeem);
 
       uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       assertEq(amount, endBalance-startBalance);
 
@@ -1799,7 +1799,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(user2);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       // Call create and assert minted tokens
@@ -1807,7 +1807,7 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedRedeem);
 
       uint256 endBalance = rToken.balanceOf(user2);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       assertEq(amount, endBalance-startBalance);
 
@@ -1885,7 +1885,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       // Call create and assert minted tokens
@@ -1893,18 +1893,18 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedSwap);
 
       uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       assertEq(0, startBalance-endBalance);
 
       if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets + amount);
         assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
         assertEq(amount, endLevBalance-startLevBalance);
       } else {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets - calcTestCases2[i].inAmount);
         assertEq(calcTestCases2[i].inAmount, startLevBalance-endLevBalance);
         assertEq(amount, endBondBalance-startBondBalance);
@@ -1933,10 +1933,10 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
-      uint256 startBondBalanceUser = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 startBondBalanceUser = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 startLevBalanceUser = LeverageToken(_pool.lToken()).balanceOf(user2);
 
 
@@ -1945,21 +1945,21 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedSwap);
 
       uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
-      uint256 endBondBalanceUser = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 endBondBalanceUser = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 endLevBalanceUser = LeverageToken(_pool.lToken()).balanceOf(user2);
 
       assertEq(0, startBalance-endBalance);
 
       if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets + amount);
         assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
         assertEq(amount, endLevBalanceUser-startLevBalanceUser);
       } else {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets - calcTestCases2[i].inAmount);
         assertEq(calcTestCases2[i].inAmount, startLevBalance-endLevBalance);
         assertEq(amount, endBondBalanceUser-startBondBalanceUser);
@@ -2067,7 +2067,7 @@ function testNotEnoughBalanceInPool() public {
     vm.stopPrank();
 
     vm.startPrank(address(_pool));
-    _pool.dToken().mint(user, 1000*10**18);
+    _pool.bondToken().mint(user, 1000*10**18);
     vm.stopPrank();
 
     vm.startPrank(governance);
@@ -2086,11 +2086,11 @@ function testNotEnoughBalanceInPool() public {
     Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.dToken().SHARES_DECIMALS();
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
     vm.stopPrank();
 
     vm.startPrank(address(_pool));
-    _pool.dToken().mint(user, initialBalance);
+    _pool.bondToken().mint(user, initialBalance);
     vm.stopPrank();
 
     vm.startPrank(minter);
@@ -2114,11 +2114,11 @@ function testNotEnoughBalanceInPool() public {
 
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.dToken().SHARES_DECIMALS();
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
     vm.stopPrank();
     
     vm.startPrank(address(_pool));
-    _pool.dToken().mint(user, initialBalance);
+    _pool.bondToken().mint(user, initialBalance);
     vm.stopPrank();
 
     vm.startPrank(minter);

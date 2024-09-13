@@ -86,17 +86,17 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     require(_pool != address(0), UnsupportedPool());
     
     Pool pool = Pool(_pool);
-    BondToken dToken = pool.dToken();
+    BondToken bondToken = pool.bondToken();
     address couponToken = pool.couponToken();
     ERC20 sharesToken = ERC20(couponToken);
 
-    if (address(dToken) == address(0) || address(sharesToken) == address(0)){
+    if (address(bondToken) == address(0) || address(sharesToken) == address(0)){
       revert UnsupportedPool();
     }
 
-    (uint256 currentPeriod,) = dToken.globalPool();
-    uint256 balance = dToken.balanceOf(msg.sender);
-    uint256 shares = dToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
+    (uint256 currentPeriod,) = bondToken.globalPool();
+    uint256 balance = bondToken.balanceOf(msg.sender);
+    uint256 shares = bondToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
 
     if (sharesToken.balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
@@ -122,7 +122,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     poolInfo.amountToDistribute -= shares;
     couponAmountsToDistribute[couponToken] -= shares;
 
-    dToken.resetIndexedUserAssets(msg.sender);
+    bondToken.resetIndexedUserAssets(msg.sender);
     emit ClaimedShares(msg.sender, currentPeriod, shares);
   }
 

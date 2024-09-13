@@ -149,7 +149,7 @@ contract Router is OracleReader {
     if (tokenType == Pool.TokenType.LEVERAGE) {
       require(Pool(_pool).lToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
     } else {
-      require(Pool(_pool).dToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
+      require(Pool(_pool).bondToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
     }
 
     uint256 redeemAmount = Pool(_pool).redeem(tokenType, depositAmount, 0, deadline, address(this));
