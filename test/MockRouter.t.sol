@@ -87,17 +87,17 @@ contract MockRouterTest is Test {
     usdc.approve(address(mockRouter), 3000000000000000000000);
 
     // Call create and assert minted tokens
-    uint256 amount = mockRouter.swapCreate(address(pool), pool.couponToken(), Pool.TokenType.DEBT, 3000000000000000000000, 0);
+    uint256 amount = mockRouter.swapCreate(address(pool), pool.couponToken(), Pool.TokenType.BOND, 3000000000000000000000, 0);
     assertEq(amount, 31250000000000000000);
   }
 
   function testRouterRedeem() public {
     vm.startPrank(governance);
 
-    pool.dToken().approve(address(mockRouter), 31000000000000000000);
+    pool.bondToken().approve(address(mockRouter), 31000000000000000000);
 
     // Call create and assert minted tokens
-    uint256 amount = mockRouter.swapRedeem(address(pool), pool.couponToken(), Pool.TokenType.DEBT, 31000000000000000000, 0);
+    uint256 amount = mockRouter.swapRedeem(address(pool), pool.couponToken(), Pool.TokenType.BOND, 31000000000000000000, 0);
     assertEq(amount, 2976000000000000000000);
   }
 

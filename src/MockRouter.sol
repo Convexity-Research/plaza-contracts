@@ -6,18 +6,37 @@ import {Decimals} from "./lib/Decimals.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {OracleReader} from "./OracleReader.sol";
 
-// Testnet contract that replaces the real Router contract on testnet
-// Out of the scope of an audit
+/**
+ * @title Router
+ * @dev Testnet contract that replaces the real Router contract on testnet.
+ * @dev *******This contract is out of the scope of an audit.*******
+ */
 contract Router is OracleReader {
 
+  /**
+   * @dev Error thrown when the minimum amount condition is not met.
+   */
   error MinAmount();
 
   using Decimals for uint256;
 
+  /**
+   * @dev Constructor that initializes the OracleReader with the ETH price feed.
+   * @param _ethPriceFeed The address of the ETH price feed.
+   */
   constructor(address _ethPriceFeed) {
     __OracleReader_init(_ethPriceFeed);
   }
 
+  /**
+   * @dev Swaps and creates tokens in a pool.
+   * @param _pool The address of the pool.
+   * @param depositToken The address of the token to deposit.
+   * @param tokenType The type of token to create (LEVERAGE or BOND).
+   * @param depositAmount The amount of tokens to deposit.
+   * @param minAmount The minimum amount of tokens to receive.
+   * @return amount of tokens created.
+   */
   function swapCreate(address _pool,
     address depositToken,
     Pool.TokenType tokenType,
@@ -26,6 +45,17 @@ contract Router is OracleReader {
     return swapCreate(_pool, depositToken, tokenType, depositAmount, minAmount, block.timestamp, msg.sender);
   }
 
+  /**
+   * @dev Swaps and creates tokens in a pool with additional parameters.
+   * @param _pool The address of the pool.
+   * @param depositToken The address of the token to deposit.
+   * @param tokenType The type of token to create (LEVERAGE or BOND).
+   * @param depositAmount The amount of tokens to deposit.
+   * @param minAmount The minimum amount of tokens to receive.
+   * @param deadline The deadline timestamp in seconds for the transaction.
+   * @param onBehalfOf The address to receive the created tokens.
+   * @return amount of tokens created.
+   */
   function swapCreate(address _pool,
     address depositToken,
     Pool.TokenType tokenType,
@@ -76,6 +106,15 @@ contract Router is OracleReader {
     return Pool(_pool).create(tokenType, reserveAmount, minAmount, deadline, onBehalfOf);
   }
 
+  /**
+   * @dev Swaps and redeems tokens from a pool.
+   * @param _pool The address of the pool.
+   * @param redeemToken The address of the token to redeem.
+   * @param tokenType The type of token to redeem (LEVERAGE or BOND).
+   * @param depositAmount The amount of tokens to deposit.
+   * @param minAmount The minimum amount of tokens to receive.
+   * @return amount of tokens redeemed.
+   */
   function swapRedeem(address _pool,
     address redeemToken,
     Pool.TokenType tokenType,
@@ -84,6 +123,17 @@ contract Router is OracleReader {
     return swapRedeem(_pool, redeemToken, tokenType, depositAmount, minAmount, block.timestamp, msg.sender);
   }
 
+  /**
+   * @dev Swaps and redeems tokens from a pool with additional parameters.
+   * @param _pool The address of the pool.
+   * @param redeemToken The address of the token to redeem.
+   * @param tokenType The type of token to redeem (LEVERAGE or BOND).
+   * @param depositAmount The amount of tokens to deposit.
+   * @param minAmount The minimum amount of tokens to receive.
+   * @param deadline The deadline for the transaction.
+   * @param onBehalfOf The address to receive the redeemed tokens.
+   * @return amount of tokens redeemed.
+   */
   function swapRedeem(address _pool,
     address redeemToken,
     Pool.TokenType tokenType,
@@ -99,7 +149,7 @@ contract Router is OracleReader {
     if (tokenType == Pool.TokenType.LEVERAGE) {
       require(Pool(_pool).lToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
     } else {
-      require(Pool(_pool).dToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
+      require(Pool(_pool).bondToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
     }
 
     uint256 redeemAmount = Pool(_pool).redeem(tokenType, depositAmount, 0, deadline, address(this));
