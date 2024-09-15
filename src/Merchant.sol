@@ -37,7 +37,7 @@ contract Merchant is AccessControl, Pausable, Trader {
   }
   
   // this will be called by automation to check if there are any pending orders
-  function hasPendingOrders(address _pool) public view returns(bool) {
+  function hasPendingOrders(address _pool) public /*view*/ returns(bool) {
     if (ordersTimestamp[_pool] == 0) {
       return getLimitOrders(_pool).length > 0;
     }
@@ -65,7 +65,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     ordersTimestamp[_pool] = block.timestamp;
   }
 
-  function ordersPriceReached(address _pool) public view returns(bool) {
+  function ordersPriceReached(address _pool) public /*view*/ returns(bool) {
     LimitOrder[] memory limitOrders = orders[_pool];
 
     uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
@@ -119,7 +119,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     orders[_pool] = limitOrders;
   }
 
-  function getLimitOrders(address _pool) public view returns(LimitOrder[] memory limitOrders) {
+  function getLimitOrders(address _pool) public /*view*/ returns(LimitOrder[] memory limitOrders) {
     Pool pool = Pool(_pool);
     ERC20 reserveToken = ERC20(pool.reserveToken());
     ERC20 couponToken = ERC20(pool.couponToken());
@@ -220,7 +220,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     return a < b ? a : b;
   }
 
-  function getCurrentPrice(address token0, address token1) public pure returns(uint256) {
+  function getCurrentPrice(address token0, address token1) public returns(uint256) {
     return quote(token0, token1, 1 ether);
   }
 

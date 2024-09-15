@@ -89,6 +89,7 @@ contract Trader {
     );
 
     // Get the quote
+    // @todo: investigate why this could modify state - if I restrict to view, it moans
     amountOut = quoter.quoteExactInput(path, amountIn);
   }
 
