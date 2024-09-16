@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+// @todo: remove
+import {console} from "forge-std/console.sol";
+
 import {Distributor} from "./Distributor.sol";
 import {Pool} from "./Pool.sol";
 import {Utils} from "./lib/Utils.sol";
@@ -79,6 +82,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     ERC20 reserveToken = ERC20(params.reserveToken);
     string memory reserveSymbol = reserveToken.symbol();
+
+    console.log("Deploying Bond token");
     
     // Deploy Bond token
     BondToken dToken = BondToken(tokenDeployer.deployDebtToken(
@@ -90,6 +95,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       params.sharesPerToken
     ));
 
+    console.log("Deploying Leverage token");
+
     // Deploy Leverage token
     LeverageToken lToken = LeverageToken(tokenDeployer.deployLeverageToken(
       string.concat("Leverage", reserveSymbol),
@@ -97,6 +104,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
       address(this),
       address(this)
     ));
+
+    console.log("Deploying pool contract");
 
     // Deploy pool contract
     address pool = Utils.deploy(address(new Pool()), abi.encodeCall(

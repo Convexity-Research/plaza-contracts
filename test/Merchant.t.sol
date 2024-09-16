@@ -6,6 +6,7 @@ import "./mocks/Token.sol";
 import "forge-std/Test.sol";
 import "../src/Merchant.sol";
 import {Utils} from "../src/lib/Utils.sol";
+import {Distributor} from "../src/Distributor.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MerchantTest is Test {
@@ -21,11 +22,12 @@ contract MerchantTest is Test {
 
 	function setUp() public {
 		vm.startPrank(governance);
+    Distributor distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
     console.log("Deploying pool factory");
     PoolFactory poolFactory = PoolFactory(
       Utils.deploy(address(new PoolFactory()), 
       abi.encodeCall(PoolFactory.initialize,
-      (governance,governance, address(0), ethPriceFeed)))
+      (governance, governance, address(distributor), ethPriceFeed)))
     );
 
     console.log("Deploying pool");

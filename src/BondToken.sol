@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+// @todo: remove
+import {console} from "forge-std/console.sol";
+
 import {Pool} from "./Pool.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -58,16 +61,22 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     address distributor,
     uint256 sharesPerToken
     ) initializer public {
+
+    console.log("Initializing Bond token");
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();
 
     globalPool.sharesPerToken = sharesPerToken;
 
+    console.log("Granting roles");
+
     // Grant the access roles
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
     _grantRole(DISTRIBUTOR_ROLE, distributor);
+
+    console.log("Roles granted");
   }
 
   /**
