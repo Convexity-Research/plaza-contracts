@@ -8,6 +8,7 @@ import "../src/Merchant.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {Distributor} from "../src/Distributor.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
 contract MerchantTest is Test {
 	Merchant public merchant;
@@ -22,15 +23,18 @@ contract MerchantTest is Test {
 
 	function setUp() public {
 		vm.startPrank(governance);
+
     Distributor distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    console.log("Deploying pool factory");
+
+    address tokenDeployer = address(new TokenDeployer());
+
     PoolFactory poolFactory = PoolFactory(
       Utils.deploy(address(new PoolFactory()), 
       abi.encodeCall(PoolFactory.initialize,
-      (governance, governance, address(distributor), ethPriceFeed)))
+      (governance, tokenDeployer, address(distributor), ethPriceFeed)))
     );
 
-    console.log("Deploying pool");
+    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
     uint256 reserveAmount = 1_000_000 ether;
     uint256 bondAmount = 25_000_000 ether;
@@ -46,18 +50,15 @@ contract MerchantTest is Test {
       couponToken: address(new Token("Circle USD", "USDC"))
     });
 
-    console.log("Minting reserve tokens");
     // Mint reserve tokens
     Token(params.reserveToken).mint(governance, reserveAmount);
     Token(params.reserveToken).approve(address(poolFactory), reserveAmount);
-    console.log("Creating pool");
 
     // Create pool and approve deposit amount
     pool = Pool(poolFactory.CreatePool(params, reserveAmount, bondAmount, leverageAmount));
-    console.log("Deploying merchant");
-		merchant = new Merchant(address(0x0), address(0x0), address(0x0));
-    console.log("Setting pool");
-		vm.stopPrank();
+    
+    merchant = new Merchant(address(0x0), address(0x0), address(0x0));
+    vm.stopPrank();
 	}
 
 	function testHasPendingOrders() public {
