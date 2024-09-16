@@ -52,7 +52,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     return false;
   }
 
-  function updateLimitOrders(address _pool) external {
+  function updateLimitOrders(address _pool) external whenNotPaused() {
     // If 12 hours have not passed, revert
     if (ordersTimestamp[_pool] + 12 hours > block.timestamp) {
       revert UpdateNotRequired();
@@ -90,7 +90,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     return false;
   }
 
-  function executeOrders(address _pool) external {
+  function executeOrders(address _pool) external whenNotPaused() {
     if (!ordersPriceReached(_pool)) {
       revert NoOrdersToExecute();
     }
@@ -139,7 +139,7 @@ contract Merchant is AccessControl, Pausable, Trader {
   function getLimitOrders(address _pool) public /*view*/ returns(LimitOrder[] memory limitOrders) {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
-    
+
     // Hard stop if 95% of the liquidity is sold
     if (hasStoppedSelling[_pool][poolInfo.currentPeriod]) {
       return limitOrders;
