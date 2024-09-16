@@ -27,6 +27,9 @@ contract Merchant is AccessControl, Pausable, Trader {
   mapping (address => LimitOrder[]) public orders;
   mapping (address => uint256) public ordersTimestamp;
 
+  // Pool -> Period -> Has Stopped Selling
+  mapping (address => mapping(uint256 => bool)) private hasStoppedSelling;
+
   error ZeroPrice();
   error UpdateNotRequired();
   error NoOrdersToExecute();
@@ -92,9 +95,13 @@ contract Merchant is AccessControl, Pausable, Trader {
       revert NoOrdersToExecute();
     }
 
-    // @todo: duplicated checks from ordersPriceReached - refactor
+    // @todo: duplicated checks from ordersPriceReached - refactor if gas becomes a problem
     LimitOrder[] memory limitOrders = orders[_pool];
     uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
+    uint256 poolReserves = getPoolReserves(_pool);
+
+    // 94% of the pool liquidity
+    uint256 minLiquidity = (currentPrice * poolReserves * 94) / 100;
 
     for (uint256 i = 0; i < limitOrders.length; i++) {
       if (limitOrders[i].buy == address(0) || limitOrders[i].filled) {
@@ -113,6 +120,16 @@ contract Merchant is AccessControl, Pausable, Trader {
         swap(_pool, limitOrders[i]);
         limitOrders[i].filled = true;
       }
+
+      if (minLiquidity <= limitOrders[i].amount) {
+        Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
+        hasStoppedSelling[_pool][poolInfo.currentPeriod] = true;
+
+        // remove all orders
+        orders[_pool] = new LimitOrder[](0);
+
+        return;
+      }
     }
 
     // Update storage
@@ -121,6 +138,13 @@ contract Merchant is AccessControl, Pausable, Trader {
 
   function getLimitOrders(address _pool) public /*view*/ returns(LimitOrder[] memory limitOrders) {
     Pool pool = Pool(_pool);
+    Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
+    
+    // Hard stop if 95% of the liquidity is sold
+    if (hasStoppedSelling[_pool][poolInfo.currentPeriod]) {
+      return limitOrders;
+    }
+
     ERC20 reserveToken = ERC20(pool.reserveToken());
     ERC20 couponToken = ERC20(pool.couponToken());
 
