@@ -66,7 +66,7 @@ contract PoolFactoryTest is Test {
 
     assertEq(1, endLength-startLength);
     assertEq(rToken.totalSupply(), 10000000000);
-    assertEq(_pool.dToken().totalSupply(), 10000);
+    assertEq(_pool.bondToken().totalSupply(), 10000);
     assertEq(_pool.lToken().totalSupply(), 20000);
 
     // Reset reserve state

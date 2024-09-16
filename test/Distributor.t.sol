@@ -56,8 +56,8 @@ contract DistributorTest is Test {
     // Create pool and approve deposit amount
     _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000*10**18, 10000*10**18));
 
-    _pool.dToken().grantRole(_pool.dToken().DISTRIBUTOR_ROLE(), address(distributor));
-    _pool.dToken().grantRole(_pool.dToken().MINTER_ROLE(), minter);
+    _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
+    _pool.bondToken().grantRole(_pool.bondToken().MINTER_ROLE(), minter);
     _pool.lToken().grantRole(_pool.lToken().MINTER_ROLE(), minter);
   }
 
@@ -65,11 +65,11 @@ contract DistributorTest is Test {
     Token sharesToken = Token(_pool.couponToken());
 
     vm.startPrank(minter);
-    _pool.dToken().mint(user, 1*10**18);
+    _pool.bondToken().mint(user, 1*10**18);
     sharesToken.mint(address(_pool), 50*(1+10000)*10**18);
     vm.stopPrank();
 
-    (uint256 lastUpdatedPeriod, uint256 shares) = _pool.dToken().userAssets(user);
+    (uint256 lastUpdatedPeriod, uint256 shares) = _pool.bondToken().userAssets(user);
 
     vm.startPrank(governance);
     _pool.distribute();
@@ -81,9 +81,9 @@ contract DistributorTest is Test {
     // vm.expectEmit(true, true, true, true);
     // emit Distributor.ClaimedShares(user, 1, 200);
 
-    // _pool.dToken().transfer(address(0x24), 1);
+    // _pool.bondToken().transfer(address(0x24), 1);
 
-    (lastUpdatedPeriod, shares) = _pool.dToken().userAssets(user);
+    (lastUpdatedPeriod, shares) = _pool.bondToken().userAssets(user);
 
     distributor.claim(address(_pool));
     assertEq(sharesToken.balanceOf(user), 50*10**18);
@@ -101,8 +101,8 @@ contract DistributorTest is Test {
     Token sharesToken = Token(_pool.couponToken());
 
     vm.startPrank(minter);
-    _pool.dToken().mint(user, 1000*10**18);
-    sharesToken.mint(address(_pool), (3 * (params.sharesPerToken * 1000 + params.sharesPerToken * 10000) / 10**_pool.dToken().SHARES_DECIMALS()) * 10**sharesToken.decimals()); //instantiate value + minted value right above
+    _pool.bondToken().mint(user, 1000*10**18);
+    sharesToken.mint(address(_pool), (3 * (params.sharesPerToken * 1000 + params.sharesPerToken * 10000) / 10**_pool.bondToken().SHARES_DECIMALS()) * 10**sharesToken.decimals()); //instantiate value + minted value right above
     vm.stopPrank();
 
     vm.startPrank(governance);
@@ -123,14 +123,14 @@ contract DistributorTest is Test {
     Token sharesToken = Token(_pool.couponToken());
 
     vm.startPrank(minter);
-    _pool.dToken().mint(user, 1*10**18);
+    _pool.bondToken().mint(user, 1*10**18);
     // Mint enough shares but don't allocate them
     sharesToken.mint(address(distributor), 50*10**sharesToken.decimals());
     vm.stopPrank();
 
     //this would never happen in production
     vm.startPrank(governance);
-    _pool.dToken().increaseIndexedAssetPeriod(1);
+    _pool.bondToken().increaseIndexedAssetPeriod(1);
     vm.stopPrank();
 
     vm.startPrank(user);
@@ -143,7 +143,7 @@ contract DistributorTest is Test {
     Token sharesToken = Token(_pool.couponToken());
 
     vm.startPrank(minter);
-    _pool.dToken().mint(user, 1000*10**18);
+    _pool.bondToken().mint(user, 1000*10**18);
     // Mint shares but transfer them away from the distributor
     sharesToken.mint(address(distributor), 50*10**18);
     vm.stopPrank();
@@ -154,7 +154,7 @@ contract DistributorTest is Test {
 
     //this would never happen in production
     vm.startPrank(governance);
-    _pool.dToken().increaseIndexedAssetPeriod(1);
+    _pool.bondToken().increaseIndexedAssetPeriod(1);
     vm.stopPrank();
 
     vm.startPrank(user);

@@ -11,38 +11,67 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
+/**
+ * @title BondToken
+ * @dev This contract implements a bond token with upgradeable capabilities, access control, and pausability.
+ * It includes functionality for managing indexed user assets and global asset pools.
+ */
 contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {  
   using Decimals for uint256;
 
+  /**
+   * @dev Struct to represent a pool's outstanding shares and shares per bond at a specific period
+   * @param period The period of the pool amount
+   * @param amount The total amount in the pool
+   * @param sharesPerToken The number of shares per token (base 10000)
+   */
   struct PoolAmount {
     uint256 period;
     uint256 amount;
-    uint256 sharesPerToken; // 10000 base
+    uint256 sharesPerToken;
   }
 
+  /**
+   * @dev Struct to represent the global asset pool, including the current period, shares per token, and previous pool amounts.
+   * @param currentPeriod The current period of the global pool
+   * @param sharesPerToken The current number of shares per token (base 10000)
+   * @param previousPoolAmounts An array of previous pool amounts
+   */
   struct IndexedGlobalAssetPool {
     uint256 currentPeriod;
-    uint256 sharesPerToken; // 10000 base
+    uint256 sharesPerToken;
     PoolAmount[] previousPoolAmounts;
   }
 
+  /**
+   * @dev Struct to represent a user's indexed assets, which are the user's shares
+   * @param lastUpdatedPeriod The last period when the user's assets were updated
+   * @param indexedAmountShares The user's indexed amount of shares
+   */
   struct IndexedUserAssets {
     uint256 lastUpdatedPeriod;
     uint256 indexedAmountShares;
   }
 
+  /// @dev The global asset pool
   IndexedGlobalAssetPool public globalPool;
 
+  /// @dev Mapping of user addresses to their indexed assets
   mapping(address => IndexedUserAssets) public userAssets;
 
-  // Define a constants for the access roles using keccak256 to generate a unique hash
+  /// @dev Role identifier for accounts with minting privileges
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+  /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  /// @dev Role identifier for the distributor
   bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
 
+  /// @dev The number of decimals for shares
   uint8 public constant SHARES_DECIMALS = 6;
 
+  /// @dev Emitted when the asset period is increased
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
+  /// @dev Emitted when a user's assets are updated
   event UpdatedUserAssets(address user, uint256 lastUpdatedPeriod, uint256 indexedAmountShares);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -50,6 +79,15 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     _disableInitializers();
   }
 
+  /**
+   * @dev Initializes the contract with a name, symbol, minter, governance address, distributor, and initial shares per token.
+   * @param name The name of the token
+   * @param symbol The symbol of the token
+   * @param minter The address that will have minting privileges
+   * @param governance The address that will have governance privileges
+   * @param distributor The address that will have distributor privileges
+   * @param sharesPerToken The initial number of shares per token
+   */
   function initialize(
     string memory name, 
     string memory symbol, 
@@ -65,7 +103,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
     globalPool.sharesPerToken = sharesPerToken;
 
-    // Grant the access roles
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
     _grantRole(DISTRIBUTOR_ROLE, distributor);
@@ -73,7 +110,9 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Mints new tokens to the specified address.
-   * Can only be called by addresses with the MINTER_ROLE.
+   * @param to The address that will receive the minted tokens
+   * @param amount The amount of tokens to mint
+   * @notice Can only be called by addresses with the MINTER_ROLE.
    */
   function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
     _mint(to, amount);
@@ -81,7 +120,9 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Burns tokens from the specified account.
-   * Can only be called by addresses with the MINTER_ROLE.
+   * @param account The account from which tokens will be burned
+   * @param amount The amount of tokens to burn
+   * @notice Can only be called by addresses with the MINTER_ROLE.
    */
   function burn(address account, uint256 amount) public onlyRole(MINTER_ROLE) {
     _burn(account, amount);
@@ -89,6 +130,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Returns the previous pool amounts from the global pool.
+   * @return An array of PoolAmount structs representing the previous pool amounts
    */
   function getPreviousPoolAmounts() external view returns (PoolAmount[] memory) {
     return globalPool.previousPoolAmounts;
@@ -96,7 +138,10 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Internal function to update user assets after a transfer.
-   * Called during token transfer.
+   * @param from The address tokens are transferred from
+   * @param to The address tokens are transferred to
+   * @param amount The amount of tokens transferred
+   * @notice This function is called during token transfer and is paused when the contract is paused.
    */
   function _update(address from, address to, uint256 amount) internal virtual override whenNotPaused() {
     if (from != address(0)) {
@@ -112,7 +157,9 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Updates the indexed user assets for a specific user.
-   * Updates the number of shares held by the user based on the current period.
+   * @param user The address of the user
+   * @param balance The current balance of the user
+   * @notice This function updates the number of shares held by the user based on the current period.
    */
   function updateIndexedUserAssets(address user, uint256 balance) internal {
     uint256 period = globalPool.currentPeriod;
@@ -126,7 +173,11 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Returns the indexed amount of shares for a specific user.
-   * Calculates the number of shares based on the current period and the previous pool amounts.
+   * @param user The address of the user
+   * @param balance The current balance of the user
+   * @param period The period to calculate the shares for
+   * @return The indexed amount of shares for the user
+   * @notice This function calculates the number of shares based on the current period and the previous pool amounts.
    */
   function getIndexedUserAmount(address user, uint256 balance, uint256 period) public view returns(uint256) {
     IndexedUserAssets memory userPool = userAssets[user];
@@ -141,7 +192,9 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Resets the indexed user assets for a specific user.
-   * Resets the last updated period and indexed amount of shares to zero.
+   * @param user The address of the user
+   * @notice This function resets the last updated period and indexed amount of shares to zero.
+   * Can only be called by addresses with the DISTRIBUTOR_ROLE and when the contract is not paused.
    */
   function resetIndexedUserAssets(address user) external onlyRole(DISTRIBUTOR_ROLE) whenNotPaused(){
     userAssets[user].lastUpdatedPeriod = globalPool.currentPeriod;
@@ -150,7 +203,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Increases the current period and updates the shares per token.
-   * Can only be called by addresses with the GOV_ROLE.
+   * @param sharesPerToken The new number of shares per token
+   * @notice Can only be called by addresses with the GOV_ROLE and when the contract is not paused.
    */
   function increaseIndexedAssetPeriod(uint256 sharesPerToken) public onlyRole(GOV_ROLE) whenNotPaused() {
     globalPool.previousPoolAmounts.push(
@@ -167,45 +221,46 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   }
 
   /**
-    * @dev Grants `role` to `account`.
-    * If `account` had not been already granted `role`, emits a {RoleGranted}
-    * event.
-    * May emit a {RoleGranted} event.
-    */
+   * @dev Grants a role to an account.
+   * @param role The role to grant
+   * @param account The account to grant the role to
+   * @notice Can only be called by addresses with the GOV_ROLE.
+   */
   function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
     _grantRole(role, account);
   }
 
   /**
-    * @dev Revokes `role` from `account`.
-    * If `account` had been granted `role`, emits a {RoleRevoked} event.
-    * May emit a {RoleRevoked} event.
-    */
+   * @dev Revokes a role from an account.
+   * @param role The role to revoke
+   * @param account The account to revoke the role from
+   * @notice Can only be called by addresses with the GOV_ROLE.
+   */
   function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
     _revokeRole(role, account);
   }
 
   /**
-   * @dev Updates paused property which will revert any intecation with the contract.
-   * Including transfer, mint, burn, or indexing updates.
-   * It does not prevent contract upgrades
+   * @dev Pauses all contract functions except for upgrades.
+   * @notice Can only be called by addresses with the GOV_ROLE.
    */
   function pause() external onlyRole(GOV_ROLE) {
     _pause();
   }
 
-    /**
-   * @dev Updates paused property which will revert any intecation with the contract.
-   * Including transfer, mint, burn, or indexing updates.
-   * It does not prevent contract upgrades
+  /**
+   * @dev Unpauses all contract functions.
+   * @notice Can only be called by addresses with the GOV_ROLE.
    */
   function unpause() external onlyRole(GOV_ROLE) {
     _unpause();
   }
 
   /**
-   * @dev Authorizes an upgrade to a new implementation.
-   * Can only be called by the owner of the contract.
+   * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+   * {upgradeTo} and {upgradeToAndCall}.
+   * @param newImplementation Address of the new implementation contract
+   * @notice Can only be called by addresses with the GOV_ROLE.
    */
   function _authorizeUpgrade(address newImplementation)
     internal

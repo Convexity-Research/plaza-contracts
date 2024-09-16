@@ -12,8 +12,5 @@ bin/
 .vscode/
 .history/
 
-# Docs
-docs/
-
 # Dotenv file
 .env

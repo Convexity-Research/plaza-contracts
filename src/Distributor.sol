@@ -10,10 +10,15 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
+/**
+ * @title Distributor
+ * @dev This contract manages the distribution of coupon shares to users based on their bond token balances.
+ */
 contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
 
-  // Define a constants for the access roles using keccak256 to generate a unique hash
+  /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  /// @dev Role identifier for the pool factory
   bytes32 public constant POOL_FACTORY_ROLE = keccak256("POOL_FACTORY_ROLE");
 
   struct PoolInfo {
@@ -21,17 +26,26 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     uint256 amountToDistribute;
   }
 
-  //map of pool info
+  /// @dev Mapping of pool addresses to their respective PoolInfo
   mapping(address => PoolInfo) public poolInfos;
 
+  /// @dev Mapping of coupon token addresses to their total amount to be distributed
   mapping(address => uint256) public couponAmountsToDistribute;
 
+  /// @dev Error thrown when there are not enough shares in the contract's balance
   error NotEnoughSharesBalance();
+  /// @dev Error thrown when an unsupported pool is accessed
   error UnsupportedPool();
+  /// @dev Error thrown when there are not enough shares allocated to distribute
   error NotEnoughSharesToDistribute();
+  /// @dev Error thrown when there are not enough coupon tokens in the contract's balance
   error NotEnoughCouponBalance();
+  /// @dev Error thrown when attempting to register an already registered pool
   error PoolAlreadyRegistered();
+
+  /// @dev Event emitted when a user claims their shares
   event ClaimedShares(address user, uint256 period, uint256 shares);
+  /// @dev Event emitted when a new pool is registered
   event PoolRegistered(address pool, address couponToken);
 
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -52,6 +66,8 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
   /**
    * @dev Allows the pool factory to register a pool in the distributor.
+   * @param _pool Address of the pool to be registered
+   * @param _couponToken Address of the coupon token associated with the pool
    */
   function registerPool(address _pool, address _couponToken) external onlyRole(POOL_FACTORY_ROLE) {
     require(_pool != address(0), "Invalid pool address");
@@ -70,17 +86,17 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     require(_pool != address(0), UnsupportedPool());
     
     Pool pool = Pool(_pool);
-    BondToken dToken = pool.dToken();
+    BondToken bondToken = pool.bondToken();
     address couponToken = pool.couponToken();
     ERC20 sharesToken = ERC20(couponToken);
 
-    if (address(dToken) == address(0) || address(sharesToken) == address(0)){
+    if (address(bondToken) == address(0) || address(sharesToken) == address(0)){
       revert UnsupportedPool();
     }
 
-    (uint256 currentPeriod,) = dToken.globalPool();
-    uint256 balance = dToken.balanceOf(msg.sender);
-    uint256 shares = dToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
+    (uint256 currentPeriod,) = bondToken.globalPool();
+    uint256 balance = bondToken.balanceOf(msg.sender);
+    uint256 shares = bondToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
 
     if (sharesToken.balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
@@ -106,7 +122,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     poolInfo.amountToDistribute -= shares;
     couponAmountsToDistribute[couponToken] -= shares;
 
-    dToken.resetIndexedUserAssets(msg.sender);
+    bondToken.resetIndexedUserAssets(msg.sender);
     emit ClaimedShares(msg.sender, currentPeriod, shares);
   }
 
@@ -131,41 +147,51 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
   }
 
   /**
-    * @dev Grants `role` to `account`.
-    * If `account` had not been already granted `role`, emits a {RoleGranted}
-    * event.
-    * May emit a {RoleGranted} event.
-    */
+   * @dev Grants `role` to `account`.
+   * If `account` had not been already granted `role`, emits a {RoleGranted} event.
+   * Requirements:
+   * - the caller must have ``role``'s admin role.
+   * @param role The role to grant
+   * @param account The account to grant the role to
+   */
   function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
     _grantRole(role, account);
   }
 
   /**
-    * @dev Revokes `role` from `account`.
-    * If `account` had been granted `role`, emits a {RoleRevoked} event.
-    * May emit a {RoleRevoked} event.
-    */
+   * @dev Revokes `role` from `account`.
+   * If `account` had been granted `role`, emits a {RoleRevoked} event.
+   * Requirements:
+   * - the caller must have ``role``'s admin role.
+   * @param role The role to revoke
+   * @param account The account to revoke the role from
+   */
   function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
     _revokeRole(role, account);
   }
 
   /**
-   * @dev Pauses contract. Reverts any interaction expect upgrade.
+   * @dev Pauses all contract functions except for upgrades.
+   * Requirements:
+   * - the caller must have the `GOV_ROLE`.
    */
   function pause() external onlyRole(GOV_ROLE) {
     _pause();
   }
 
   /**
-   * @dev Unpauses contract.
+   * @dev Unpauses all contract functions.
+   * Requirements:
+   * - the caller must have the `GOV_ROLE`.
    */
   function unpause() external onlyRole(GOV_ROLE) {
     _unpause();
   }
 
   /**
-   * @dev Authorizes an upgrade to a new implementation.
-   * Can only be called by the owner of the contract.
+   * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+   * {upgradeTo} and {upgradeToAndCall}.
+   * @param newImplementation Address of the new implementation contract
    */
   function _authorizeUpgrade(address newImplementation)
     internal

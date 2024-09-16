@@ -100,7 +100,7 @@ contract PoolTest is Test {
   function initializeTestCases() public {
     // Debt - Below Threshold
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1000,
         ethPrice: 3000,
         TotalUnderlyingAssets: 1000000000,
@@ -112,7 +112,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2000,
         ethPrice: 4000,
         TotalUnderlyingAssets: 1000000000,
@@ -124,7 +124,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1500,
         ethPrice: 2500,
         TotalUnderlyingAssets: 1000000000,
@@ -136,7 +136,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 500,
         ethPrice: 3500,
         TotalUnderlyingAssets: 1000000000,
@@ -148,7 +148,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 3000,
         ethPrice: 1500,
         TotalUnderlyingAssets: 1000000000,
@@ -160,7 +160,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 750,
         ethPrice: 4500,
         TotalUnderlyingAssets: 1000000000,
@@ -172,7 +172,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1200,
         ethPrice: 5000,
         TotalUnderlyingAssets: 1000000000,
@@ -184,7 +184,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 800,
         ethPrice: 2600,
         TotalUnderlyingAssets: 1000000000,
@@ -196,7 +196,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2200,
         ethPrice: 3300,
         TotalUnderlyingAssets: 1000000000,
@@ -208,7 +208,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 3500,
         ethPrice: 4200,
         TotalUnderlyingAssets: 1000000000,
@@ -220,7 +220,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2900,
         ethPrice: 2700,
         TotalUnderlyingAssets: 1000000000,
@@ -232,7 +232,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1800,
         ethPrice: 3800,
         TotalUnderlyingAssets: 1000000000,
@@ -244,7 +244,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 100,
         ethPrice: 8000,
         TotalUnderlyingAssets: 1000000000,
@@ -256,7 +256,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 600,
         ethPrice: 3200,
         TotalUnderlyingAssets: 1000000000,
@@ -268,7 +268,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1600,
         ethPrice: 2900,
         TotalUnderlyingAssets: 1000000000,
@@ -280,7 +280,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 4500,
         ethPrice: 2500,
         TotalUnderlyingAssets: 1000000000,
@@ -292,7 +292,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 300,
         ethPrice: 7000,
         TotalUnderlyingAssets: 1000000000,
@@ -304,7 +304,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 5000,
         ethPrice: 1200,
         TotalUnderlyingAssets: 1000000000,
@@ -316,7 +316,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 400,
         ethPrice: 6500,
         TotalUnderlyingAssets: 1000000000,
@@ -329,7 +329,7 @@ contract PoolTest is Test {
 
     // Debt - Above Threshold
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1000,
         ethPrice: 3000,
         TotalUnderlyingAssets: 1200456789222,
@@ -341,7 +341,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2000,
         ethPrice: 4000,
         TotalUnderlyingAssets: 1200456789222,
@@ -353,7 +353,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1500,
         ethPrice: 2500,
         TotalUnderlyingAssets: 1200456789222,
@@ -365,7 +365,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 500,
         ethPrice: 3500,
         TotalUnderlyingAssets: 1200456789222,
@@ -377,7 +377,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 3000,
         ethPrice: 1500,
         TotalUnderlyingAssets: 1200456789222,
@@ -389,7 +389,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 750,
         ethPrice: 4500,
         TotalUnderlyingAssets: 1200456789222,
@@ -401,7 +401,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1200,
         ethPrice: 5000,
         TotalUnderlyingAssets: 1200456789222,
@@ -413,7 +413,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 800,
         ethPrice: 2600,
         TotalUnderlyingAssets: 1200456789222,
@@ -425,7 +425,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2200,
         ethPrice: 3300,
         TotalUnderlyingAssets: 1200456789222,
@@ -437,7 +437,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 3500,
         ethPrice: 4200,
         TotalUnderlyingAssets: 1200456789222,
@@ -449,7 +449,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2900,
         ethPrice: 2700,
         TotalUnderlyingAssets: 1200456789222,
@@ -461,7 +461,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1800,
         ethPrice: 3800,
         TotalUnderlyingAssets: 1200456789222,
@@ -473,7 +473,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 100,
         ethPrice: 8000,
         TotalUnderlyingAssets: 1200456789222,
@@ -485,7 +485,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 600,
         ethPrice: 3200,
         TotalUnderlyingAssets: 1200456789222,
@@ -497,7 +497,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1600,
         ethPrice: 2900,
         TotalUnderlyingAssets: 1200456789222,
@@ -509,7 +509,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 4500,
         ethPrice: 2500,
         TotalUnderlyingAssets: 1200456789222,
@@ -521,7 +521,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 300,
         ethPrice: 7000,
         TotalUnderlyingAssets: 1200456789222,
@@ -533,7 +533,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 5000,
         ethPrice: 1200,
         TotalUnderlyingAssets: 1200456789222,
@@ -545,7 +545,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 400,
         ethPrice: 6500,
         TotalUnderlyingAssets: 1200456789222,
@@ -1028,7 +1028,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1000,
         ethPrice: 3600,
         TotalUnderlyingAssets: 7200000,
@@ -1052,7 +1052,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 7000,
         ethPrice: 1200,
         TotalUnderlyingAssets: 144000000,
@@ -1076,7 +1076,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2400,
         ethPrice: 6000,
         TotalUnderlyingAssets: 360000000,
@@ -1100,7 +1100,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 3700,
         ethPrice: 1500,
         TotalUnderlyingAssets: 54000000,
@@ -1124,7 +1124,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2900,
         ethPrice: 3000,
         TotalUnderlyingAssets: 900000000,
@@ -1148,7 +1148,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 4500,
         ethPrice: 15000,
         TotalUnderlyingAssets: 18000000000,
@@ -1172,7 +1172,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 3000,
         ethPrice: 9000,
         TotalUnderlyingAssets: 5400000000,
@@ -1196,7 +1196,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 7000,
         ethPrice: 4800,
         TotalUnderlyingAssets: 1440000000,
@@ -1220,7 +1220,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 2500,
         ethPrice: 1200,
         TotalUnderlyingAssets: 36000000,
@@ -1244,7 +1244,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 4700,
         ethPrice: 6000,
         TotalUnderlyingAssets: 720000000,
@@ -1268,7 +1268,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 5500,
         ethPrice: 15000,
         TotalUnderlyingAssets: 18000000000,
@@ -1292,7 +1292,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 4200,
         ethPrice: 9000,
         TotalUnderlyingAssets: 5400000000,
@@ -1316,7 +1316,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 6800,
         ethPrice: 12000,
         TotalUnderlyingAssets: 14400000000,
@@ -1340,7 +1340,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 7800,
         ethPrice: 15000,
         TotalUnderlyingAssets: 18000000000,
@@ -1364,7 +1364,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 3100,
         ethPrice: 1200,
         TotalUnderlyingAssets: 288000000,
@@ -1379,7 +1379,7 @@ contract PoolTest is Test {
   // eth comes from Pool constant (3000)
   function initializeTestCasesFixedEth() public {
     calcTestCases2.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1000,
         ethPrice: 0, // not used
         TotalUnderlyingAssets: 1000000000,
@@ -1391,7 +1391,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases2.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 1250,
         ethPrice: 0, // not used
         TotalUnderlyingAssets: 1200456789222,
@@ -1439,7 +1439,7 @@ contract PoolTest is Test {
     }));
 
     calcTestCases2.push(CalcTestCase({
-        assetType: Pool.TokenType.DEBT,
+        assetType: Pool.TokenType.BOND,
         inAmount: 7000,
         ethPrice: 0, // not used
         TotalUnderlyingAssets: 144000000,
@@ -1485,7 +1485,7 @@ contract PoolTest is Test {
   function testGetCreateAmountZeroDebtSupply() public {
     Pool pool = new Pool();
     vm.expectRevert(Pool.ZeroDebtSupply.selector);
-    pool.getCreateAmount(Pool.TokenType.DEBT, 10, 0, 100, 100, 3000, CHAINLINK_DECIMAL);
+    pool.getCreateAmount(Pool.TokenType.BOND, 10, 0, 100, 100, 3000, CHAINLINK_DECIMAL);
   }
 
   function testGetCreateAmountZeroLeverageSupply() public {
@@ -1511,7 +1511,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
       rToken.approve(address(_pool), calcTestCases2[i].inAmount);
 
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       uint256 startReserveBalance = rToken.balanceOf(governance);
 
@@ -1519,12 +1519,12 @@ contract PoolTest is Test {
       uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0);
       assertEq(amount, calcTestCases2[i].expectedCreate);
 
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       uint256 endReserveBalance = rToken.balanceOf(governance);
       assertEq(calcTestCases2[i].inAmount, startReserveBalance-endReserveBalance);
 
-      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
+      if (calcTestCases2[i].assetType == Pool.TokenType.BOND) {
         assertEq(amount, endBondBalance-startBondBalance);
         assertEq(0, endLevBalance-startLevBalance);
       } else {
@@ -1555,7 +1555,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
       rToken.approve(address(_pool), calcTestCases2[i].inAmount);
 
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(user2);
       uint256 startReserveBalance = rToken.balanceOf(governance);
 
@@ -1563,12 +1563,12 @@ contract PoolTest is Test {
       uint256 amount = _pool.create(calcTestCases2[i].assetType, calcTestCases2[i].inAmount, 0, block.timestamp, user2);
       assertEq(amount, calcTestCases2[i].expectedCreate);
 
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(user2);
       uint256 endReserveBalance = rToken.balanceOf(governance);
       assertEq(calcTestCases2[i].inAmount, startReserveBalance-endReserveBalance);
 
-      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
+      if (calcTestCases2[i].assetType == Pool.TokenType.BOND) {
         assertEq(amount, endBondBalance-startBondBalance);
         assertEq(0, endLevBalance-startLevBalance);
       } else {
@@ -1596,7 +1596,7 @@ contract PoolTest is Test {
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
-    uint256 amount = _pool.create(Pool.TokenType.DEBT, 1000, 30000, block.timestamp, governance);
+    uint256 amount = _pool.create(Pool.TokenType.BOND, 1000, 30000, block.timestamp, governance);
     assertEq(amount, 30000);
 
     // Reset reserve state
@@ -1618,7 +1618,7 @@ contract PoolTest is Test {
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
-    uint256 amount = _pool.create(Pool.TokenType.DEBT, 1000, 30000, block.timestamp + 10000, governance);
+    uint256 amount = _pool.create(Pool.TokenType.BOND, 1000, 30000, block.timestamp + 10000, governance);
     assertEq(amount, 30000);
 
     // Reset reserve state
@@ -1641,7 +1641,7 @@ contract PoolTest is Test {
 
     // Call create and assert minted tokens
     vm.expectRevert(Validator.TransactionTooOld.selector);
-    _pool.create(Pool.TokenType.DEBT, 1000, 30000, block.timestamp - 1, governance);
+    _pool.create(Pool.TokenType.BOND, 1000, 30000, block.timestamp - 1, governance);
   }
 
   function testCreateDeadlineSimulateBlockAdvanceRevert() public {
@@ -1663,7 +1663,7 @@ contract PoolTest is Test {
 
     // Call create and assert minted tokens
     vm.expectRevert(Validator.TransactionTooOld.selector);
-    _pool.create(Pool.TokenType.DEBT, 1000, 30000, block.timestamp, governance);
+    _pool.create(Pool.TokenType.BOND, 1000, 30000, block.timestamp, governance);
   }
 
   function testCreateMinAmountExactSuccess() public {
@@ -1679,7 +1679,7 @@ contract PoolTest is Test {
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
-    uint256 amount = _pool.create(Pool.TokenType.DEBT, 1000, 30000);
+    uint256 amount = _pool.create(Pool.TokenType.BOND, 1000, 30000);
     assertEq(amount, 30000);
 
     // Reset reserve state
@@ -1701,7 +1701,7 @@ contract PoolTest is Test {
 
     // Call create and expect error
     vm.expectRevert(Pool.MinAmount.selector);
-    _pool.create(Pool.TokenType.DEBT, 1000, 30001);
+    _pool.create(Pool.TokenType.BOND, 1000, 30001);
 
     // Reset reserve state
     rToken.burn(governance, rToken.balanceOf(governance));
@@ -1756,7 +1756,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       // Call create and assert minted tokens
@@ -1764,11 +1764,11 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedRedeem);
 
       uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       assertEq(amount, endBalance-startBalance);
 
-      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
+      if (calcTestCases2[i].assetType == Pool.TokenType.BOND) {
         assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
         assertEq(0, endLevBalance-startLevBalance);
       } else {
@@ -1799,7 +1799,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(user2);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       // Call create and assert minted tokens
@@ -1807,11 +1807,11 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedRedeem);
 
       uint256 endBalance = rToken.balanceOf(user2);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       assertEq(amount, endBalance-startBalance);
 
-      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
+      if (calcTestCases2[i].assetType == Pool.TokenType.BOND) {
         assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
         assertEq(0, endLevBalance-startLevBalance);
       } else {
@@ -1839,7 +1839,7 @@ contract PoolTest is Test {
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
-    uint256 amount = _pool.redeem(Pool.TokenType.DEBT, 1000, 33);
+    uint256 amount = _pool.redeem(Pool.TokenType.BOND, 1000, 33);
     assertEq(amount, 33);
 
     // Reset reserve state
@@ -1861,7 +1861,7 @@ contract PoolTest is Test {
 
     // Call create and expect error
     vm.expectRevert(Pool.MinAmount.selector);
-    _pool.redeem(Pool.TokenType.DEBT, 1000, 34);
+    _pool.redeem(Pool.TokenType.BOND, 1000, 34);
 
     // Reset reserve state
     rToken.burn(governance, rToken.balanceOf(governance));
@@ -1885,7 +1885,7 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       // Call create and assert minted tokens
@@ -1893,18 +1893,18 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedSwap);
 
       uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
       assertEq(0, startBalance-endBalance);
 
-      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
+      if (calcTestCases2[i].assetType == Pool.TokenType.BOND) {
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets + amount);
         assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
         assertEq(amount, endLevBalance-startLevBalance);
       } else {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets - calcTestCases2[i].inAmount);
         assertEq(calcTestCases2[i].inAmount, startLevBalance-endLevBalance);
         assertEq(amount, endBondBalance-startBondBalance);
@@ -1933,10 +1933,10 @@ contract PoolTest is Test {
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases2[i].TotalUnderlyingAssets, calcTestCases2[i].DebtAssets, calcTestCases2[i].LeverageAssets));
 
       uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
-      uint256 startBondBalanceUser = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 startBondBalanceUser = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 startLevBalanceUser = LeverageToken(_pool.lToken()).balanceOf(user2);
 
 
@@ -1945,21 +1945,21 @@ contract PoolTest is Test {
       assertEq(amount, calcTestCases2[i].expectedSwap);
 
       uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.dToken()).balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
-      uint256 endBondBalanceUser = BondToken(_pool.dToken()).balanceOf(user2);
+      uint256 endBondBalanceUser = BondToken(_pool.bondToken()).balanceOf(user2);
       uint256 endLevBalanceUser = LeverageToken(_pool.lToken()).balanceOf(user2);
 
       assertEq(0, startBalance-endBalance);
 
-      if (calcTestCases2[i].assetType == Pool.TokenType.DEBT) {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
+      if (calcTestCases2[i].assetType == Pool.TokenType.BOND) {
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets - calcTestCases2[i].inAmount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets + amount);
         assertEq(calcTestCases2[i].inAmount, startBondBalance-endBondBalance);
         assertEq(amount, endLevBalanceUser-startLevBalanceUser);
       } else {
-        assertEq(_pool.dToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases2[i].DebtAssets + amount);
         assertEq(_pool.lToken().totalSupply(), calcTestCases2[i].LeverageAssets - calcTestCases2[i].inAmount);
         assertEq(calcTestCases2[i].inAmount, startLevBalance-endLevBalance);
         assertEq(amount, endBondBalanceUser-startBondBalanceUser);
@@ -1984,7 +1984,7 @@ contract PoolTest is Test {
     
     Pool.PoolInfo memory info = _pool.getPoolInfo();
     assertEq(info.reserve, 10000000000);
-    assertEq(info.debtSupply, 10000);
+    assertEq(info.bondSupply, 10000);
     assertEq(info.levSupply, 10000);
   }
 
@@ -2036,13 +2036,13 @@ contract PoolTest is Test {
     _pool.setFee(0);
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    _pool.create(Pool.TokenType.DEBT, 0, 0);
+    _pool.create(Pool.TokenType.BOND, 0, 0);
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    _pool.redeem(Pool.TokenType.DEBT, 0, 0);
+    _pool.redeem(Pool.TokenType.BOND, 0, 0);
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    _pool.swap(Pool.TokenType.DEBT, 0, 0);
+    _pool.swap(Pool.TokenType.BOND, 0, 0);
 
     _pool.unpause();
     _pool.setFee(100);
@@ -2067,7 +2067,7 @@ function testNotEnoughBalanceInPool() public {
     vm.stopPrank();
 
     vm.startPrank(address(_pool));
-    _pool.dToken().mint(user, 1000*10**18);
+    _pool.bondToken().mint(user, 1000*10**18);
     vm.stopPrank();
 
     vm.startPrank(governance);
@@ -2086,11 +2086,11 @@ function testNotEnoughBalanceInPool() public {
     Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 10000));
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.dToken().SHARES_DECIMALS();
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
     vm.stopPrank();
 
     vm.startPrank(address(_pool));
-    _pool.dToken().mint(user, initialBalance);
+    _pool.bondToken().mint(user, initialBalance);
     vm.stopPrank();
 
     vm.startPrank(minter);
@@ -2114,11 +2114,11 @@ function testNotEnoughBalanceInPool() public {
 
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.dToken().SHARES_DECIMALS();
+    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
     vm.stopPrank();
     
     vm.startPrank(address(_pool));
-    _pool.dToken().mint(user, initialBalance);
+    _pool.bondToken().mint(user, initialBalance);
     vm.stopPrank();
 
     vm.startPrank(minter);
@@ -2165,13 +2165,13 @@ function testNotEnoughBalanceInPool() public {
   //   Token rToken = Token(params.reserveToken);
 
   //   uint256 reserveAmount = 1000000000000000; // 0.001 ETH
-  //   uint256 debtAmount = 25000000000000000;
+  //   uint256 bondAmount = 25000000000000000;
   //   uint256 leverageAmount = 1000000000000000;
 
   //   rToken.mint(governance, reserveAmount);
   //   rToken.approve(address(poolFactory), reserveAmount);
 
-  //   Pool _pool = Pool(poolFactory.CreatePool(params, reserveAmount, debtAmount, leverageAmount));
+  //   Pool _pool = Pool(poolFactory.CreatePool(params, reserveAmount, bondAmount, leverageAmount));
 
   //   uint256 depositAmount = 50000000000000;
   //   rToken.mint(governance, depositAmount);
@@ -2180,10 +2180,10 @@ function testNotEnoughBalanceInPool() public {
   //   uint256 ethPrice = 235007000000;
   //   setEthPrice(ethPrice);
 
-  //   uint256 mintedBonds = _pool.create(Pool.TokenType.DEBT, depositAmount / 2, 0);
+  //   uint256 mintedBonds = _pool.create(Pool.TokenType.BOND, depositAmount / 2, 0);
   //   uint256 mintedLev = _pool.create(Pool.TokenType.LEVERAGE, depositAmount / 2, 0);
   //   uint256 swapedBonds = _pool.swap(Pool.TokenType.LEVERAGE, mintedLev, 0);
-  //   uint256 redeemBonds = _pool.redeem(Pool.TokenType.DEBT, mintedBonds+swapedBonds, 0);
+  //   uint256 redeemBonds = _pool.redeem(Pool.TokenType.BOND, mintedBonds+swapedBonds, 0);
 
   //   // Reset reserve state
   //   rToken.burn(governance, rToken.balanceOf(governance));
