@@ -95,9 +95,11 @@ contract Merchant is AccessControl, Pausable, Trader {
       revert NoOrdersToExecute();
     }
 
+    address couponToken = Pool(_pool).couponToken();
+
     // @todo: duplicated checks from ordersPriceReached - refactor if gas becomes a problem
     LimitOrder[] memory limitOrders = orders[_pool];
-    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
+    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), couponToken);
     uint256 poolReserves = getPoolReserves(_pool);
 
     for (uint256 i = 0; i < limitOrders.length; i++) {
@@ -112,11 +114,10 @@ contract Merchant is AccessControl, Pausable, Trader {
 
       if (limitOrders[i].price <= currentPrice) {
         uint256 amountOut = quote(limitOrders[i].sell, limitOrders[i].buy, limitOrders[i].amount);
-        uint256 accuredCoupons = ERC20(pool.couponToken()).balanceOf(_pool);
-
+        uint256 accruedCoupons = ERC20(couponToken).balanceOf(_pool);
         
         // This block implements a safety check to prevent over-selling of the pool's assets.
-        // It ensures that the total coupon tokens bought (accuredCoupons) plus the expected
+        // It ensures that the total coupon tokens bought (accruedCoupons) plus the expected
         // coupon tokens from this order (amountOut) does not exceed a certain threshold
         // relative to the remaining reserve tokens in the pool.
         // The threshold is dynamically calculated based on the current price of reserve token.
@@ -128,7 +129,7 @@ contract Merchant is AccessControl, Pausable, Trader {
         // - currentPrice is the current price of reserve tokens in coupon tokens
         // - The multiplier (19 in this case) represents the maximum allowed ratio of coupon
         //   tokens to reserve tokens (95% sell / 5% keep)
-        if (accuredCoupons + amountOut > 19 * (poolReserves - limitOrders[i].amount) * currentPrice) {
+        if (accruedCoupons + amountOut > 19 * (poolReserves - limitOrders[i].amount) * currentPrice) {
           setHardStop(_pool);
           return;
         }
@@ -272,9 +273,9 @@ contract Merchant is AccessControl, Pausable, Trader {
     Pool pool = Pool(_pool);
 
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
-    uint256 accuredCoupons = ERC20(pool.couponToken()).balanceOf(_pool);
+    uint256 accruedCoupons = ERC20(pool.couponToken()).balanceOf(_pool);
 
-    return (pool.bondToken().totalSupply() * poolInfo.sharesPerToken) - accuredCoupons;
+    return (pool.bondToken().totalSupply() * poolInfo.sharesPerToken) - accruedCoupons;
   }
 
   function getPoolReserves(address _pool) public view returns(uint256) {
