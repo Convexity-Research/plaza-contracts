@@ -100,9 +100,6 @@ contract Merchant is AccessControl, Pausable, Trader {
     uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
     uint256 poolReserves = getPoolReserves(_pool);
 
-    // 94% of the pool liquidity
-    uint256 minLiquidity = (currentPrice * poolReserves * 94) / 100;
-
     for (uint256 i = 0; i < limitOrders.length; i++) {
       if (limitOrders[i].buy == address(0) || limitOrders[i].filled) {
         continue;
@@ -111,24 +108,33 @@ contract Merchant is AccessControl, Pausable, Trader {
       // if price is 0, it means it's a market order
       if (limitOrders[i].price == 0) {
         limitOrders[i].price = currentPrice;
-
-        swap(_pool, limitOrders[i]);
-        limitOrders[i].filled = true;
       }
 
       if (limitOrders[i].price <= currentPrice) {
+        uint256 amountOut = quote(limitOrders[i].sell, limitOrders[i].buy, limitOrders[i].amount);
+        uint256 couponAmount = getCouponAmount(_pool);
+
+        
+        // This block implements a safety check to prevent over-selling of the pool's assets.
+        // It ensures that the total coupon tokens generated (couponAmount) plus the expected
+        // coupon tokens from this order (amountOut) does not exceed a certain threshold
+        // relative to the remaining reserve tokens in the pool.
+        // The threshold is dynamically calculated based on the current price of reserve token.
+        // If this threshold is reached, it triggers a hard stop to prevent further selling.
+        //
+        // Calculation breakdown:
+        // - (poolReserves - limitOrders[i].amount) represents the expected remaining reserve
+        //   tokens after this order
+        // - currentPrice is the current price of reserve tokens in coupon tokens
+        // - The multiplier (19 in this case) represents the maximum allowed ratio of coupon
+        //   tokens to reserve tokens (95% sell / 5% keep)
+        if (couponAmount + amountOut > 19 * (poolReserves - limitOrders[i].amount) * currentPrice) {
+          setHardStop(_pool);
+          return;
+        }
+
         swap(_pool, limitOrders[i]);
         limitOrders[i].filled = true;
-      }
-
-      if (minLiquidity <= limitOrders[i].amount) {
-        Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
-        hasStoppedSelling[_pool][poolInfo.currentPeriod] = true;
-
-        // remove all orders
-        orders[_pool] = new LimitOrder[](0);
-
-        return;
       }
     }
 
@@ -140,7 +146,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
 
-    // Hard stop if 95% of the liquidity is sold
+    // Hard stop
     if (hasStoppedSelling[_pool][poolInfo.currentPeriod]) {
       return limitOrders;
     }
@@ -276,6 +282,14 @@ contract Merchant is AccessControl, Pausable, Trader {
     ERC20 reserveToken = ERC20(pool.reserveToken());
 
     return reserveToken.balanceOf(_pool);
+  }
+
+  function setHardStop(address _pool) private {
+    Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
+    hasStoppedSelling[_pool][poolInfo.currentPeriod] = true;
+
+    // remove all orders
+    orders[_pool] = new LimitOrder[](0);
   }
 
   function pause() external onlyRole(GOV_ROLE) {
