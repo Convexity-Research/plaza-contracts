@@ -112,11 +112,11 @@ contract Merchant is AccessControl, Pausable, Trader {
 
       if (limitOrders[i].price <= currentPrice) {
         uint256 amountOut = quote(limitOrders[i].sell, limitOrders[i].buy, limitOrders[i].amount);
-        uint256 couponAmount = getCouponAmount(_pool);
+        uint256 accuredCoupons = ERC20(pool.couponToken()).balanceOf(_pool);
 
         
         // This block implements a safety check to prevent over-selling of the pool's assets.
-        // It ensures that the total coupon tokens generated (couponAmount) plus the expected
+        // It ensures that the total coupon tokens bought (accuredCoupons) plus the expected
         // coupon tokens from this order (amountOut) does not exceed a certain threshold
         // relative to the remaining reserve tokens in the pool.
         // The threshold is dynamically calculated based on the current price of reserve token.
@@ -128,7 +128,7 @@ contract Merchant is AccessControl, Pausable, Trader {
         // - currentPrice is the current price of reserve tokens in coupon tokens
         // - The multiplier (19 in this case) represents the maximum allowed ratio of coupon
         //   tokens to reserve tokens (95% sell / 5% keep)
-        if (couponAmount + amountOut > 19 * (poolReserves - limitOrders[i].amount) * currentPrice) {
+        if (accuredCoupons + amountOut > 19 * (poolReserves - limitOrders[i].amount) * currentPrice) {
           setHardStop(_pool);
           return;
         }
