@@ -268,7 +268,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
     uint256 accuredCoupons = ERC20(pool.couponToken()).balanceOf(_pool);
 
-    return (pool.dToken().totalSupply() * poolInfo.sharesPerToken) - accuredCoupons;
+    return (pool.bondToken().totalSupply() * poolInfo.sharesPerToken) - accuredCoupons;
   }
 
   function getPoolReserves(address _pool) public view returns(uint256) {
