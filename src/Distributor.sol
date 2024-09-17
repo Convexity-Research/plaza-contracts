@@ -9,12 +9,13 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 /**
  * @title Distributor
  * @dev This contract manages the distribution of coupon shares to users based on their bond token balances.
  */
-contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
 
   /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
@@ -60,6 +61,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    */
   function initialize(address _governance) initializer public {
     __UUPSUpgradeable_init();
+    __ReentrancyGuard_init();
 
     _grantRole(GOV_ROLE, _governance);
   }
@@ -82,7 +84,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * Transfers the calculated shares to the user's address.
    * @param _pool Address of the pool from which to claim shares.
    */
-  function claim(address _pool) external whenNotPaused() {
+  function claim(address _pool) external whenNotPaused() nonReentrant() {
     require(_pool != address(0), UnsupportedPool());
     
     Pool pool = Pool(_pool);
