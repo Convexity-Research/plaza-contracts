@@ -24,8 +24,6 @@ contract Merchant is AccessControl, Pausable, Trader {
     bool filled;
   }
 
-  address public factory;
-
   mapping (address => LimitOrder[]) public orders;
   mapping (address => uint256) public ordersTimestamp;
 
@@ -36,12 +34,10 @@ contract Merchant is AccessControl, Pausable, Trader {
   error UpdateNotRequired();
   error NoOrdersToExecute();
 
-  constructor(address _router, address _quoter, address _factory) Trader(_router, _quoter, _factory) {
+  constructor(address _router, address _quoter, address _dexFactory) Trader(_router, _quoter, _dexFactory) {
     // @todo: update access control to copy Pool mechanism
     _setRoleAdmin(GOV_ROLE, GOV_ROLE);
     _grantRole(GOV_ROLE, msg.sender);
-
-    factory = _factory;
   }
   
   // this will be called by automation to check if there are any pending orders
