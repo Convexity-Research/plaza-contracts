@@ -24,6 +24,8 @@ contract Merchant is AccessControl, Pausable, Trader {
     bool filled;
   }
 
+  address public factory;
+
   mapping (address => LimitOrder[]) public orders;
   mapping (address => uint256) public ordersTimestamp;
 
@@ -35,8 +37,11 @@ contract Merchant is AccessControl, Pausable, Trader {
   error NoOrdersToExecute();
 
   constructor(address _router, address _quoter, address _factory) Trader(_router, _quoter, _factory) {
+    // @todo: update access control to copy Pool mechanism
     _setRoleAdmin(GOV_ROLE, GOV_ROLE);
     _grantRole(GOV_ROLE, msg.sender);
+
+    factory = _factory;
   }
   
   // this will be called by automation to check if there are any pending orders
@@ -115,7 +120,7 @@ contract Merchant is AccessControl, Pausable, Trader {
       if (limitOrders[i].price <= currentPrice) {
         uint256 amountOut = quote(limitOrders[i].sell, limitOrders[i].buy, limitOrders[i].amount);
         uint256 accruedCoupons = ERC20(couponToken).balanceOf(_pool);
-        
+
         // This block implements a safety check to prevent over-selling of the pool's assets.
         // It ensures that the total coupon tokens bought (accruedCoupons) plus the expected
         // coupon tokens from this order (amountOut) does not exceed a certain threshold
