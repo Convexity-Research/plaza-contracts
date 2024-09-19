@@ -1307,19 +1307,75 @@ contract TestCases {
     // Debt - Below Threshold
     calcTestCases.push(CalcTestCase({
       assetType: Pool.TokenType.BOND,
-      inAmount: 3 * (10**18),
-      ethPrice: 3000 * 10**8, // @todo: replace with chainlink constant when its merged
-      TotalUnderlyingAssets: 1000000 * (10**18),
-      DebtAssets: 25000000 * (10**18),
-      LeverageAssets: 1000000 * (10**18),
-      expectedCreate: 93750000000000000000,
-      expectedRedeem: 32,
-      expectedSwap: 0
+      inAmount: 3 ether,
+      ethPrice: 3000 * 10**8,
+      TotalUnderlyingAssets: 1000000 ether,
+      DebtAssets: 30000000 ether,
+      LeverageAssets: 1000000 ether,
+      expectedCreate: 112500000000000000000,
+      expectedRedeem: 80000000000000000,
+      expectedSwap: 400000032000002560
     }));
     // Debt - Above Threshold
+    calcTestCases.push(CalcTestCase({
+      assetType: Pool.TokenType.BOND,
+      inAmount: 3 ether,
+      ethPrice: 3000 * 10**8,
+      TotalUnderlyingAssets: 1000000 ether,
+      DebtAssets: 20000000 ether,
+      LeverageAssets: 1000000 ether,
+      expectedCreate: 90000000000000000000,
+      expectedRedeem: 100000000000000000,
+      expectedSwap: 300000000000000000
+    }));
+    
     // Leverage - Below Threshold
+    calcTestCases.push(CalcTestCase({
+      assetType: Pool.TokenType.LEVERAGE,
+      inAmount: 3 ether,
+      ethPrice: 3000 * 10**8,
+      TotalUnderlyingAssets: 1000000 ether,
+      DebtAssets: 30000000 ether,
+      LeverageAssets: 1000000 ether,
+      expectedCreate: 15000000000000000000,
+      expectedRedeem: 600000000000000000,
+      expectedSwap: 22500013500008100004
+    }));
     // Leverage - Above Threshold
+    calcTestCases.push(CalcTestCase({
+      assetType: Pool.TokenType.LEVERAGE,
+      inAmount: 3 ether,
+      ethPrice: 3000 * 10**8,
+      TotalUnderlyingAssets: 1000000 ether,
+      DebtAssets: 20000000 ether,
+      LeverageAssets: 1000000 ether,
+      expectedCreate: 9000000000000000000,
+      expectedRedeem: 1000000000000000000,
+      expectedSwap: 30000000000000000000
+    }));
     // Random Values but Leverage Level = 1.2
+    calcTestCases.push(CalcTestCase({
+      assetType: Pool.TokenType.BOND,
+      inAmount: 3 ether,
+      ethPrice: 3000 * 10**8,
+      TotalUnderlyingAssets: 1000000 ether,
+      DebtAssets: 25000000 ether,
+      LeverageAssets: 1000000 ether,
+      expectedCreate: 93750000000000000000,
+      expectedRedeem: 96000000000000000,
+      expectedSwap: 480000046400004485
+    }));
+    calcTestCases.push(CalcTestCase({
+      assetType: Pool.TokenType.LEVERAGE,
+      inAmount: 3 ether,
+      ethPrice: 3000 * 10**8,
+      TotalUnderlyingAssets: 1000000 ether,
+      DebtAssets: 25000000 ether,
+      LeverageAssets: 1000000 ether,
+      expectedCreate: 15000000000000000000,
+      expectedRedeem: 600000000000000000,
+      expectedSwap: 18750011328131844079
+    }));
   }
 
   // eth comes from Pool constant (3000)

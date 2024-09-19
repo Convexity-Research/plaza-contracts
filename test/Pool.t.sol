@@ -691,51 +691,6 @@ contract PoolTest is Test, TestCases {
     Pool.PoolInfo memory info = _pool.getPoolInfo();
     assertEq(info.fee, 100);
   }
-  
-  function testCreateRealistic() public {
-    initializeRealisticTestCases();
-    vm.startPrank(governance);
-    Token rToken = Token(params.reserveToken);
-
-    for (uint256 i = 0; i < calcTestCases.length; i++) {
-      if (calcTestCases[i].inAmount == 0) {
-        continue;
-      }
-
-      // Mint reserve tokens
-      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets + calcTestCases[i].inAmount);
-      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
-
-      // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
-      rToken.approve(address(_pool), calcTestCases[i].inAmount);
-
-      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-      uint256 startReserveBalance = rToken.balanceOf(governance);
-
-      // Call create and assert minted tokens
-      uint256 amount = _pool.create(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
-      assertEq(amount, calcTestCases[i].expectedCreate);
-
-      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-      uint256 endReserveBalance = rToken.balanceOf(governance);
-      assertEq(calcTestCases[i].inAmount, startReserveBalance-endReserveBalance);
-
-      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
-        assertEq(amount, endBondBalance-startBondBalance);
-        assertEq(0, endLevBalance-startLevBalance);
-      } else {
-        assertEq(0, endBondBalance-startBondBalance);
-        assertEq(amount, endLevBalance-startLevBalance);
-      }
-
-      // Reset reserve state
-      rToken.burn(governance, rToken.balanceOf(governance));
-      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
-    }
-  }
 
   function testNotEnoughBalanceInPool() public {
     Token rToken = Token(params.reserveToken);
@@ -844,5 +799,151 @@ contract PoolTest is Test, TestCases {
     vm.stopPrank();
     vm.expectRevert();
     _pool.distribute();
+  }
+
+  function testCreateRealistic() public {
+    initializeRealisticTestCases();
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      if (calcTestCases[i].inAmount == 0) {
+        continue;
+      }
+
+      // Mint reserve tokens
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets + calcTestCases[i].inAmount);
+      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
+
+      setEthPrice(calcTestCases[i].ethPrice);
+
+      // Create pool and approve deposit amount
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      rToken.approve(address(_pool), calcTestCases[i].inAmount);
+
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      uint256 startReserveBalance = rToken.balanceOf(governance);
+
+      // Call create and assert minted tokens
+      uint256 amount = _pool.create(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
+      assertEq(amount, calcTestCases[i].expectedCreate);
+
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      uint256 endReserveBalance = rToken.balanceOf(governance);
+      assertEq(calcTestCases[i].inAmount, startReserveBalance-endReserveBalance);
+
+      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
+        assertEq(amount, endBondBalance-startBondBalance);
+        assertEq(0, endLevBalance-startLevBalance);
+      } else {
+        assertEq(0, endBondBalance-startBondBalance);
+        assertEq(amount, endLevBalance-startLevBalance);
+      }
+
+      // Reset reserve state
+      rToken.burn(governance, rToken.balanceOf(governance));
+      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+    }
+  }
+
+  function testRedeemRealistic() public {
+    initializeRealisticTestCases();
+
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      if (calcTestCases[i].inAmount == 0) {
+        continue;
+      }
+
+      // Mint reserve tokens
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
+      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
+
+      setEthPrice(calcTestCases[i].ethPrice);
+
+      // Create pool and approve deposit amount
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+
+      uint256 startBalance = rToken.balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+
+      // Call create and assert minted tokens
+      uint256 amount = _pool.redeem(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
+      assertEq(amount, calcTestCases[i].expectedRedeem);
+
+      uint256 endBalance = rToken.balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      assertEq(amount, endBalance-startBalance);
+
+      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
+        assertEq(calcTestCases[i].inAmount, startBondBalance-endBondBalance);
+        assertEq(0, endLevBalance-startLevBalance);
+      } else {
+        assertEq(0, endBondBalance-startBondBalance);
+        assertEq(calcTestCases[i].inAmount, startLevBalance-endLevBalance);
+      }
+
+      // Reset reserve state
+      rToken.burn(governance, rToken.balanceOf(governance));
+      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+    }
+  }
+
+  function testSwapRealistic() public {
+    initializeRealisticTestCases();
+
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      if (calcTestCases[i].inAmount == 0) {
+        continue;
+      }
+
+      // Mint reserve tokens
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
+      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
+
+      setEthPrice(calcTestCases[i].ethPrice);
+
+      // Create pool and approve deposit amount
+      Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+
+      uint256 startBalance = rToken.balanceOf(governance);
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+
+      // Call create and assert minted tokens
+      uint256 amount = _pool.swap(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
+      assertEq(amount, calcTestCases[i].expectedSwap);
+
+      uint256 endBalance = rToken.balanceOf(governance);
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+
+      assertEq(0, startBalance-endBalance);
+
+      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets - calcTestCases[i].inAmount);
+        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets + amount);
+        assertEq(calcTestCases[i].inAmount, startBondBalance-endBondBalance);
+        assertEq(amount, endLevBalance-startLevBalance);
+      } else {
+        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets + amount);
+        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets - calcTestCases[i].inAmount);
+        assertEq(calcTestCases[i].inAmount, startLevBalance-endLevBalance);
+        assertEq(amount, endBondBalance-startBondBalance);
+      }
+
+      // Reset reserve state
+      rToken.burn(governance, rToken.balanceOf(governance));
+      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+    }
   }
 }
