@@ -8,6 +8,9 @@ contract MerchantAutomation {
   Merchant private merchant;
   PoolFactory private factory;
 
+  error NothingToExecute();
+  error ExecutionError();
+
   constructor(address _merchant, address _poolFactory) {
     merchant = Merchant(_merchant);
     factory = PoolFactory(_poolFactory);
@@ -15,31 +18,43 @@ contract MerchantAutomation {
 
   // @todo: if one pool fails for whatever reason, everything else will fail too
   // We should improve this by isolating each exeucition independantly or using soft-revert
-  function execute() external returns (bool canExec, bytes memory execPayload) {
+  function canExecute() public returns (bool canExec, bytes memory payload) {
     uint256 poolsLength = factory.poolsLength();
 
     address pool;
     for (uint256 i = 0; i < poolsLength; i++) {
       pool = factory.pools(i);
       if (merchant.hasPendingOrders(pool)) {
-        execPayload = abi.encodeWithSelector(
+        payload = abi.encodeWithSelector(
           Merchant.updateLimitOrders.selector,
           pool
         );
 
-        return (true, execPayload);
+        return (true, payload);
       }
 
       if (merchant.ordersPriceReached(pool)) {
-        execPayload = abi.encodeWithSelector(
+        payload = abi.encodeWithSelector(
           Merchant.executeOrders.selector,
           pool
         );
 
-        return (true, execPayload);
+        return (true, payload);
       }
     }
 
-    return (false, execPayload);
+    return (false, payload);
+  }
+
+  function execute() external {
+    (bool canExec, bytes memory payload) = canExecute();
+    if (!canExec) {
+      revert NothingToExecute();
+    }
+
+    (bool success,) = address(merchant).call{value:0}(payload);
+    if (!success) {
+      revert ExecutionError();
+    }
   }
 }
