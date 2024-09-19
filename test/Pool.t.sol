@@ -97,6 +97,15 @@ contract PoolTest is Test {
     mockPriceFeed.setMockPrice(int256(price), uint8(CHAINLINK_DECIMAL));
   }
 
+  function resetReentrancy(address contractAddress) public {
+    // Reset `_status` to allow the next call
+    vm.store(
+        contractAddress,
+        bytes32(0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00), // Storage slot for `_status`
+        bytes32(uint256(1))  // Reset to `_NOT_ENTERED`
+    );
+  }
+
   function initializeTestCases() public {
     // Debt - Below Threshold
     calcTestCases.push(CalcTestCase({
@@ -1537,6 +1546,8 @@ contract PoolTest is Test {
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+
+      resetReentrancy(address(_pool));
     }
   }
 
@@ -1581,6 +1592,8 @@ contract PoolTest is Test {
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+
+      resetReentrancy(address(_pool));
     }
   }
 
@@ -1915,6 +1928,8 @@ contract PoolTest is Test {
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+
+      resetReentrancy(address(_pool));
     }
   }
 
