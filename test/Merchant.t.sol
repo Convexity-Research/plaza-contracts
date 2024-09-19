@@ -59,6 +59,7 @@ contract MerchantTest is Test {
     
     merchant = new Merchant(address(0x0), address(0x0), address(0x0));
     vm.stopPrank();
+    
 	}
 
 	// function testHasPendingOrders() public {
