@@ -5,6 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {Distributor} from "../src/Distributor.sol";
 
+import {Pool} from "../src/Pool.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -17,6 +18,7 @@ contract TestnetScript is Script {
   // Arbitrum Sepolia addresses
   address public constant reserveToken = address(0xE46230A4963b8bBae8681b5c05F8a22B9469De18);
   address public constant couponToken = address(0xDA1334a1084170eb1438E0d9d5C8799A07fbA7d3);
+  address public constant merchant = address(0x0);
 
   address public constant ethPriceFeed = address(0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1);
 
@@ -56,7 +58,8 @@ contract TestnetScript is Script {
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
 
-    factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    address pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    Pool(pool).approveMerchant(address(merchant));
     
     vm.stopBroadcast();
   }

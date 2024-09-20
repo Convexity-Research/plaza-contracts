@@ -161,6 +161,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     uint256 poolReserves = getPoolReserves(_pool);
     uint256 currentPrice = getCurrentPrice(address(reserveToken), address(couponToken));
     uint256 liquidity = getLiquidity(address(reserveToken), address(couponToken));
+    
     require (currentPrice > 0, ZeroPrice());
 
     if (daysToPayment > 10 || couponAmount == 0) {
@@ -180,7 +181,7 @@ contract Merchant is AccessControl, Pausable, Trader {
                   (poolReserves * 9500) / PRECISION));
 
       sellAmount = (maxOrder * 2000) / PRECISION;
-       
+
       for (uint256 i = 1; i <= 5; i++) {
         limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
