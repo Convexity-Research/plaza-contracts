@@ -167,9 +167,8 @@ contract Merchant is AccessControl, Pausable, Trader {
       return limitOrders;
     }
 
-    // It should not happen - something likely wrong
-    // @todo: should we do anything else here?
-    assert(poolReserves * currentPrice <= couponAmount);
+    // Ensure pool reserves is greater than coupon amount
+    assert(poolReserves * currentPrice > couponAmount);
 
     limitOrders = new LimitOrder[](5);
     uint256 maxOrder = 0;
