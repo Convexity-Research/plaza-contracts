@@ -592,8 +592,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
     // Transfer coupon tokens to the distributor
-    // @todo: replace with safeTransfer
-    IERC20(couponToken).transfer(address(distributor), couponAmountToDistribute);
+    IERC20(couponToken).safeTransfer(address(distributor), couponAmountToDistribute);
 
     // Update distributor with the amount to distribute
     distributor.allocate(address(this), couponAmountToDistribute);
