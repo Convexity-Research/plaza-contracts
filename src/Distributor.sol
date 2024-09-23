@@ -3,7 +3,8 @@ pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
 import {BondToken} from "./BondToken.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -16,6 +17,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
  * @dev This contract manages the distribution of coupon shares to users based on their bond token balances.
  */
 contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+  using SafeERC20 for IERC20;
 
   /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
@@ -90,9 +92,8 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     Pool pool = Pool(_pool);
     BondToken bondToken = pool.bondToken();
     address couponToken = pool.couponToken();
-    ERC20 sharesToken = ERC20(couponToken);
 
-    if (address(bondToken) == address(0) || address(sharesToken) == address(0)){
+    if (address(bondToken) == address(0) || couponToken == address(0)){
       revert UnsupportedPool();
     }
 
@@ -100,7 +101,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     uint256 balance = bondToken.balanceOf(msg.sender);
     uint256 shares = bondToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
 
-    if (sharesToken.balanceOf(address(this)) < shares) {
+    if (IERC20(couponToken).balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
     }
 
@@ -112,14 +113,11 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     }
 
     // check if the distributor has enough shares tokens as the amount to distribute
-    if (sharesToken.balanceOf(address(this)) < poolInfo.amountToDistribute) {
+    if (IERC20(couponToken).balanceOf(address(this)) < poolInfo.amountToDistribute) {
       revert NotEnoughSharesToDistribute();
     }
-
-    // @todo: replace with safeTransfer
-    if (!sharesToken.transfer(msg.sender, shares)) {
-      revert("not enough balance");
-    }
+    
+    IERC20(couponToken).safeTransfer(msg.sender, shares);
 
     poolInfo.amountToDistribute -= shares;
     couponAmountsToDistribute[couponToken] -= shares;
@@ -143,7 +141,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     couponAmountsToDistribute[couponToken] += _amountToDistribute;
     poolInfos[_pool].amountToDistribute += _amountToDistribute;
 
-    if (ERC20(couponToken).balanceOf(address(this)) < couponAmountsToDistribute[couponToken]) {
+    if (IERC20(couponToken).balanceOf(address(this)) < couponAmountsToDistribute[couponToken]) {
       revert NotEnoughCouponBalance();
     }
   }
