@@ -60,6 +60,10 @@ contract PoolFactoryTest is Test {
 
     uint256 startLength = poolFactory.poolsLength();
 
+    vm.expectEmit(true, true, true, false);
+    // Pool address is not deterministic
+    emit PoolFactory.PoolCreated(address(0), 10000000000, 10000, 20000);
+
     // Create pool and approve deposit amount
     Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 20000));
     uint256 endLength = poolFactory.poolsLength();
