@@ -41,9 +41,9 @@ contract DistributorTest is Test {
 
     params.fee = 0;
     params.sharesPerToken = 50*10**6;
-    params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
+    params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.distributionPeriod = 0;
-    params.couponToken = address(new Token("Circle USD", "USDC"));
+    params.couponToken = address(new Token("Circle USD", "USDC", false));
     
     vm.stopPrank(); 
     vm.startPrank(governance);
