@@ -8,7 +8,9 @@ import {PoolFactory} from "./PoolFactory.sol";
 import {Validator} from "./utils/Validator.sol";
 import {OracleReader} from "./OracleReader.sol";
 import {LeverageToken} from "./LeverageToken.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -22,6 +24,8 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
  */
 contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
   using Decimals for uint256;
+  using SafeERC20 for IERC20;
+  using ERC20Extensions for IERC20;
   
   // Constants
   uint256 private constant POINT_EIGHT = 800000; // 1000000 precision | 800000=0.8
@@ -195,8 +199,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       lToken.mint(recipient, amount);
     }
 
-    // @todo: replace with safeTransfer  
-    require(ERC20(reserveToken).transferFrom(msg.sender, address(this), depositAmount), "failed to deposit");
+    IERC20(reserveToken).safeTransferFrom(msg.sender, address(this), depositAmount);
 
     emit TokensCreated(msg.sender, recipient, tokenType, depositAmount, amount);
     return amount;
@@ -215,7 +218,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
                           .normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
     uint256 levSupply = lToken.totalSupply()
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
-    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this))
+    uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
     depositAmount = depositAmount.normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
@@ -351,10 +354,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
     address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
 
-    // @todo: replace with safeTransfer
-    if (!ERC20(reserveToken).transfer(recipient, reserveAmount)) {
-      revert("not enough funds");
-    }
+    IERC20(reserveToken).safeTransfer(recipient, reserveAmount);
 
     emit TokensRedeemed(msg.sender, recipient, tokenType, depositAmount, reserveAmount);
     return reserveAmount;
@@ -373,7 +373,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
                           .normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
     uint256 levSupply = lToken.totalSupply()
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
-    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this))
+    uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
     if (tokenType == TokenType.LEVERAGE) {
@@ -390,7 +390,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       poolReserves,
       getOraclePrice(address(0)),
       getOracleDecimals(address(0))
-    ).normalizeAmount(COMMON_DECIMALS, ERC20(reserveToken).decimals());
+    ).normalizeAmount(COMMON_DECIMALS, IERC20(reserveToken).safeDecimals());
   }
 
   /**
@@ -528,7 +528,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
                           .normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
     uint256 levSupply = lToken.totalSupply()
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
-    uint256 poolReserves = ERC20(reserveToken).balanceOf(address(this))
+    uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
     if (tokenType == TokenType.LEVERAGE) {
@@ -592,8 +592,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
     // Transfer coupon tokens to the distributor
-    // @todo: replace with safeTransfer
-    ERC20(couponToken).transfer(address(distributor), couponAmountToDistribute);
+    IERC20(couponToken).safeTransfer(address(distributor), couponAmountToDistribute);
 
     // Update distributor with the amount to distribute
     distributor.allocate(address(this), couponAmountToDistribute);
@@ -611,7 +610,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     info = PoolInfo({
       fee: fee,
       distributionPeriod: distributionPeriod,
-      reserve: ERC20(reserveToken).balanceOf(address(this)),
+      reserve: IERC20(reserveToken).balanceOf(address(this)),
       bondSupply: bondToken.totalSupply(),
       levSupply: lToken.totalSupply(),
       sharesPerToken: _sharesPerToken,
@@ -671,9 +670,9 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   // @todo: remove before prod
   function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
     // Transfer ERC20 token balance
-    uint256 tokenBalance = ERC20(token).balanceOf(address(this));
+    uint256 tokenBalance = IERC20(token).balanceOf(address(this));
     if (tokenBalance > 0) {
-      ERC20(token).transfer(msg.sender, tokenBalance);
+      IERC20(token).safeTransfer(msg.sender, tokenBalance);
     }
 
     // Transfer native token balance
