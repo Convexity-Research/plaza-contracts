@@ -82,6 +82,15 @@ contract PoolTest is Test, TestCases {
     mockPriceFeed.setMockPrice(int256(price), uint8(CHAINLINK_DECIMAL));
   }
 
+  function resetReentrancy(address contractAddress) public {
+    // Reset `_status` to allow the next call
+    vm.store(
+        contractAddress,
+        bytes32(0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00), // Storage slot for `_status`
+        bytes32(uint256(1))  // Reset to `_NOT_ENTERED`
+    );
+  }
+
   function testGetCreateAmount() public {
     initializeTestCases();
     
@@ -143,6 +152,7 @@ contract PoolTest is Test, TestCases {
 
       // Create pool and approve deposit amount
       Pool _pool = Pool(poolFactory.CreatePool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      useMockPool(address(_pool));
       rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -169,6 +179,8 @@ contract PoolTest is Test, TestCases {
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+
+      resetReentrancy(address(_pool));
     }
   }
 
@@ -213,6 +225,8 @@ contract PoolTest is Test, TestCases {
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+
+      resetReentrancy(address(_pool));
     }
   }
 
@@ -553,6 +567,8 @@ contract PoolTest is Test, TestCases {
       // Reset reserve state
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+
+      resetReentrancy(address(_pool));
     }
   }
 
