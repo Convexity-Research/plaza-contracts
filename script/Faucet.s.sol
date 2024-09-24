@@ -8,13 +8,14 @@ import {Faucet} from "../src/Faucet.sol";
 contract FaucetScript is Script {
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
+
     Faucet f = new Faucet();
-    // Marion
-    f.addToWhitelist(address(0x1FaE1550229fE09ef3e266d8559acdcFC154e72f));
-    // Vlad
-    f.addToWhitelist(address(0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd));
-    // Neeel
-    f.addToWhitelist(address(0x5dbAb2D4a3aea73CD6c6C2494A062E07a630430f));
+    
+    f.addToWhitelist(address(0x1FaE1550229fE09ef3e266d8559acdcFC154e72f)); // Marion
+    f.addToWhitelist(address(0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd)); // Vlad
+    f.addToWhitelist(address(0x5dbAb2D4a3aea73CD6c6C2494A062E07a630430f)); // Neeel
+    f.addToWhitelist(address(0x316778512b7a2ea2e923A99F4E7257C837a7123b)); // Illia
+
     vm.stopBroadcast();
   }
 }
