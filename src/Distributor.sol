@@ -117,12 +117,12 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
       revert NotEnoughSharesToDistribute();
     }
     
-    IERC20(couponToken).safeTransfer(msg.sender, shares);
-
     poolInfo.amountToDistribute -= shares;
     couponAmountsToDistribute[couponToken] -= shares;
-
+    
     bondToken.resetIndexedUserAssets(msg.sender);
+    IERC20(couponToken).safeTransfer(msg.sender, shares);
+    
     emit ClaimedShares(msg.sender, currentPeriod, shares);
   }
 

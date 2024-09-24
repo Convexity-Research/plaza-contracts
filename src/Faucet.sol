@@ -20,8 +20,8 @@ contract Faucet {
   constructor() {
     deployer = msg.sender;
     whitelist[deployer] = true;
-    reserveToken = new Token("Wrapped Fake ETH", "WETH");
-    couponToken = new Token("Circle Fake USD", "USDC");
+    reserveToken = new Token("Wrapped Fake ETH", "WETH", true);
+    couponToken = new Token("Circle Fake USD", "USDC", true);
   }
   
   /// @notice Distributes a fixed amount of both reserve and coupon tokens to the caller
