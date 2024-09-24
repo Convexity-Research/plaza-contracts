@@ -366,7 +366,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param depositAmount The amount of derivative tokens to simulate redeeming.
    * @return amount of reserve tokens that would be received.
    */
-  function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+  function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
 
     uint256 bondSupply = bondToken.totalSupply()
@@ -521,7 +521,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param depositAmount The amount of derivative tokens to simulate swapping.
    * @return amount of derivative tokens that would be received in the swap.
    */
-  function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+  function simulateSwap(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
 
     uint256 bondSupply = bondToken.totalSupply()
