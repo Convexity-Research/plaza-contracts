@@ -44,7 +44,7 @@ contract PoolFactoryTest is Test {
     distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
     params.fee = 0;
-    params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
+    params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.distributionPeriod = 0;
     
     vm.stopPrank();
