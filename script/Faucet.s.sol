@@ -9,8 +9,12 @@ contract FaucetScript is Script {
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     Faucet f = new Faucet();
-    f.addToWhitelist(address(0x11cba1EFf7a308Ac2cF6a6Ac2892ca33fabc3398));
+    // Marion
+    f.addToWhitelist(address(0x1FaE1550229fE09ef3e266d8559acdcFC154e72f));
+    // Vlad
     f.addToWhitelist(address(0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd));
+    // Neeel
+    f.addToWhitelist(address(0x5dbAb2D4a3aea73CD6c6C2494A062E07a630430f));
     vm.stopBroadcast();
   }
 }
