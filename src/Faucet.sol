@@ -17,11 +17,11 @@ contract Faucet {
   mapping(address => bool) private whitelist;
 
   /// @notice Initializes the contract by creating new instances of reserve and coupon tokens
-  constructor() {
+  constructor(address _mockMerchant) {
     deployer = msg.sender;
     whitelist[deployer] = true;
-    reserveToken = new Token("Wrapped Fake ETH", "WETH", true);
-    couponToken = new Token("Circle Fake USD", "USDC", true);
+    reserveToken = new Token("Wrapped Fake ETH", "WETH", true, _mockMerchant);
+    couponToken = new Token("Circle Fake USD", "USDC", true, _mockMerchant);
   }
   
   /// @notice Distributes a fixed amount of both reserve and coupon tokens to the caller

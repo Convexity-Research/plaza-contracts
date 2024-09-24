@@ -44,10 +44,10 @@ contract MockRouterTest is Test {
 
     PoolFactory.PoolParams memory params;
     params.fee = 0;
-    params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
+    params.reserveToken = address(new Token("Wrapped ETH", "WETH", false, address(0x0)));
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
-    params.couponToken = address(new Token("USDC", "USDC", false));
+    params.couponToken = address(new Token("USDC", "USDC", false, address(0x0)));
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();

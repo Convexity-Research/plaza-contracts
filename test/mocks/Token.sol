@@ -8,11 +8,16 @@ contract Token is ERC20 {
   bool public restricted;
   address public deployer;
 
-  constructor (string memory name, string memory symbol, bool _restricted) ERC20(name, symbol) {
+  constructor (string memory name, string memory symbol, bool _restricted, address mockMerchant) ERC20(name, symbol) {
     restricted = _restricted;
     deployer = msg.sender;
     whitelist[deployer] = true;
+    
+    // Neeel's address
     whitelist[0x2516115b336E3a5A0790D8B6EfdF5bD8D7d263Dd] = true;
+    
+    // Mock Merchant
+    whitelist[mockMerchant] = true;
   }
 
   function mint(address to, uint256 amount) public {
