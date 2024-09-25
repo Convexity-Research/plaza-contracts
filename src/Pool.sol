@@ -141,7 +141,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @return amount of new tokens created.
    */
   function create(TokenType tokenType, uint256 depositAmount, uint256 minAmount) external whenNotPaused() nonReentrant() returns(uint256) {
-    return _create(tokenType, depositAmount, minAmount, block.timestamp, address(0));
+    return _create(tokenType, depositAmount, minAmount, address(0));
   }
 
   /**
@@ -159,7 +159,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 minAmount,
     uint256 deadline,
     address onBehalfOf) external whenNotPaused() nonReentrant() checkDeadline(deadline) returns(uint256) {
-    return _create(tokenType, depositAmount, minAmount, deadline, onBehalfOf);
+    return _create(tokenType, depositAmount, minAmount, onBehalfOf);
   }
   
   /**
@@ -167,7 +167,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param tokenType The type of token to create (BOND or LEVERAGE).
    * @param depositAmount The amount of reserve tokens to deposit.
    * @param minAmount The minimum amount of new tokens to receive.
-   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
    * @param onBehalfOf The address to receive the new tokens.
    * @return The amount of new tokens created.
    */
@@ -175,7 +174,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     TokenType tokenType,
     uint256 depositAmount,
     uint256 minAmount,
-    uint256 deadline,
     address onBehalfOf) private returns(uint256) {
     // Get amount to mint
     uint256 amount = simulateCreate(tokenType, depositAmount);
@@ -296,7 +294,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @return amount of reserve tokens received.
    */
   function redeem(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() nonReentrant() returns(uint256) {
-    return _redeem(tokenType, depositAmount, minAmount, block.timestamp, address(0));
+    return _redeem(tokenType, depositAmount, minAmount, address(0));
   }
 
   /**
@@ -314,7 +312,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 minAmount,
     uint256 deadline,
     address onBehalfOf) external whenNotPaused() nonReentrant() checkDeadline(deadline) returns(uint256) {
-    return _redeem(tokenType, depositAmount, minAmount, deadline, onBehalfOf);
+    return _redeem(tokenType, depositAmount, minAmount, onBehalfOf);
   }
 
   /**
@@ -322,7 +320,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param tokenType The type of derivative token to redeem (BOND or LEVERAGE).
    * @param depositAmount The amount of derivative tokens to redeem.
    * @param minAmount The minimum amount of reserve tokens to receive.
-   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
    * @param onBehalfOf The address to receive the reserve tokens.
    * @return amount of reserve tokens received.
    */
@@ -330,7 +327,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     TokenType tokenType,
     uint256 depositAmount,
     uint256 minAmount,
-    uint256 deadline,
     address onBehalfOf) private returns(uint256) {
     // Get amount to mint
     uint256 reserveAmount = simulateRedeem(tokenType, depositAmount);
@@ -366,7 +362,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param depositAmount The amount of derivative tokens to simulate redeeming.
    * @return amount of reserve tokens that would be received.
    */
-  function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+  function simulateRedeem(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
 
     uint256 bondSupply = bondToken.totalSupply()
@@ -457,7 +453,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @return amount of derivative tokens received in the swap.
    */
   function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() nonReentrant() returns(uint256) {
-    return _swap(tokenType, depositAmount, minAmount, block.timestamp, address(0));
+    return _swap(tokenType, depositAmount, minAmount, address(0));
   }
 
   /**
@@ -476,7 +472,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 deadline,
     address onBehalfOf
   ) public whenNotPaused() nonReentrant() checkDeadline(deadline) returns(uint256) {
-    return _swap(tokenType, depositAmount, minAmount, deadline, onBehalfOf);
+    return _swap(tokenType, depositAmount, minAmount, onBehalfOf);
   }
 
   /**
@@ -484,7 +480,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param tokenType The type of derivative token being swapped.
    * @param depositAmount The amount of derivative tokens to swap.
    * @param minAmount The minimum amount of derivative tokens to receive in return.
-   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
    * @param onBehalfOf The address to receive the swapped derivative tokens.
    * @return amount of derivative tokens received in the swap.
    */
@@ -492,7 +487,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     TokenType tokenType,
     uint256 depositAmount,
     uint256 minAmount,
-    uint256 deadline,
     address onBehalfOf
   ) private returns(uint256) {
     uint256 mintAmount = simulateSwap(tokenType, depositAmount);
@@ -521,7 +515,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param depositAmount The amount of derivative tokens to simulate swapping.
    * @return amount of derivative tokens that would be received in the swap.
    */
-  function simulateSwap(TokenType tokenType, uint256 depositAmount) public view whenNotPaused() returns(uint256) {
+  function simulateSwap(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
     require(depositAmount > 0, ZeroAmount());
 
     uint256 bondSupply = bondToken.totalSupply()

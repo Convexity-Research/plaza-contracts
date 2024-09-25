@@ -44,7 +44,7 @@ contract PoolFactoryTest is Test {
     distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
     params.fee = 0;
-    params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
+    params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.distributionPeriod = 0;
     
     vm.stopPrank();
@@ -59,6 +59,10 @@ contract PoolFactoryTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     uint256 startLength = poolFactory.poolsLength();
+
+    vm.expectEmit(true, true, true, false);
+    // Pool address is not deterministic
+    emit PoolFactory.PoolCreated(address(0), 10000000000, 10000, 20000);
 
     // Create pool and approve deposit amount
     Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 20000));
