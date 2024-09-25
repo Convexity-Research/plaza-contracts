@@ -159,6 +159,9 @@ contract PoolTest is Test, TestCases {
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       uint256 startReserveBalance = rToken.balanceOf(governance);
 
+      vm.expectEmit(true, true, true, true);
+      emit Pool.TokensCreated(governance, governance, calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].expectedCreate);
+
       // Call create and assert minted tokens
       uint256 amount = _pool.create(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
       assertEq(amount, calcTestCases[i].expectedCreate);
@@ -411,6 +414,9 @@ contract PoolTest is Test, TestCases {
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
 
+      vm.expectEmit(true, true, true, true);
+      emit Pool.TokensRedeemed(governance, governance, calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].expectedRedeem);
+
       // Call create and assert minted tokens
       uint256 amount = _pool.redeem(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
       assertEq(amount, calcTestCases[i].expectedRedeem);
@@ -541,6 +547,9 @@ contract PoolTest is Test, TestCases {
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+
+      vm.expectEmit(true, true, true, true);
+      emit Pool.TokensSwapped(governance, governance, calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].expectedSwap);
 
       // Call create and assert minted tokens
       uint256 amount = _pool.swap(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
@@ -755,6 +764,8 @@ contract PoolTest is Test, TestCases {
     vm.stopPrank();
 
     vm.startPrank(governance);
+    vm.expectEmit(true, true, true, true);
+    emit Pool.Distributed(expectedDistribution);
     _pool.distribute();
     vm.stopPrank();
 

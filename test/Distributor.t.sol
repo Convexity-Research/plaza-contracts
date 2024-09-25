@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
 import {Utils} from "../src/lib/Utils.sol";
@@ -10,6 +10,7 @@ import {BondToken} from "../src/BondToken.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 contract DistributorTest is Test {
   Distributor public distributor;
@@ -27,15 +28,17 @@ contract DistributorTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
+    // TokenDeployer deploy
     address tokenDeployer = address(new TokenDeployer());
-    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    PoolFactory poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
 
     // Distributor deploy
+    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+
+    // PoolFactory deploy
+    PoolFactory poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
 
     vm.stopPrank();
 
-    // Create pool
     vm.startPrank(governance);
     distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
@@ -77,13 +80,8 @@ contract DistributorTest is Test {
 
     vm.startPrank(user);
 
-    // @todo: figure out why it doesn't match
-    // vm.expectEmit(true, true, true, true);
-    // emit Distributor.ClaimedShares(user, 1, 200);
-
-    // _pool.bondToken().transfer(address(0x24), 1);
-
-    (lastUpdatedPeriod, shares) = _pool.bondToken().userAssets(user);
+    vm.expectEmit(true, true, true, true);
+    emit Distributor.ClaimedShares(user, 1, 50*10**18);
 
     distributor.claim(address(_pool));
     assertEq(sharesToken.balanceOf(user), 50*10**18);
