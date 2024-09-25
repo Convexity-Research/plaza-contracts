@@ -8,6 +8,7 @@ import {Utils} from "../src/lib/Utils.sol";
 import {MockPool} from "./mocks/MockPool.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {TestCases} from "./data/TestCases.sol";
+import {Decimals} from "../src/lib/Decimals.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {Validator} from "../src/utils/Validator.sol";
@@ -16,6 +17,8 @@ import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
 contract PoolTest is Test, TestCases {
+  using Decimals for uint256;
+  
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
 
@@ -969,8 +972,9 @@ contract PoolTest is Test, TestCases {
     _params.sharesPerToken = 50 * 10 ** 18;
     _params.distributionPeriod = 0;
     _params.couponToken = address(new Token("USDC", "USDC"));
-    Token(_params.reserveToken).setDecimals(6);
-    Token(_params.couponToken).setDecimals(12);
+
+    uint8 reserveDecimals = 6;
+    Token(_params.reserveToken).setDecimals(reserveDecimals);
 
     initializeRealisticTestCases();
     
@@ -982,27 +986,27 @@ contract PoolTest is Test, TestCases {
       }
 
       // Mint reserve tokens
-      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets + calcTestCases[i].inAmount);
-      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals) + calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals));
+      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals));
 
       setEthPrice(calcTestCases[i].ethPrice);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.CreatePool(_params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
-      rToken.approve(address(_pool), calcTestCases[i].inAmount);
+      Pool _pool = Pool(poolFactory.CreatePool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      rToken.approve(address(_pool), calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals));
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       uint256 startReserveBalance = rToken.balanceOf(governance);
 
       // Call create and assert minted tokens
-      uint256 amount = _pool.create(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
+      uint256 amount = _pool.create(calcTestCases[i].assetType, calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals), 0);
       assertEq(amount, calcTestCases[i].expectedCreate);
 
       uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
       uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
       uint256 endReserveBalance = rToken.balanceOf(governance);
-      assertEq(calcTestCases[i].inAmount, startReserveBalance-endReserveBalance);
+      assertEq(calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals), startReserveBalance-endReserveBalance);
 
       if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
         assertEq(amount, endBondBalance-startBondBalance);
