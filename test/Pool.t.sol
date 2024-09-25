@@ -979,10 +979,10 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(governance);
     PoolFactory.PoolParams memory _params;
     _params.fee = 0;
-    _params.reserveToken = address(new Token("Wrapped ETH", "WETH"));
+    _params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     _params.sharesPerToken = 50 * 10 ** 18;
     _params.distributionPeriod = 0;
-    _params.couponToken = address(new Token("USDC", "USDC"));
+    _params.couponToken = address(new Token("USDC", "USDC", false));
 
     uint8 reserveDecimals = 6;
     Token(_params.reserveToken).setDecimals(reserveDecimals);
