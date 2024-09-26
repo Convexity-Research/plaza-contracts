@@ -155,19 +155,19 @@ contract Merchant is AccessControl, Pausable, Trader {
     ERC20 reserveToken = ERC20(pool.reserveToken());
     ERC20 couponToken = ERC20(pool.couponToken());
 
-    uint256 couponAmount = getCouponAmount(_pool);
+    uint256 remainingCouponAmount = getRemainingCouponAmount(_pool);
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
     uint256 currentPrice = getCurrentPrice(address(reserveToken), address(couponToken));
     uint256 liquidity = getLiquidity(address(reserveToken), address(couponToken));
     require (currentPrice > 0, ZeroPrice());
 
-    if (daysToPayment > 10 || couponAmount == 0) {
+    if (daysToPayment > 10 || remainingCouponAmount == 0) {
       return limitOrders;
     }
 
     // Ensure pool reserves is greater than coupon amount
-    assert(poolReserves * currentPrice > couponAmount);
+    assert(poolReserves * currentPrice > remainingCouponAmount);
 
     limitOrders = new LimitOrder[](5);
     uint256 maxOrder = 0;
@@ -175,7 +175,7 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     if (daysToPayment > 5) {
       maxOrder = min((250 * liquidity / PRECISION),
-                  min((1000 * couponAmount / (currentPrice * 10250)) / PRECISION, 
+                  min((1000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION, 
                   (poolReserves * 9500) / PRECISION));
 
       sellAmount = (maxOrder * 2000) / PRECISION;
@@ -194,7 +194,7 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     if (daysToPayment > 1) {
       maxOrder = min((500 * liquidity / PRECISION),
-                  min((2000 * couponAmount / (currentPrice * 10250)) / PRECISION, 
+                  min((2000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION, 
                   (poolReserves * 9500) / PRECISION));
 
       sellAmount = (maxOrder * 2000) / PRECISION;
@@ -213,7 +213,7 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     if (daysToPayment > 0) {
       maxOrder = min((500 * liquidity / PRECISION),
-                  min((couponAmount / (currentPrice * 10250)) / PRECISION, 
+                  min((remainingCouponAmount / (currentPrice * 10250)) / PRECISION, 
                   (poolReserves * 9500) / PRECISION));
 
       sellAmount = (maxOrder * 200000) / PRECISION;
@@ -232,7 +232,7 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     // Sell what's left
     maxOrder = min((1000 * liquidity / PRECISION),
-                min((couponAmount / currentPrice),
+                min((remainingCouponAmount / currentPrice),
                 (poolReserves * 9500) / PRECISION));
     
     limitOrders[0] = LimitOrder({
@@ -268,7 +268,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     return uint8((poolInfo.lastDistribution + poolInfo.distributionPeriod - block.timestamp) / 86400);
   }
 
-  function getCouponAmount(address _pool) public view returns(uint256) {
+  function getRemainingCouponAmount(address _pool) public view returns(uint256) {
     Pool pool = Pool(_pool);
 
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();

@@ -119,8 +119,8 @@ contract MerchantTest is Test {
 		assertEq(daysToPayment, 90);
 	}
 
-	function testGetCouponAmount() view public {
-		uint256 couponAmount = merchant.getCouponAmount(address(pool));
+	function testGetRemainingCouponAmount() view public {
+		uint256 couponAmount = merchant.getRemainingCouponAmount(address(pool));
 		assertEq(couponAmount, 62500000000000000000000000000000);
 	}
 
