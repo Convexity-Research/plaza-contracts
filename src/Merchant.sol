@@ -143,7 +143,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     orders[_pool] = limitOrders;
   }
 
-  function getLimitOrders(address _pool) public /*view*/ returns(LimitOrder[] memory limitOrders) {
+  function getLimitOrders(address _pool) public returns(LimitOrder[] memory limitOrders) {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
 
@@ -167,7 +167,10 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
 
     // Ensure pool reserves is greater than coupon amount
-    assert(poolReserves * currentPrice > remainingCouponAmount);
+    if (poolReserves * currentPrice <= remainingCouponAmount) {
+      setHardStop(_pool);
+      return limitOrders;
+    }
 
     limitOrders = new LimitOrder[](5);
     uint256 maxOrder = 0;
