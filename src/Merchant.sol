@@ -30,6 +30,8 @@ contract Merchant is AccessControl, Pausable, Trader {
   // Pool -> Period -> Has Stopped Selling
   mapping (address => mapping(uint256 => bool)) private hasStoppedSelling;
 
+  event StoppedSelling(address pool);
+
   error ZeroPrice();
   error UpdateNotRequired();
   error NoOrdersToExecute();
@@ -309,6 +311,8 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     // remove all orders
     orders[_pool] = new LimitOrder[](0);
+
+    emit StoppedSelling(_pool);
   }
 
   function pause() external onlyRole(GOV_ROLE) {
