@@ -93,6 +93,17 @@ contract Trader {
     amountOut = quoter.quoteExactInput(path, amountIn);
   }
 
+  /**
+   * @dev Returns the lowest fee tier for the given token pair.
+   * This function checks for the existence of a pool for the given token pair at various fee tiers.
+   * It starts from the lowest fee tier and goes up to the highest fee tier.
+   * If a pool is found at a particular fee tier, it returns that fee tier.
+   * If no pool is found for any of the fee tiers, it reverts with a `NoPoolFound` error.
+   *
+   * @param tokenA The address of the first token.
+   * @param tokenB The address of the second token.
+   * @return The lowest fee tier for the given token pair.
+   */
   function getFeeTier(address tokenA, address tokenB) internal view returns (uint24) {
     address pool = factory.getPool(tokenA, tokenB, 100);
     if (pool != address(0)) return 100;
