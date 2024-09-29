@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Merchant} from "./Merchant.sol";
 import {TickMath} from "./lib/TickMath.sol";
 import {FullMath} from "./lib/FullMath.sol";
+import {Tick} from "@uniswap/v3-core/contracts/libraries/Tick.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IQuoter} from "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
 import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
@@ -129,32 +130,73 @@ contract Trader {
     revert NoPoolFound();
   }
 
-  function getLiquidity(address reserveToken, address couponToken) public view returns (uint256) {
-    uint24 fee1 = getFeeTier(reserveToken, WETH);
-    uint24 fee2 = getFeeTier(WETH, couponToken);
+  function getLiquidity(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256) {
+    uint24 fee = getFeeTier(tokenA, tokenB);
 
-    address pool1 = factory.getPool(reserveToken, WETH, fee1);
-    address pool2 = factory.getPool(WETH, couponToken, fee2);
+    address pool = factory.getPool(tokenA, tokenB, fee);
+    int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
-    if (pool1 == address(0) || pool2 == address(0)) revert NoPoolFound();
+    if (pool == address(0)) revert NoPoolFound();
 
-    (uint160 sqrtPriceX96_1, int24 tick_1,,,,,) = IUniswapV3Pool(pool1).slot0();
-    (uint160 sqrtPriceX96_2, int24 tick_2,,,,,) = IUniswapV3Pool(pool2).slot0();
+    (uint160 sqrtPriceX96, int24 tick,,,,,) = IUniswapV3Pool(pool).slot0();
 
-    uint128 liquidity1 = IUniswapV3Pool(pool1).liquidity();
-    uint128 liquidity2 = IUniswapV3Pool(pool2).liquidity();
+    // Division here acts as a floor rounding division
+    int24 lowerInitializedTick = (tick / tickSpacing) * tickSpacing;
 
-    uint256 amount0_1 = getAmount0ForLiquidity(sqrtPriceX96_1, TickMath.getSqrtRatioAtTick(tick_1 - 1), liquidity1);
-    uint256 amount1_1 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick_1 + 1), sqrtPriceX96_1, liquidity1);
+    int24 currentTick = lowerInitializedTick;
+    uint128 liquidity = IUniswapV3Pool(pool).liquidity();
 
-    uint256 amount0_2 = getAmount0ForLiquidity(sqrtPriceX96_2, TickMath.getSqrtRatioAtTick(tick_2 - 1), liquidity2);
-    uint256 amount1_2 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick_2 + 1), sqrtPriceX96_2, liquidity2);
+    while (true) {
+      if (abs(lowerInitializedTick - currentTick) >= targetTickRange) { break; }
+      if (abs(lowerInitializedTick - currentTick) % tickSpacing != 0) { break; }
+      if (currentTick < TickMath.MIN_TICK && currentTick > TickMath.MAX_TICK) { break; }
 
-    uint256 value1 = amount0_1 + (amount1_1 * uint256(sqrtPriceX96_1) * uint256(sqrtPriceX96_1)) / (1 << 192);
-    uint256 value2 = amount0_2 + (amount1_2 * uint256(sqrtPriceX96_2) * uint256(sqrtPriceX96_2)) / (1 << 192);
+      Tick.Info tickInfo = IUniswapV3Pool(pool).ticks(currentTick);
+      if (!tickInfo.initialized) { revert; } // this shouldn't happen
 
-    return value1 < value2 ? value1 : value2;
+      liquidity -= tickInfo.liquidityNet;
+
+      currentTick -= tickSpacing;
+    }
+
+    return liquidity;
+
+    // uint256 amount0 = getAmount0ForLiquidity(sqrtPriceX96, TickMath.getSqrtRatioAtTick(tick - 1), liquidity);
+    // uint256 amount1 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick + 1), sqrtPriceX96, liquidity);
+
+    // return amount0 + (amount1 * uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192);
   }
+
+  function abs(int24 x) internal pure returns (uint24) {
+    return x >= 0 ? uint24(x) : uint24(-x);
+  }
+
+  // function getLiquidity(address reserveToken, address couponToken) public view returns (uint256) {
+  //   uint24 fee1 = getFeeTier(reserveToken, WETH);
+  //   uint24 fee2 = getFeeTier(WETH, couponToken);
+
+  //   address pool1 = factory.getPool(reserveToken, WETH, fee1);
+  //   address pool2 = factory.getPool(WETH, couponToken, fee2);
+
+  //   if (pool1 == address(0) || pool2 == address(0)) revert NoPoolFound();
+
+  //   (uint160 sqrtPriceX96_1, int24 tick_1,,,,,) = IUniswapV3Pool(pool1).slot0();
+  //   (uint160 sqrtPriceX96_2, int24 tick_2,,,,,) = IUniswapV3Pool(pool2).slot0();
+
+  //   uint128 liquidity1 = IUniswapV3Pool(pool1).liquidity();
+  //   uint128 liquidity2 = IUniswapV3Pool(pool2).liquidity();
+
+  //   uint256 amount0_1 = getAmount0ForLiquidity(sqrtPriceX96_1, TickMath.getSqrtRatioAtTick(tick_1 - 1), liquidity1);
+  //   uint256 amount1_1 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick_1 + 1), sqrtPriceX96_1, liquidity1);
+
+  //   uint256 amount0_2 = getAmount0ForLiquidity(sqrtPriceX96_2, TickMath.getSqrtRatioAtTick(tick_2 - 1), liquidity2);
+  //   uint256 amount1_2 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick_2 + 1), sqrtPriceX96_2, liquidity2);
+
+  //   uint256 value1 = amount0_1 + (amount1_1 * uint256(sqrtPriceX96_1) * uint256(sqrtPriceX96_1)) / (1 << 192);
+  //   uint256 value2 = amount0_2 + (amount1_2 * uint256(sqrtPriceX96_2) * uint256(sqrtPriceX96_2)) / (1 << 192);
+
+  //   return value1 < value2 ? value1 : value2;
+  // }
 
   function getAmount0ForLiquidity(uint160 sqrtRatioAX96, uint160 sqrtRatioBX96, uint128 liquidity) internal pure returns (uint256 amount0) {
     if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
