@@ -8,7 +8,12 @@ contract Token is ERC20 {
   bool public restricted;
   address public deployer;
 
+  string private _name;
+  string private _symbol;
+
   constructor (string memory name, string memory symbol, bool _restricted) ERC20(name, symbol) {
+    _name = name;
+    _symbol = symbol;
     restricted = _restricted;
     deployer = msg.sender;
     whitelist[deployer] = true;
@@ -32,5 +37,15 @@ contract Token is ERC20 {
 
   function decimals() public view virtual override returns (uint8) {
     return 18;
+  }
+
+  function name() public view virtual override returns (string memory) {
+    require(!restricted || whitelist[msg.sender], "Not authorized to mint");
+    return _name;
+  }
+
+  function symbol() public view virtual override returns (string memory) {
+    require(!restricted || whitelist[msg.sender], "Not authorized to mint");
+    return _symbol;
   }
 }
