@@ -3,18 +3,21 @@ pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
 import {BondToken} from "./BondToken.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 /**
  * @title Distributor
  * @dev This contract manages the distribution of coupon shares to users based on their bond token balances.
  */
-contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+  using SafeERC20 for IERC20;
 
   /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
@@ -60,6 +63,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    */
   function initialize(address _governance) initializer public {
     __UUPSUpgradeable_init();
+    __ReentrancyGuard_init();
 
     _grantRole(GOV_ROLE, _governance);
   }
@@ -82,15 +86,14 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * Transfers the calculated shares to the user's address.
    * @param _pool Address of the pool from which to claim shares.
    */
-  function claim(address _pool) external whenNotPaused() {
+  function claim(address _pool) external whenNotPaused() nonReentrant() {
     require(_pool != address(0), UnsupportedPool());
     
     Pool pool = Pool(_pool);
     BondToken bondToken = pool.bondToken();
     address couponToken = pool.couponToken();
-    ERC20 sharesToken = ERC20(couponToken);
 
-    if (address(bondToken) == address(0) || address(sharesToken) == address(0)){
+    if (address(bondToken) == address(0) || couponToken == address(0)){
       revert UnsupportedPool();
     }
 
@@ -98,7 +101,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     uint256 balance = bondToken.balanceOf(msg.sender);
     uint256 shares = bondToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
 
-    if (sharesToken.balanceOf(address(this)) < shares) {
+    if (IERC20(couponToken).balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
     }
 
@@ -110,19 +113,16 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     }
 
     // check if the distributor has enough shares tokens as the amount to distribute
-    if (sharesToken.balanceOf(address(this)) < poolInfo.amountToDistribute) {
+    if (IERC20(couponToken).balanceOf(address(this)) < poolInfo.amountToDistribute) {
       revert NotEnoughSharesToDistribute();
     }
-
-    // @todo: replace with safeTransfer
-    if (!sharesToken.transfer(msg.sender, shares)) {
-      revert("not enough balance");
-    }
-
+    
     poolInfo.amountToDistribute -= shares;
     couponAmountsToDistribute[couponToken] -= shares;
-
+    
     bondToken.resetIndexedUserAssets(msg.sender);
+    IERC20(couponToken).safeTransfer(msg.sender, shares);
+    
     emit ClaimedShares(msg.sender, currentPeriod, shares);
   }
 
@@ -131,7 +131,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @param _pool Address of the pool to allocate shares to.
    * @param _amountToDistribute Amount of shares to allocate.
    */
-  function allocate(address _pool, uint256 _amountToDistribute) external {
+  function allocate(address _pool, uint256 _amountToDistribute) external whenNotPaused() {
     require(_pool == msg.sender, "Caller must be a registered pool");
 
     Pool pool = Pool(_pool);
@@ -141,7 +141,7 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
     couponAmountsToDistribute[couponToken] += _amountToDistribute;
     poolInfos[_pool].amountToDistribute += _amountToDistribute;
 
-    if (ERC20(couponToken).balanceOf(address(this)) < couponAmountsToDistribute[couponToken]) {
+    if (IERC20(couponToken).balanceOf(address(this)) < couponAmountsToDistribute[couponToken]) {
       revert NotEnoughCouponBalance();
     }
   }

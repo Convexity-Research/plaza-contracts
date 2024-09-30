@@ -7,7 +7,9 @@ import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "./BondToken.sol";
 import {LeverageToken} from "./LeverageToken.sol";
 import {TokenDeployer} from "./utils/TokenDeployer.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -19,7 +21,10 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
  * @dev This contract is responsible for creating and managing pools.
  * It inherits from various OpenZeppelin upgradeable contracts for enhanced functionality and security.
  */
-contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {  
+contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+  using SafeERC20 for IERC20;
+  using ERC20Extensions for IERC20;
+
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -106,9 +111,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     //   revert ZeroLeverageAmount();
     // }
 
-    ERC20 reserveToken = ERC20(params.reserveToken);
-    string memory reserveSymbol = reserveToken.symbol();
-        
+    string memory reserveSymbol = IERC20(params.reserveToken).safeSymbol();
+    
     // Deploy Bond token
     BondToken bondToken = BondToken(tokenDeployer.deployDebtToken(
       string.concat("Bond", reserveSymbol),
@@ -163,11 +167,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     poolsLength = poolsLength + 1;
     emit PoolCreated(pool, reserveAmount, bondAmount, leverageAmount);
 
-    // @todo: make it safeTransferFrom
     // Send seed reserves to pool
-    if (!reserveToken.transferFrom(msg.sender, pool, reserveAmount)) {
-      revert("failed to transfer funds");
-    }
+    IERC20(params.reserveToken).safeTransferFrom(msg.sender, pool, reserveAmount);
 
     // Mint seed amounts
     bondToken.mint(msg.sender, bondAmount);
