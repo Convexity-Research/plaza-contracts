@@ -8,12 +8,12 @@ contract Token is ERC20 {
   bool public restricted;
   address public deployer;
 
-  string private _name;
-  string private _symbol;
+  string private _tokenName;
+  string private _tokenSymbol;
 
   constructor (string memory name, string memory symbol, bool _restricted) ERC20(name, symbol) {
-    _name = name;
-    _symbol = symbol;
+    _tokenName = name;
+    _tokenSymbol = symbol;
     restricted = _restricted;
     deployer = msg.sender;
     whitelist[deployer] = true;
@@ -40,12 +40,10 @@ contract Token is ERC20 {
   }
 
   function name() public view virtual override returns (string memory) {
-    require(!restricted || whitelist[msg.sender], "Not authorized to mint");
-    return _name;
+    return _tokenName;
   }
 
   function symbol() public view virtual override returns (string memory) {
-    require(!restricted || whitelist[msg.sender], "Not authorized to mint");
-    return _symbol;
+    return _tokenSymbol;
   }
 }
