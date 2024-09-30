@@ -15,6 +15,8 @@ contract FaucetScript is Script {
     f.addToWhitelist(address(0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd)); // Vlad
     f.addToWhitelist(address(0x5dbAb2D4a3aea73CD6c6C2494A062E07a630430f)); // Neeel
     f.addToWhitelist(address(0x316778512b7a2ea2e923A99F4E7257C837a7123b)); // Illia
+    f.addToWhitelist(address(0x1dabd8c1c485D00E64874d40098747573ae79665)); // Ryan
+    f.addToWhitelist(address(0xD1c67cC3E3A3FF83A7a75fAC21C6663004cDf684)); // Faucet API
 
     vm.stopBroadcast();
   }
