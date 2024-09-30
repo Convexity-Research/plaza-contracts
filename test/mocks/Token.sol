@@ -11,9 +11,9 @@ contract Token is ERC20 {
   string private _tokenName;
   string private _tokenSymbol;
 
-  constructor (string memory name, string memory symbol, bool _restricted) ERC20(name, symbol) {
-    _tokenName = name;
-    _tokenSymbol = symbol;
+  constructor (string memory _nameParam, string memory _symbolParam, bool _restricted) ERC20(_nameParam, _symbolParam) {
+    _tokenName = _nameParam;
+    _tokenSymbol = _symbolParam;
     restricted = _restricted;
     deployer = msg.sender;
     whitelist[deployer] = true;
