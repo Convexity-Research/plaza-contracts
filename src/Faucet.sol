@@ -20,7 +20,7 @@ contract Faucet {
   constructor() {
     deployer = msg.sender;
     whitelist[deployer] = true;
-    reserveToken = new Token("Wrapped Fake ETH", "WETH", true);
+    reserveToken = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
     couponToken = new Token("Circle Fake USD", "USDC", true);
   }
   
