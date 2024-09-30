@@ -53,8 +53,7 @@ contract Faucet {
 
   /// @notice Adds an address to the whitelist
   /// @param account The address to add to the whitelist
-  function addToWhitelist(address account) public {
-    require(msg.sender == deployer, "Only deployer can add to whitelist");
+  function addToWhitelist(address account) public isWhitelisted() {
     whitelist[account] = true;
   }
 
