@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Merchant} from "./Merchant.sol";
 import {TickMath} from "./lib/TickMath.sol";
 import {FullMath} from "./lib/FullMath.sol";
+import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {Tick} from "@uniswap/v3-core/contracts/libraries/Tick.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IQuoter} from "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
@@ -12,6 +13,7 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 
 contract Trader {
+  using ERC20Extensions for IERC20;
   ISwapRouter private router;
   IQuoter private quoter;
   IUniswapV3Factory private factory;
@@ -90,7 +92,6 @@ contract Trader {
     );
 
     // Get the quote
-    // @todo: investigate why this could modify state - if I restrict to view, it moans
     amountOut = quoter.quoteExactInput(path, amountIn);
   }
 
@@ -165,6 +166,28 @@ contract Trader {
     // uint256 amount1 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick + 1), sqrtPriceX96, liquidity);
 
     // return amount0 + (amount1 * uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192);
+  }
+
+  function getPrice(address tokenA, address tokenB) public view returns (uint256) {
+    uint24 fee = getFeeTier(tokenA, tokenB);
+    address pool = factory.getPool(tokenA, tokenB, fee);
+
+    if (pool == address(0)) revert NoPoolFound();
+
+    (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+
+    // sqrtPriceX96 represents the square root of the price ratio of token1 to token0
+    // where token0 is the token with the smaller address (in hex)
+    // Price = (sqrtPriceX96 / 2^96)^2 gives us the price of token0 in terms of token1
+    if (tokenA < tokenB) {
+      // If tokenA < tokenB, then tokenA is token0 and tokenB is token1
+      // So we can directly use the formula to get the price of tokenA in terms of tokenB
+      return (uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192);
+    } else {
+      // If tokenA > tokenB, then tokenB is token0 and tokenA is token1
+      // We need to invert the price to get the price of tokenA in terms of tokenB
+      return (10**IERC20(tokenA).decimals()) / ((uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192));
+    }
   }
 
   function abs(int24 x) internal pure returns (uint24) {
