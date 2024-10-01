@@ -14,6 +14,7 @@ import {Validator} from "../src/utils/Validator.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract PoolTest is Test, TestCases {
   PoolFactory private poolFactory;
@@ -43,7 +44,14 @@ contract PoolTest is Test, TestCases {
 
     address tokenDeployer = address(new TokenDeployer());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+      PoolFactory.initialize, 
+      (governance,tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+    )));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));

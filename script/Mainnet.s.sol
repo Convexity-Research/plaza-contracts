@@ -3,15 +3,16 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {Distributor} from "../src/Distributor.sol";
-
+import {Pool} from "../src/Pool.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {Distributor} from "../src/Distributor.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract MainnetScript is Script {
 
@@ -33,9 +34,14 @@ contract MainnetScript is Script {
     
     address tokenDeployer = address(new TokenDeployer());
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
+
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), deployerAddress));
+
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed)
+      (deployerAddress, tokenDeployer, distributor, ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
     )));
 
     // Grant pool factory role to factory

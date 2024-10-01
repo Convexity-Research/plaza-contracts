@@ -10,8 +10,9 @@ import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
-import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract PoolFactoryTest is Test {
   PoolFactory private poolFactory;
@@ -36,7 +37,14 @@ contract PoolFactoryTest is Test {
 
     address tokenDeployer = address(new TokenDeployer());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance, tokenDeployer, address(distributor), ethPriceFeed))));
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+      PoolFactory.initialize, 
+      (governance, tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+    )));
 
     vm.stopPrank();
 
