@@ -5,8 +5,9 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {Pool} from "../src/Pool.sol";
 import {Utils} from "../src/lib/Utils.sol";
-import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
+import {LifiRouter} from "../src/LifiRouter.sol";
+import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
@@ -32,13 +33,20 @@ contract MainnetScript is Script {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
     
+    // Deploys LifiRouter
+    new LifiRouter();
+
+    // Deploys TokenDeployer
     address tokenDeployer = address(new TokenDeployer());
+
+    // Deploys Distributor
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
 
+    // Pool, Bond & Leverage Beacon Deploy
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), deployerAddress));
-
+    
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
       (deployerAddress, tokenDeployer, distributor, ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
