@@ -204,47 +204,4 @@ contract Trader {
   function abs(int24 x) internal pure returns (uint24) {
     return x >= 0 ? uint24(x) : uint24(-x);
   }
-
-  // function getLiquidity(address reserveToken, address couponToken) public view returns (uint256) {
-  //   uint24 fee1 = getFeeTier(reserveToken, WETH);
-  //   uint24 fee2 = getFeeTier(WETH, couponToken);
-
-  //   address pool1 = factory.getPool(reserveToken, WETH, fee1);
-  //   address pool2 = factory.getPool(WETH, couponToken, fee2);
-
-  //   if (pool1 == address(0) || pool2 == address(0)) revert NoPoolFound();
-
-  //   (uint160 sqrtPriceX96_1, int24 tick_1,,,,,) = IUniswapV3Pool(pool1).slot0();
-  //   (uint160 sqrtPriceX96_2, int24 tick_2,,,,,) = IUniswapV3Pool(pool2).slot0();
-
-  //   uint128 liquidity1 = IUniswapV3Pool(pool1).liquidity();
-  //   uint128 liquidity2 = IUniswapV3Pool(pool2).liquidity();
-
-  //   uint256 amount0_1 = getAmount0ForLiquidity(sqrtPriceX96_1, TickMath.getSqrtRatioAtTick(tick_1 - 1), liquidity1);
-  //   uint256 amount1_1 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick_1 + 1), sqrtPriceX96_1, liquidity1);
-
-  //   uint256 amount0_2 = getAmount0ForLiquidity(sqrtPriceX96_2, TickMath.getSqrtRatioAtTick(tick_2 - 1), liquidity2);
-  //   uint256 amount1_2 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick_2 + 1), sqrtPriceX96_2, liquidity2);
-
-  //   uint256 value1 = amount0_1 + (amount1_1 * uint256(sqrtPriceX96_1) * uint256(sqrtPriceX96_1)) / (1 << 192);
-  //   uint256 value2 = amount0_2 + (amount1_2 * uint256(sqrtPriceX96_2) * uint256(sqrtPriceX96_2)) / (1 << 192);
-
-  //   return value1 < value2 ? value1 : value2;
-  // }
-
-  function getAmount0ForLiquidity(uint160 sqrtRatioAX96, uint160 sqrtRatioBX96, uint128 liquidity) internal pure returns (uint256 amount0) {
-    if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
-
-    return FullMath.mulDiv(
-      uint256(liquidity) << 96,
-      sqrtRatioBX96 - sqrtRatioAX96,
-      sqrtRatioBX96
-    ) / sqrtRatioAX96;
-  }
-
-  function getAmount1ForLiquidity(uint160 sqrtRatioAX96, uint160 sqrtRatioBX96, uint128 liquidity) internal pure returns (uint256 amount1) {
-    if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
-
-    return FullMath.mulDiv(liquidity, sqrtRatioBX96 - sqrtRatioAX96, 1 << 96);
-  }
 }
