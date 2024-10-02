@@ -2,10 +2,11 @@
 pragma solidity ^0.8.26;
 
 import {Merchant} from "./Merchant.sol";
-import {TickMath} from "./lib/TickMath.sol";
-import {FullMath} from "./lib/FullMath.sol";
+import {Tick} from "./lib/uniswap/Tick.sol";
+import {TickMath} from "./lib/uniswap/TickMath.sol";
+import {FullMath} from "./lib/uniswap/FullMath.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
-import {Tick} from "@uniswap/v3-core/contracts/libraries/Tick.sol";
+import {LiquidityAmounts} from "./lib/uniswap/LiquidityAmounts.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IQuoter} from "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
 import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
@@ -131,7 +132,7 @@ contract Trader {
     revert NoPoolFound();
   }
 
-  function getLiquidity(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256) {
+  function getLiquidityAmounts(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256 amount0, uint256 amount1) {
     uint24 fee = getFeeTier(tokenA, tokenB);
 
     address pool = factory.getPool(tokenA, tokenB, fee);
@@ -145,27 +146,37 @@ contract Trader {
     int24 lowerInitializedTick = (tick / tickSpacing) * tickSpacing;
 
     int24 currentTick = lowerInitializedTick;
-    uint128 liquidity = IUniswapV3Pool(pool).liquidity();
+    int128 liquidity = int128(IUniswapV3Pool(pool).liquidity());
 
     while (true) {
       if (abs(lowerInitializedTick - currentTick) >= targetTickRange) { break; }
-      if (abs(lowerInitializedTick - currentTick) % tickSpacing != 0) { break; }
+      if (abs(lowerInitializedTick - currentTick) % uint24(tickSpacing) != 0) { break; }
       if (currentTick < TickMath.MIN_TICK && currentTick > TickMath.MAX_TICK) { break; }
 
-      Tick.Info tickInfo = IUniswapV3Pool(pool).ticks(currentTick);
-      if (!tickInfo.initialized) { revert; } // this shouldn't happen
+      (,int128 liquidityNet,,,,,,bool initialized) = IUniswapV3Pool(pool).ticks(currentTick);
+      if (!initialized) { return (0, 0); } // this shouldn't happen
 
-      liquidity -= tickInfo.liquidityNet;
+      liquidity -= liquidityNet;
 
       currentTick -= tickSpacing;
     }
 
-    return liquidity;
+    uint160 currentSqrtPriceX96 = TickMath.getSqrtRatioAtTick(tick);
+    uint160 lowerSqrtPriceX96 = TickMath.getSqrtRatioAtTick(currentTick);
+    uint160 upperSqrtPriceX96 = TickMath.getSqrtRatioAtTick(lowerInitializedTick);
 
-    // uint256 amount0 = getAmount0ForLiquidity(sqrtPriceX96, TickMath.getSqrtRatioAtTick(tick - 1), liquidity);
-    // uint256 amount1 = getAmount1ForLiquidity(TickMath.getSqrtRatioAtTick(tick + 1), sqrtPriceX96, liquidity);
+    (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
+      currentSqrtPriceX96,
+      lowerSqrtPriceX96,
+      upperSqrtPriceX96,
+      uint128(liquidity)
+    );
 
-    // return amount0 + (amount1 * uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192);
+    if (tokenA < tokenB ) {
+      return (amount0, amount1);
+    } else {
+      return (amount1, amount0);
+    }
   }
 
   function getPrice(address tokenA, address tokenB) public view returns (uint256) {
@@ -186,7 +197,7 @@ contract Trader {
     } else {
       // If tokenA > tokenB, then tokenB is token0 and tokenA is token1
       // We need to invert the price to get the price of tokenA in terms of tokenB
-      return (10**IERC20(tokenA).decimals()) / ((uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192));
+      return (10**IERC20(tokenA).safeDecimals()) / ((uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192));
     }
   }
 
