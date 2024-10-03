@@ -47,8 +47,8 @@ contract Trader {
     }
 
     // Fetch the fee tiers dynamically
-    uint24 fee1 = getFeeTier(order.sell, WETH);
-    uint24 fee2 = getFeeTier(WETH, order.buy);
+    (,uint24 fee1) = getPoolAndFee(order.sell, WETH);
+    (,uint24 fee2) = getPoolAndFee(WETH, order.buy);
 
     // Define the path: wstETH -> WETH -> USDC
     bytes memory path = abi.encodePacked(
@@ -60,7 +60,7 @@ contract Trader {
     );
 
     // Calculate amountOutMinimum as 0.5% less than order.price
-    uint256 amountOutMinimum = (order.price * order.amount * 995) / 100000;
+    uint256 amountOutMinimum = (order.price * order.amount * 995) / 1000;
 
     // Set up swap parameters
     ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
@@ -80,8 +80,8 @@ contract Trader {
     if (amountIn == 0) revert InvalidSwapAmount();
 
     // Fetch the fee tiers dynamically
-    uint24 fee1 = getFeeTier(reserveToken, WETH);
-    uint24 fee2 = getFeeTier(WETH, couponToken);
+    (,uint24 fee1) = getPoolAndFee(reserveToken, WETH);
+    (,uint24 fee2) = getPoolAndFee(WETH, couponToken);
 
     // Define the path: wstETH -> WETH -> USDC
     bytes memory path = abi.encodePacked(
@@ -105,29 +105,24 @@ contract Trader {
    *
    * @param tokenA The address of the first token.
    * @param tokenB The address of the second token.
-   * @return The lowest fee tier for the given token pair.
+   * @return The lowest fee tier for the given token pair and pool address.
    */
-  function getFeeTier(address tokenA, address tokenB) internal view returns (uint24) {
-    address pool = factory.getPool(tokenA, tokenB, 100);
-    if (pool != address(0)) return 100;
+   // @todo: move back to intenral - in public to test
+  function getPoolAndFee(address tokenA, address tokenB) public view returns (address, uint24) {
+    // this only works for Aerodrome, they decided to break compatibility with getPool mapping
+    uint24[5] memory spacing = [uint24(1), uint24(50), uint24(100), uint24(200), uint24(2000)];
 
-    pool = factory.getPool(tokenA, tokenB, 200);
-    if (pool != address(0)) return 200;
+    for (uint24 i = 0; i < spacing.length; i++) {
+      try factory.getPool(tokenA, tokenB, spacing[i]) returns (address _pool) {
+        if (_pool == address(0)) continue;
+        
+        (bool success, bytes memory data) = address(factory).staticcall(abi.encodeWithSignature("tickSpacingToFee(int24)", spacing[i]));
+        if (!success) continue;
+        
+        return (_pool, abi.decode(data, (uint24)));
 
-    pool = factory.getPool(tokenA, tokenB, 300);
-    if (pool != address(0)) return 300;
-
-    pool = factory.getPool(tokenA, tokenB, 400);
-    if (pool != address(0)) return 400;
-    
-    pool = factory.getPool(tokenA, tokenB, 500);
-    if (pool != address(0)) return 500;
-
-    pool = factory.getPool(tokenA, tokenB, 3000);
-    if (pool != address(0)) return 3000;
-
-    pool = factory.getPool(tokenA, tokenB, 10000);
-    if (pool != address(0)) return 10000;
+      } catch {}
+    }
 
     revert NoPoolFound();
   }
@@ -135,9 +130,8 @@ contract Trader {
   // @todo: this always goes from current tick to a lower tick
   // It should be dynamic depending on what token is being sold
   function getLiquidityAmounts(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256 amount0, uint256 amount1) {
-    uint24 fee = getFeeTier(tokenA, tokenB);
+    (address pool,) = getPoolAndFee(tokenA, tokenB);
 
-    address pool = factory.getPool(tokenA, tokenB, fee);
     int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
     if (pool == address(0)) revert NoPoolFound();
@@ -181,8 +175,7 @@ contract Trader {
   }
 
   function getPrice(address tokenA, address tokenB) public view returns (uint256) {
-    uint24 fee = getFeeTier(tokenA, tokenB);
-    address pool = factory.getPool(tokenA, tokenB, fee);
+    (address pool,) = getPoolAndFee(tokenA, tokenB);
 
     if (pool == address(0)) revert NoPoolFound();
 
