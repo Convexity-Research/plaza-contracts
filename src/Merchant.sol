@@ -31,6 +31,8 @@ contract Merchant is AccessControl, Pausable, Trader {
   // Pool -> Period -> Has Stopped Selling
   mapping (address => mapping(uint256 => bool)) private hasStoppedSelling;
 
+  event StoppedSelling(address pool);
+
   error ZeroPrice();
   error UpdateNotRequired();
   error NoOrdersToExecute();
@@ -161,7 +163,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
     uint256 currentPrice = getCurrentPrice(address(reserveToken), address(couponToken));
-    uint256 liquidity = getLiquidity(address(reserveToken), address(couponToken));
+    (,uint256 liquidity) = getLiquidityAmounts(address(reserveToken), address(couponToken), 50);
     require (currentPrice > 0, ZeroPrice());
 
     if (daysToPayment > 10 || remainingCouponAmount == 0) {
@@ -362,6 +364,8 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     // remove all orders
     orders[_pool] = new LimitOrder[](0);
+
+    emit StoppedSelling(_pool);
   }
 
   function pause() external onlyRole(GOV_ROLE) {

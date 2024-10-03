@@ -15,10 +15,10 @@ import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
 contract TestnetScript is Script {
 
-  // Arbitrum Sepolia addresses
+  // Base Sepolia addresses
   address public constant merchant = address(0);
-  address public constant reserveToken = address(0xE46230A4963b8bBae8681b5c05F8a22B9469De18);
-  address public constant couponToken = address(0xDA1334a1084170eb1438E0d9d5C8799A07fbA7d3);
+  address public constant reserveToken = address(0x0a38120534DA7Df6A52138926f3ceC7C970B14a1);
+  address public constant couponToken = address(0xa31577f757f371436373415F6894Cc7E37FD9D1D);
 
   address public constant ethPriceFeed = address(0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1);
 

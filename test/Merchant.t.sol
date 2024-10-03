@@ -45,9 +45,9 @@ contract MerchantTest is Test {
     PoolFactory.PoolParams memory params = PoolFactory.PoolParams({
       fee: 0,
       sharesPerToken: sharesPerToken,
-      reserveToken: address(new Token("Wrapped ETH", "WETH")),
+      reserveToken: address(new Token("Wrapped ETH", "WETH", false)),
       distributionPeriod: distributionPeriod,
-      couponToken: address(new Token("Circle USD", "USDC"))
+      couponToken: address(new Token("Circle USD", "USDC", false))
     });
 
     // Mint reserve tokens
