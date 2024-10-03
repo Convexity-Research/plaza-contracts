@@ -131,7 +131,9 @@ contract Trader {
 
     revert NoPoolFound();
   }
-
+  
+  // @todo: this always goes from current tick to a lower tick
+  // It should be dynamic depending on what token is being sold
   function getLiquidityAmounts(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256 amount0, uint256 amount1) {
     uint24 fee = getFeeTier(tokenA, tokenB);
 
