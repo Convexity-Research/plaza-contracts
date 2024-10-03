@@ -74,7 +74,7 @@ contract Merchant is AccessControl, Pausable, Trader {
   function ordersPriceReached(address _pool) public /*view*/ returns(bool) {
     LimitOrder[] memory limitOrders = orders[_pool];
 
-    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
+    uint256 currentPrice = getPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
     for (uint256 i = 0; i < limitOrders.length; i++) {
       if (limitOrders[i].buy == address(0) || limitOrders[i].filled) {
         continue;
@@ -102,7 +102,7 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     // @todo: duplicated checks from ordersPriceReached - refactor if gas becomes a problem
     LimitOrder[] memory limitOrders = orders[_pool];
-    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), couponToken);
+    uint256 currentPrice = getPrice(Pool(_pool).reserveToken(), couponToken);
     uint256 poolReserves = getPoolReserves(_pool);
 
     for (uint256 i = 0; i < limitOrders.length; i++) {
@@ -162,7 +162,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     uint256 remainingCouponAmount = getRemainingCouponAmount(_pool);
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
-    uint256 currentPrice = getCurrentPrice(address(reserveToken), address(couponToken));
+    uint256 currentPrice = getPrice(address(reserveToken), address(couponToken));
     (,uint256 liquidity) = getLiquidityAmounts(address(reserveToken), address(couponToken), 50);
     require (currentPrice > 0, ZeroPrice());
 
@@ -323,11 +323,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
     return m;
   }
-
-  function getCurrentPrice(address token0, address token1) public returns(uint256) {
-    return quote(token0, token1, 1 ether);
-  }
-
+  
   function getDaysToPayment(address _pool) public view returns(uint8) {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
