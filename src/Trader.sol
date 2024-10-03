@@ -143,30 +143,29 @@ contract Trader {
     (uint160 sqrtPriceX96, int24 tick,,,,,) = IUniswapV3Pool(pool).slot0();
 
     // Division here acts as a floor rounding division
-    int24 lowerInitializedTick = (tick / tickSpacing) * tickSpacing;
+    int24 lowerCurrentTick = (tick / tickSpacing) * tickSpacing;
 
-    int24 currentTick = lowerInitializedTick;
+    int24 tempTick = lowerCurrentTick;
     int128 liquidity = int128(IUniswapV3Pool(pool).liquidity());
 
     while (true) {
-      if (abs(lowerInitializedTick - currentTick) >= targetTickRange) { break; }
-      if (abs(lowerInitializedTick - currentTick) % uint24(tickSpacing) != 0) { break; }
-      if (currentTick < TickMath.MIN_TICK && currentTick > TickMath.MAX_TICK) { break; }
+      if (abs(lowerCurrentTick - tempTick) >= targetTickRange) { break; }
+      if (abs(lowerCurrentTick - tempTick) % uint24(tickSpacing) != 0) { break; }
+      if (tempTick < TickMath.MIN_TICK && tempTick > TickMath.MAX_TICK) { break; }
 
-      (,int128 liquidityNet,,,,,,bool initialized) = IUniswapV3Pool(pool).ticks(currentTick);
+      (,int128 liquidityNet,,,,,,bool initialized) = IUniswapV3Pool(pool).ticks(tempTick);
       if (!initialized) { return (0, 0); } // this shouldn't happen
 
       liquidity -= liquidityNet;
 
-      currentTick -= tickSpacing;
+      tempTick -= tickSpacing;
     }
 
-    uint160 currentSqrtPriceX96 = TickMath.getSqrtRatioAtTick(tick);
-    uint160 lowerSqrtPriceX96 = TickMath.getSqrtRatioAtTick(currentTick);
-    uint160 upperSqrtPriceX96 = TickMath.getSqrtRatioAtTick(lowerInitializedTick);
+    uint160 lowerSqrtPriceX96 = TickMath.getSqrtRatioAtTick(tempTick);
+    uint160 upperSqrtPriceX96 = TickMath.getSqrtRatioAtTick(lowerCurrentTick + tickSpacing);
 
     (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
-      currentSqrtPriceX96,
+      sqrtPriceX96,
       lowerSqrtPriceX96,
       upperSqrtPriceX96,
       uint128(liquidity)
