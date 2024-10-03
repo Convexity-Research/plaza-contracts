@@ -607,12 +607,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       return false;
     }
 
-    uint256 couponExcess = ERC20(couponToken).balanceOf(address(this));
+    uint256 couponExcess = IERC20(couponToken).balanceOf(address(this));
     if (couponExcess == 0) {
       return false;
     }
 
-    ERC20(couponToken).approve(merchant, couponExcess);
+    IERC20(couponToken).approve(merchant, couponExcess);
     
     try Merchant(merchant).sellCouponExcess(couponExcess) {
       return true;
