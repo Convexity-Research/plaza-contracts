@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Merchant} from "./Merchant.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Distributor} from "./Distributor.sol";
@@ -37,6 +38,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Protocol
   PoolFactory public poolFactory;
+  address public merchant;
   uint256 private fee;
 
   // Tokens
@@ -592,6 +594,31 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     distributor.allocate(address(this), couponAmountToDistribute);
 
     emit Distributed(couponAmountToDistribute);
+    sellCouponExcess();
+  }
+
+  /**
+   * @dev Sells any excess coupon tokens.
+   * @return true if the excess was sold, false otherwise.
+   */
+  function sellCouponExcess() private returns(bool) {
+    if (merchant == address(0)) {
+      // this shouldn't stop the distribution
+      return false;
+    }
+
+    uint256 couponExcess = IERC20(couponToken).balanceOf(address(this));
+    if (couponExcess == 0) {
+      return false;
+    }
+
+    IERC20(couponToken).approve(merchant, couponExcess);
+    
+    try Merchant(merchant).sellCouponExcess(couponExcess) {
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -632,6 +659,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     sharesPerToken = _sharesPerToken;
 
     emit SharesPerTokenChanged(sharesPerToken);
+  }
+
+  /** 
+   * @dev Sets the merchant address.
+   * @param _merchant The new merchant address.
+   */
+  function setMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
+    merchant = _merchant;
   }
 
   /**

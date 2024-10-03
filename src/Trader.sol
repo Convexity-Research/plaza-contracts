@@ -58,17 +58,14 @@ contract Trader {
         fee2,  // fee WETH/USDC
         order.buy     // USDC
     );
-
-    // Calculate amountOutMinimum as 0.5% less than order.price
-    uint256 amountOutMinimum = (order.price * order.amount * 995) / 1000;
-
+    
     // Set up swap parameters
     ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
         path: path,
         recipient: pool,  // Send USDC directly to the pool
         deadline: block.timestamp + 15 minutes,
         amountIn: order.amount,
-        amountOutMinimum: amountOutMinimum
+        amountOutMinimum: order.minAmount
     });
 
     // Execute the swap

@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 
+import {Pool} from "../src/Pool.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {LifiRouter} from "../src/LifiRouter.sol";
@@ -15,6 +16,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract MainnetScript is Script {
 
   // Arbitrum Sepolia addresses
+  address public constant merchant = address(0);
   address public constant reserveToken = address(0x4200000000000000000000000000000000000006);
   address public constant couponToken = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
@@ -59,7 +61,9 @@ contract MainnetScript is Script {
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    address _pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    Pool(_pool).setMerchant(merchant);
+    
     vm.stopBroadcast();
   }
 }
