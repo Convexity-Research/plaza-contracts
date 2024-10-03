@@ -10,14 +10,15 @@ import {LiquidityAmounts} from "./lib/uniswap/LiquidityAmounts.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IQuoter} from "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
 import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+
+import {ICLFactory} from "./lib/aerodrome/ICLFactory.sol";
+import {ICLPool} from "./lib/aerodrome/ICLPool.sol";
 
 contract Trader {
   using ERC20Extensions for IERC20;
   ISwapRouter private router;
   IQuoter private quoter;
-  IUniswapV3Factory private factory;
+  ICLFactory private factory;
   address private constant WETH = 0x4200000000000000000000000000000000000006; // WETH address on Base
 
   error InvalidTokenAddresses();
@@ -28,7 +29,7 @@ contract Trader {
   constructor(address _router, address _quoter, address _factory) {
     router = ISwapRouter(_router);
     quoter = IQuoter(_quoter);
-    factory = IUniswapV3Factory(_factory);
+    factory = ICLFactory(_factory);
   }
 
   function swap(address pool, Merchant.LimitOrder memory order) internal returns (uint256) {
@@ -47,8 +48,8 @@ contract Trader {
     }
 
     // Fetch the fee tiers dynamically
-    (,uint24 fee1) = getPoolAndFee(order.sell, WETH);
-    (,uint24 fee2) = getPoolAndFee(WETH, order.buy);
+    (,uint24 fee1,) = getPool(order.sell, WETH);
+    (,uint24 fee2,) = getPool(WETH, order.buy);
 
     // Define the path: wstETH -> WETH -> USDC
     bytes memory path = abi.encodePacked(
@@ -77,8 +78,8 @@ contract Trader {
     if (amountIn == 0) revert InvalidSwapAmount();
 
     // Fetch the fee tiers dynamically
-    (,uint24 fee1) = getPoolAndFee(reserveToken, WETH);
-    (,uint24 fee2) = getPoolAndFee(WETH, couponToken);
+    (,uint24 fee1,) = getPool(reserveToken, WETH);
+    (,uint24 fee2,) = getPool(WETH, couponToken);
 
     // Define the path: wstETH -> WETH -> USDC
     bytes memory path = abi.encodePacked(
@@ -94,20 +95,19 @@ contract Trader {
   }
 
   /**
-   * @dev Returns the lowest fee tier for the given token pair.
-   * This function checks for the existence of a pool for the given token pair at various fee tiers.
-   * It starts from the lowest fee tier and goes up to the highest fee tier.
-   * If a pool is found at a particular fee tier, it returns that fee tier.
-   * If no pool is found for any of the fee tiers, it reverts with a `NoPoolFound` error.
+   * @dev Returns the pool address and fee for the given token pair.
+   * This function checks for the existence of a pool for the given token pair at various tick spacings.
+   * It iterates through predefined tick spacings and attempts to find a valid pool.
+   * If a pool is found, it returns the pool address and corresponding fee.
+   * If no pool is found for any of the tick spacings, it reverts with a `NoPoolFound` error.
    *
    * @param tokenA The address of the first token.
    * @param tokenB The address of the second token.
-   * @return The lowest fee tier for the given token pair and pool address.
+   * @return The pool address and fee for the given token pair.
    */
-   // @todo: move back to intenral - in public to test
-  function getPoolAndFee(address tokenA, address tokenB) public view returns (address, uint24) {
+  function getPool(address tokenA, address tokenB) private view returns (address, uint24, int24) {
     // this only works for Aerodrome, they decided to break compatibility with getPool mapping
-    uint24[5] memory spacing = [uint24(1), uint24(50), uint24(100), uint24(200), uint24(2000)];
+    int24[5] memory spacing = [int24(1), int24(50), int24(100), int24(200), int24(2000)];
 
     for (uint24 i = 0; i < spacing.length; i++) {
       try factory.getPool(tokenA, tokenB, spacing[i]) returns (address _pool) {
@@ -116,7 +116,7 @@ contract Trader {
         (bool success, bytes memory data) = address(factory).staticcall(abi.encodeWithSignature("tickSpacingToFee(int24)", spacing[i]));
         if (!success) continue;
         
-        return (_pool, abi.decode(data, (uint24)));
+        return (_pool, abi.decode(data, (uint24)), spacing[i]);
 
       } catch {}
     }
@@ -127,26 +127,24 @@ contract Trader {
   // @todo: this always goes from current tick to a lower tick
   // It should be dynamic depending on what token is being sold
   function getLiquidityAmounts(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256 amount0, uint256 amount1) {
-    (address pool,) = getPoolAndFee(tokenA, tokenB);
-
-    int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
+    (address pool,,int24 tickSpacing) = getPool(tokenA, tokenB);
 
     if (pool == address(0)) revert NoPoolFound();
 
-    (uint160 sqrtPriceX96, int24 tick,,,,,) = IUniswapV3Pool(pool).slot0();
+    (uint160 sqrtPriceX96, int24 tick,,,,) = ICLPool(pool).slot0();
 
     // Division here acts as a floor rounding division
     int24 lowerCurrentTick = (tick / tickSpacing) * tickSpacing;
 
     int24 tempTick = lowerCurrentTick;
-    int128 liquidity = int128(IUniswapV3Pool(pool).liquidity());
+    int128 liquidity = int128(ICLPool(pool).liquidity());
 
     while (true) {
       if (abs(lowerCurrentTick - tempTick) >= targetTickRange) { break; }
       if (abs(lowerCurrentTick - tempTick) % uint24(tickSpacing) != 0) { break; }
       if (tempTick < TickMath.MIN_TICK && tempTick > TickMath.MAX_TICK) { break; }
 
-      (,int128 liquidityNet,,,,,,bool initialized) = IUniswapV3Pool(pool).ticks(tempTick);
+      (,int128 liquidityNet,,,,,,,,bool initialized) = ICLPool(pool).ticks(tempTick);
       if (!initialized) { return (0, 0); } // this shouldn't happen
 
       liquidity -= liquidityNet;
@@ -172,11 +170,11 @@ contract Trader {
   }
 
   function getPrice(address tokenA, address tokenB) public view returns (uint256) {
-    (address pool,) = getPoolAndFee(tokenA, tokenB);
+    (address pool,,) = getPool(tokenA, tokenB);
 
     if (pool == address(0)) revert NoPoolFound();
 
-    (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+    (uint160 sqrtPriceX96,,,,,) = ICLPool(pool).slot0();
 
     // sqrtPriceX96 represents the square root of the price ratio of token1 to token0
     // where token0 is the token with the smaller address (in hex)

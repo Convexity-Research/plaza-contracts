@@ -71,7 +71,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     ordersTimestamp[_pool] = block.timestamp;
   }
 
-  function ordersPriceReached(address _pool) public /*view*/ returns(bool) {
+  function ordersPriceReached(address _pool) public view returns(bool) {
     LimitOrder[] memory limitOrders = orders[_pool];
 
     uint256 currentPrice = getPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
@@ -289,7 +289,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     
     // Get the current price from Uniswap V3 router's quote method
     // currentPrice: amount of couponToken per 1e18 units of reserveToken
-    uint256 currentPrice = getCurrentPrice(address(reserveToken), address(couponToken));
+    uint256 currentPrice = getPrice(address(reserveToken), address(couponToken));
     if (currentPrice == 0) { return; }
     
     // Normalize couponExcess to 18 decimals (if not already)
