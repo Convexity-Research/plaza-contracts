@@ -197,7 +197,7 @@ contract Trader {
       return (uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192);
     } else {
       // If tokenA > tokenB, then tokenB is token0 and tokenA is token1
-      // We need to invert the price to get the price of tokenA in terms of tokenB
+      // We need to invert the price to get the price of tokenB in terms of tokenA
       return (10**IERC20(tokenA).safeDecimals()) / ((uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192));
     }
   }
