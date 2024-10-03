@@ -111,7 +111,7 @@ contract Merchant is AccessControl, Pausable, Trader {
       // if price is 0, it means it's a market order
       if (limitOrders[i].price == 0) {
         limitOrders[i].price = currentPrice;
-        limitOrders[i].minAmount = (currentPrice * limitOrders[i].amount * 995) / 100000; // 0.5% less than order.price
+        limitOrders[i].minAmount = (currentPrice * limitOrders[i].amount * 995) / 1000; // 0.5% less than order.price
       }
 
       if (limitOrders[i].price <= currentPrice) {
@@ -193,7 +193,7 @@ contract Merchant is AccessControl, Pausable, Trader {
       
       for (uint256 i = 1; i <= 5; i++) {
         price = (currentPrice * (PRECISION + (200*i))) / PRECISION;
-        minAmount = (price * sellAmount * 995) / 100000; // 0.5% less than order.price
+        minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
 
         limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
@@ -218,7 +218,7 @@ contract Merchant is AccessControl, Pausable, Trader {
        
       for (uint256 i = 1; i <= 5; i++) {
         price = (currentPrice * (PRECISION + (200*i))) / PRECISION;
-        minAmount = (price * sellAmount * 995) / 100000; // 0.5% less than order.price
+        minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
 
         limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
@@ -243,7 +243,7 @@ contract Merchant is AccessControl, Pausable, Trader {
        
       for (uint256 i = 1; i <= 5; i++) {
         price = (currentPrice * (PRECISION + (200*i))) / PRECISION;
-        minAmount = (price * sellAmount * 995) / 100000; // 0.5% less than order.price
+        minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
 
         limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
