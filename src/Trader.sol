@@ -182,11 +182,11 @@ contract Trader {
     if (tokenA < tokenB) {
       // If tokenA < tokenB, then tokenA is token0 and tokenB is token1
       // So we can directly use the formula to get the price of tokenA in terms of tokenB
-      return (uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192);
+      return (uint256(sqrtPriceX96) * uint256(sqrtPriceX96) * 10**IERC20(tokenB).safeDecimals()) / (1 << 192);
     } else {
       // If tokenA > tokenB, then tokenB is token0 and tokenA is token1
       // We need to invert the price to get the price of tokenB in terms of tokenA
-      return (10**IERC20(tokenA).safeDecimals()) / ((uint256(sqrtPriceX96) * uint256(sqrtPriceX96)) / (1 << 192));
+      return (uint256(1 << 192) * 10**IERC20(tokenB).safeDecimals()) / (uint256(sqrtPriceX96) * uint256(sqrtPriceX96));
     }
   }
 
