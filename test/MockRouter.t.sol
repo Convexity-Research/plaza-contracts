@@ -43,7 +43,6 @@ contract MockRouterTest is Test {
     Distributor distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
 
     address oracleFeeds = address(new OracleFeeds());
-    console.log("oracleFeeds", oracleFeeds);
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), oracleFeeds))));
 
     PoolFactory.PoolParams memory params;
