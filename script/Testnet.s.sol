@@ -17,8 +17,8 @@ contract TestnetScript is Script {
 
   // Base Sepolia addresses
   address public constant merchant = address(0);
-  address public constant reserveToken = address(0x0a38120534DA7Df6A52138926f3ceC7C970B14a1);
-  address public constant couponToken = address(0xa31577f757f371436373415F6894Cc7E37FD9D1D);
+  address public constant reserveToken = address(0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871);
+  address public constant couponToken = address(0xf7464321dE37BdE4C03AAeeF6b1e7b71379A9a64);
 
   address public constant ethPriceFeed = address(0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1);
 
