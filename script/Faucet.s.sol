@@ -9,7 +9,7 @@ contract FaucetScript is Script {
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
 
-    Faucet f = new Faucet();
+    Faucet f = new Faucet(address(0), address(0));
     
     f.addToWhitelist(address(0x1FaE1550229fE09ef3e266d8559acdcFC154e72f)); // Marion
     f.addToWhitelist(address(0x56B0a1Ec5932f6CF6662bF85F9099365FaAf3eCd)); // Vlad
