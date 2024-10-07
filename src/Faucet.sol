@@ -36,10 +36,16 @@ contract Faucet {
   /// @param amountCoupon The amount of coupon tokens to mint
   /// @param amountEth The amount of ETH to send to the caller
   function faucet(uint256 amountReserve, uint256 amountCoupon, uint256 amountEth) public isWhitelisted() {
-    reserveToken.mint(msg.sender, amountReserve);
-    couponToken.mint(msg.sender, amountCoupon);
-    (bool success, ) = payable(msg.sender).call{value: amountEth}("");
-    require(success, "Faucet: ETH transfer failed");
+    if (amountReserve > 0) {
+      reserveToken.mint(msg.sender, amountReserve);
+    }
+    if (amountCoupon > 0) {
+      couponToken.mint(msg.sender, amountCoupon);
+    }
+    if (amountEth > 0) {
+      (bool success, ) = payable(msg.sender).call{value: amountEth}("");
+      require(success, "Faucet: ETH transfer failed");
+    }
   }
 
   /// @notice Distributes a specified amount of reserve tokens to the caller
