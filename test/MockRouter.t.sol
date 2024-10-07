@@ -9,6 +9,7 @@ import {Router} from "../src/MockRouter.sol";
 import {MockPool} from "./mocks/MockPool.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Validator} from "../src/utils/Validator.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
@@ -40,7 +41,10 @@ contract MockRouterTest is Test {
 
     address tokenDeployer = address(new TokenDeployer());
     Distributor distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
+
+    address oracleFeeds = address(new OracleFeeds());
+    console.log("oracleFeeds", oracleFeeds);
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), oracleFeeds))));
 
     PoolFactory.PoolParams memory params;
     params.fee = 0;
@@ -48,6 +52,8 @@ contract MockRouterTest is Test {
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
+
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();
@@ -60,7 +66,7 @@ contract MockRouterTest is Test {
     mockPriceFeed = MockPriceFeed(ethPriceFeed);
     mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
     
-    mockRouter = new Router(ethPriceFeed);
+    mockRouter = new Router(oracleFeeds);
     vm.stopPrank();
 
     vm.startPrank(governance);

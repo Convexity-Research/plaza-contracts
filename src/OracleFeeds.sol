@@ -19,6 +19,8 @@ contract OracleFeeds is AccessControl {
    * @param tokenA Address of the first token
    * @param tokenB Address of the second token
    * @param priceFeed Address of the price feed oracle
+
+   * Note: address(0) is a special address that represents USD (IRL asset)
    */
   function setPriceFeed(address tokenA, address tokenB, address priceFeed) external onlyRole(GOV_ROLE) {
     priceFeeds[tokenA][tokenB] = priceFeed;

@@ -8,6 +8,7 @@ import {Utils} from "../src/lib/Utils.sol";
 import {MockPool} from "./mocks/MockPool.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {TestCases} from "./data/TestCases.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {Validator} from "../src/utils/Validator.sol";
@@ -27,8 +28,6 @@ contract PoolTest is Test, TestCases {
   address private user = address(0x4);
   address private user2 = address(0x5);
 
-  
-
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
   uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
   uint8 private constant CHAINLINK_DECIMAL = 8;
@@ -42,14 +41,17 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(deployer);
 
     address tokenDeployer = address(new TokenDeployer());
+    address oracleFeeds = address(new OracleFeeds());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), oracleFeeds))));
 
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
+
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();

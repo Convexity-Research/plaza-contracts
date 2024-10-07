@@ -12,6 +12,9 @@ contract OracleReader {
 
   address public oracleFeeds;
 
+  // @note: address(0) is a special address that represents USD (IRL asset)
+  address public constant USD = address(0);
+
   /**
    * @dev Error thrown when no valid price is found
    */

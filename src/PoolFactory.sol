@@ -44,8 +44,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
   address public governance;
   /// @dev Address of the distributor contract
   address public distributor;
-  /// @dev Address of the ETH price feed
-  address private ethPriceFeed;
+  /// @dev Address of the OracleFeeds contract
+  address public oracleFeeds;
   /// @dev Instance of the TokenDeployer contract
   TokenDeployer private tokenDeployer;
 
@@ -76,15 +76,15 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @param _governance Address of the governance account that will have the GOV_ROLE.
    * @param _tokenDeployer Address of the TokenDeployer contract.
    * @param _distributor Address of the Distributor contract.
-   * @param _ethPriceFeed Address of the ETH price feed.
+   * @param _oracleFeeds Address of the OracleFeeds contract.
    */
-  function initialize(address _governance, address _tokenDeployer, address _distributor, address _ethPriceFeed) initializer public {
+  function initialize(address _governance, address _tokenDeployer, address _distributor, address _oracleFeeds) initializer public {
     __UUPSUpgradeable_init();
 
     tokenDeployer = TokenDeployer(_tokenDeployer);
     governance = _governance;
     distributor = _distributor;
-    ethPriceFeed = _ethPriceFeed;
+    oracleFeeds = _oracleFeeds;
     _grantRole(GOV_ROLE, _governance);
   }
 
@@ -143,7 +143,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
         params.couponToken,
         params.sharesPerToken,
         params.distributionPeriod,
-        ethPriceFeed
+        oracleFeeds
       )
     ));
 
