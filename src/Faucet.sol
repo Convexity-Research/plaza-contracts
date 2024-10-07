@@ -45,29 +45,35 @@ contract Faucet {
   /// @param amountReserve The amount of reserve tokens to mint
   /// @param amountCoupon The amount of coupon tokens to mint
   /// @param amountEth The amount of ETH to send to the caller
-  function faucet(uint256 amountReserve, uint256 amountCoupon, uint256 amountEth) public isWhitelisted() {
+  /// @param onBehalfOf The address to mint the tokens on behalf of
+  function faucet(uint256 amountReserve, uint256 amountCoupon, uint256 amountEth, address onBehalfOf) public isWhitelisted() {
+    address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
     if (amountReserve > 0) {
-      reserveToken.mint(msg.sender, amountReserve);
+      reserveToken.mint(user, amountReserve);
     }
     if (amountCoupon > 0) {
-      couponToken.mint(msg.sender, amountCoupon);
+      couponToken.mint(user, amountCoupon);
     }
     if (amountEth > 0) {
-      (bool success, ) = payable(msg.sender).call{value: amountEth}("");
+      (bool success, ) = payable(user).call{value: amountEth}("");
       require(success, "Faucet: ETH transfer failed");
     }
   }
 
   /// @notice Distributes a specified amount of reserve tokens to the caller
   /// @param amount The amount of reserve tokens to mint
-  function faucetReserve(uint256 amount) public isWhitelisted() {
-    reserveToken.mint(msg.sender, amount);
+  /// @param onBehalfOf The address to mint the tokens on behalf of
+  function faucetReserve(uint256 amount, address onBehalfOf) public isWhitelisted() {
+    address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+    reserveToken.mint(user, amount);
   }
 
   /// @notice Distributes a specified amount of coupon tokens to the caller
   /// @param amount The amount of coupon tokens to mint
-  function faucetCoupon(uint256 amount) public isWhitelisted() {
-    couponToken.mint(msg.sender, amount);
+  /// @param onBehalfOf The address to mint the tokens on behalf of
+  function faucetCoupon(uint256 amount, address onBehalfOf) public isWhitelisted() {
+    address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+    couponToken.mint(user, amount);
   }
 
   /// @notice Adds an address to the whitelist
