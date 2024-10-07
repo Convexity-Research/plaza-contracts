@@ -8,6 +8,7 @@ import {BondToken} from "../src/BondToken.sol";
 import {LifiRouter} from "../src/LifiRouter.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -39,10 +40,13 @@ contract MainnetScript is Script {
     // Deploys Distributor
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
 
+    // Deploys OracleFeeds
+    address oracleFeeds = address(new OracleFeeds());
+
     // Deploys PoolFactory
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed)
+      (deployerAddress, tokenDeployer, distributor, oracleFeeds)
     )));
 
     // Grant pool factory role to factory
@@ -55,6 +59,9 @@ contract MainnetScript is Script {
       sharesPerToken: sharesPerToken,
       distributionPeriod: distributionPeriod
     });
+
+    // Set price feed
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);

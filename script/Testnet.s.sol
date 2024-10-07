@@ -3,12 +3,12 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {Distributor} from "../src/Distributor.sol";
-
 import {Utils} from "../src/lib/Utils.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
@@ -33,9 +33,11 @@ contract TestnetScript is Script {
     
     address tokenDeployer = address(new TokenDeployer());
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
+
+    address oracleFeeds = address(new OracleFeeds());
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed)
+      (deployerAddress, tokenDeployer, distributor, oracleFeeds)
     )));
 
     // Grant pool factory role to factory
@@ -52,6 +54,9 @@ contract TestnetScript is Script {
       distributionPeriod: distributionPeriod,
       couponToken: couponToken
     });
+
+    // Set price feed
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
