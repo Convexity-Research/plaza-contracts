@@ -20,7 +20,7 @@ contract Faucet {
   constructor() {
     deployer = msg.sender;
     whitelist[deployer] = true;
-    reserveToken = new Token("Wrapped Fake ETH", "WETH", true);
+    reserveToken = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
     couponToken = new Token("Circle Fake USD", "USDC", true);
   }
   
@@ -53,8 +53,7 @@ contract Faucet {
 
   /// @notice Adds an address to the whitelist
   /// @param account The address to add to the whitelist
-  function addToWhitelist(address account) public {
-    require(msg.sender == deployer, "Only deployer can add to whitelist");
+  function addToWhitelist(address account) public isWhitelisted() {
     whitelist[account] = true;
   }
 
