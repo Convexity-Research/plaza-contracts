@@ -17,11 +17,21 @@ contract Faucet {
   mapping(address => bool) private whitelist;
 
   /// @notice Initializes the contract by creating new instances of reserve and coupon tokens
-  constructor() {
+  constructor(address _reserveToken, address _couponToken) {
     deployer = msg.sender;
     whitelist[deployer] = true;
-    reserveToken = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
-    couponToken = new Token("Circle Fake USD", "USDC", true);
+
+    if (_reserveToken != address(0)) {
+      reserveToken = Token(_reserveToken);
+    } else {
+      reserveToken = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
+    }
+
+    if (_couponToken != address(0)) {
+      couponToken = Token(_couponToken);
+    } else {
+      couponToken = new Token("Circle Fake USD", "USDC", true);
+    }
   }
   
   /// @notice Distributes a fixed amount of both reserve and coupon tokens to the caller
