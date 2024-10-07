@@ -77,7 +77,7 @@ contract Faucet {
   }
 
   /// @notice Fallback function to receive ETH
-  fallback() external payable {}
+  receive() external payable {}
 
   modifier isWhitelisted() {
     require(whitelist[msg.sender], "Not whitelisted");
