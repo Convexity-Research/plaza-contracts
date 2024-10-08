@@ -97,7 +97,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @return Address of the newly created pool
    */
   // @todo: make it payable (to accept native ETH)
-  function CreatePool(
+  function createPool(
     PoolParams calldata params,
     uint256 reserveAmount,
     uint256 bondAmount,

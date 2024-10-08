@@ -65,7 +65,7 @@ contract PoolFactoryTest is Test {
     emit PoolFactory.PoolCreated(address(0), 10000000000, 10000, 20000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 20000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", ""));
     uint256 endLength = poolFactory.poolsLength();
 
     assertEq(1, endLength-startLength);
@@ -82,16 +82,16 @@ contract PoolFactoryTest is Test {
     vm.startPrank(governance);
 
     // vm.expectRevert(bytes4(keccak256("ZeroReserveAmount()")));
-    // poolFactory.CreatePool(params, 0, 10000, 20000);
+    // poolFactory.createPool(params, 0, 10000, 20000);
 
     // vm.expectRevert(bytes4(keccak256("ZeroDebtAmount()")));
-    // poolFactory.CreatePool(params, 10000000000, 0, 20000);
+    // poolFactory.createPool(params, 10000000000, 0, 20000);
 
     // vm.expectRevert(bytes4(keccak256("ZeroLeverageAmount()")));
-    // poolFactory.CreatePool(params, 10000000000, 10000, 0);
+    // poolFactory.createPool(params, 10000000000, 10000, 0);
 
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.CreatePool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
     
   }
 
@@ -100,10 +100,10 @@ contract PoolFactoryTest is Test {
     poolFactory.pause();
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    poolFactory.CreatePool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
     
     poolFactory.unpause();
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.CreatePool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
   }
 }
