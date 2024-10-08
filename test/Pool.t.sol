@@ -46,10 +46,10 @@ contract PoolTest is Test, TestCases {
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
 
     params.fee = 0;
-    params.reserveToken = address(new Token("Wrapped ETH", "WETH", false, address(0x0)));
+    params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
-    params.couponToken = address(new Token("USDC", "USDC", false, address(0x0)));
+    params.couponToken = address(new Token("USDC", "USDC", false));
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();

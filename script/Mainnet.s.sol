@@ -3,11 +3,10 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {Distributor} from "../src/Distributor.sol";
-
 import {Utils} from "../src/lib/Utils.sol";
-import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
+import {LifiRouter} from "../src/LifiRouter.sol";
+import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
@@ -31,8 +30,16 @@ contract MainnetScript is Script {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
     
+    // Deploys LifiRouter
+    new LifiRouter();
+
+    // Deploys TokenDeployer
     address tokenDeployer = address(new TokenDeployer());
+
+    // Deploys Distributor
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
+
+    // Deploys PoolFactory
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
       (deployerAddress, tokenDeployer, distributor, ethPriceFeed)
