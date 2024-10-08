@@ -10,11 +10,12 @@ import {LiquidityAmounts} from "./lib/uniswap/LiquidityAmounts.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IQuoter} from "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
 import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {ICLFactory} from "./lib/aerodrome/ICLFactory.sol";
 import {ICLPool} from "./lib/aerodrome/ICLPool.sol";
 
-contract Trader {
+contract Trader is Initializable {
   using ERC20Extensions for IERC20;
   ISwapRouter private router;
   IQuoter private quoter;
@@ -26,7 +27,7 @@ contract Trader {
   error InvalidSwapAmount();
   error InvalidTokenAddresses();
 
-  constructor(address _router, address _quoter, address _factory) {
+  function __Trader_init(address _router, address _quoter, address _factory) internal onlyInitializing {
     router = ISwapRouter(_router);
     quoter = IQuoter(_quoter);
     factory = ICLFactory(_factory);
