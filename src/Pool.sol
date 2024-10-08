@@ -579,9 +579,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     // Calculate last distribution time
     lastDistribution = block.timestamp + distributionPeriod;
 
-    // Calculate the coupon amount to distribute
-    uint256 couponAmountToDistribute = (bondToken.totalSupply() * sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS());
+    uint8 bondDecimals = bondToken.decimals();
+    uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
+    uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
 
+    uint256 normalizedTotalSupply = bondToken.totalSupply().normalizeAmount(bondDecimals, maxDecimals);
+    uint256 normalizedShares = sharesPerToken.normalizeAmount(sharesDecimals, maxDecimals);
+
+    // Calculate the coupon amount to distribute
+    uint256 couponAmountToDistribute = (normalizedTotalSupply * normalizedShares)
+        .toBaseUnit(maxDecimals * 2 - IERC20(couponToken).safeDecimals());
+    
     // Increase the bond token period
     bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
