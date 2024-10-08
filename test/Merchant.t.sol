@@ -121,7 +121,7 @@ contract MerchantTest is Test {
 		merchant.updateLimitOrders(address(pool));
 
 		// Check that orders were updated
-		(address sell, address buy, uint256 price, uint256 amount, uint256 minAmount, bool filled) = merchant.orders(address(pool), 0);
+		(address sell, address buy, uint256 price, uint256 amount, uint256 minAmount, bool filled) = merchant.orders(address(pool));
 		assertEq(sell, pool.reserveToken());
 		assertEq(buy, pool.couponToken());
 		assertTrue(price > 0);
@@ -154,15 +154,20 @@ contract MerchantTest is Test {
 		merchant.executeOrders(address(pool));
 
 		// Check that orders were executed
-		(,,,,,bool filled) = merchant.orders(address(pool), 0);
+		(,,,,,bool filled) = merchant.orders(address(pool));
 		assertTrue(filled);
     MockQuoterV2(quoter).setAmountOut(0);
 	}
 
 	function testGetLimitOrders() public {
     vm.warp(block.timestamp + 6 days);
-		Merchant.LimitOrder[] memory orders = merchant.getLimitOrders(address(pool));
-		assertEq(orders.length, 5);
+		Merchant.LimitOrder memory order = merchant.getLimitOrders(address(pool));
+		assertEq(order.sell, pool.reserveToken());
+		assertEq(order.buy, pool.couponToken());
+		assertTrue(order.price > 0);
+		assertTrue(order.amount > 0);
+		assertTrue(order.minAmount > 0);
+		assertFalse(order.filled);
 	}
 
 	function testGetPrice() public {
