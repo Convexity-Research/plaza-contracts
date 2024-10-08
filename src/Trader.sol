@@ -32,7 +32,7 @@ contract Trader {
     factory = ICLFactory(_factory);
   }
 
-  function swap(address pool, Merchant.LimitOrder memory order) internal returns (uint256) {
+  function swap(address pool, Merchant.Order memory order) internal returns (uint256) {
     if (order.sell == address(0) || order.buy == address(0)) revert InvalidTokenAddresses();
     if (order.amount == 0) revert InvalidSwapAmount();
 
@@ -92,6 +92,10 @@ contract Trader {
 
     // Get the quote
     amountOut = quoter.quoteExactInput(path, amountIn);
+  }
+
+  function quoteBasedPrice(address reserveToken, address couponToken, uint256 amountIn) public returns (uint256) {
+    return (amountIn * 10**IERC20(reserveToken).safeDecimals()) / quote(reserveToken, couponToken, amountIn);
   }
 
   /**

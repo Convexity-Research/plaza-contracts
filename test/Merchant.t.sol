@@ -115,13 +115,13 @@ contract MerchantTest is Test {
 
 	function testUpdateLimitOrders() public {
 		vm.expectRevert(Merchant.UpdateNotRequired.selector);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
 		vm.warp(block.timestamp + 6 days);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
 		// Check that orders were updated
-		(address sell, address buy, uint256 price, uint256 amount, uint256 minAmount, bool filled) = merchant.orders(address(pool));
+		(, address sell, address buy, uint256 price, uint256 amount, uint256 minAmount, bool filled) = merchant.orders(address(pool));
 		assertEq(sell, pool.reserveToken());
 		assertEq(buy, pool.couponToken());
 		assertTrue(price > 0);
@@ -132,7 +132,7 @@ contract MerchantTest is Test {
 
 	function testOrdersPriceReached() public {
 		vm.warp(block.timestamp + 6 days);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
     // Mock price increase
     MockQuoterV2(quoter).setAmountOut(1020000000000000000);
@@ -145,7 +145,7 @@ contract MerchantTest is Test {
 
 	function testExecuteOrders() public {
 		vm.warp(block.timestamp + 6 days);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
     // Mock price increase
     MockUniswapV3Pool(uniPool3).setStorage(4206428064337469953968261);
@@ -154,14 +154,14 @@ contract MerchantTest is Test {
 		merchant.executeOrders(address(pool));
 
 		// Check that orders were executed
-		(,,,,,bool filled) = merchant.orders(address(pool));
+		(,,,,,,bool filled) = merchant.orders(address(pool));
 		assertTrue(filled);
     MockQuoterV2(quoter).setAmountOut(0);
 	}
 
 	function testGetLimitOrders() public {
     vm.warp(block.timestamp + 6 days);
-		Merchant.LimitOrder memory order = merchant.getLimitOrders(address(pool));
+		Merchant.Order memory order = merchant.getOrder(address(pool));
 		assertEq(order.sell, pool.reserveToken());
 		assertEq(order.buy, pool.couponToken());
 		assertTrue(order.price > 0);

@@ -26,7 +26,7 @@ contract MerchantAutomation {
       pool = factory.pools(i);
       if (merchant.hasPendingOrders(pool)) {
         payload = abi.encodeWithSelector(
-          Merchant.updateLimitOrders.selector,
+          Merchant.updateOrders.selector,
           pool
         );
 
