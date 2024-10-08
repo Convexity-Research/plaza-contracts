@@ -37,7 +37,8 @@ contract Merchant is AccessControl, Pausable, Trader {
   error UpdateNotRequired();
   error NoOrdersToExecute();
 
-  constructor(address _router, address _quoter, address _factory) Trader(_router, _quoter, _factory) {
+  constructor(address _router, address _quoter, address _dexFactory) Trader(_router, _quoter, _dexFactory) {
+    // @todo: update access control to copy Pool mechanism
     _setRoleAdmin(GOV_ROLE, GOV_ROLE);
     _grantRole(GOV_ROLE, msg.sender);
   }
@@ -119,7 +120,7 @@ contract Merchant is AccessControl, Pausable, Trader {
       if (limitOrders[i].price <= currentPrice) {
         uint256 amountOut = quote(limitOrders[i].sell, limitOrders[i].buy, limitOrders[i].amount);
         uint256 accruedCoupons = ERC20(couponToken).balanceOf(_pool);
-        
+
         // This block implements a safety check to prevent over-selling of the pool's assets.
         // It ensures that the total coupon tokens bought (accruedCoupons) plus the expected
         // coupon tokens from this order (amountOut) does not exceed a certain threshold
@@ -164,6 +165,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     uint256 poolReserves = getPoolReserves(_pool);
     uint256 currentPrice = getPrice(address(reserveToken), address(couponToken));
     (,uint256 liquidity) = getLiquidityAmounts(address(reserveToken), address(couponToken), 50);
+
     require (currentPrice > 0, ZeroPrice());
 
     if (daysToPayment > 10 || remainingCouponAmount == 0) {

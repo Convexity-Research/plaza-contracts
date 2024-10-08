@@ -20,11 +20,11 @@ contract Trader {
   IQuoter private quoter;
   ICLFactory private factory;
   address private constant WETH = 0x4200000000000000000000000000000000000006; // WETH address on Base
-
-  error InvalidTokenAddresses();
-  error InvalidSwapAmount();
-  error TransferFailed();
+  
   error NoPoolFound();
+  error TransferFailed();
+  error InvalidSwapAmount();
+  error InvalidTokenAddresses();
 
   constructor(address _router, address _quoter, address _factory) {
     router = ISwapRouter(_router);

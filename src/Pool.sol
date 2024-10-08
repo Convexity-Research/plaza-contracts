@@ -90,6 +90,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event SharesPerTokenChanged(uint256 sharesPerToken);
+  event MerchantApproved(address merchant);
   event Distributed(uint256 amount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -638,6 +639,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       currentPeriod: currentPeriod,
       lastDistribution: lastDistribution
     });
+  }
+
+  /**
+   * @dev Approves a merchant to spend the maximum amount of reserve tokens.
+   * @param _merchant The address of the merchant to approve.
+   * @notice Only callable by accounts with the GOV_ROLE.
+   * @notice Emits a MerchantApproved event upon successful approval.
+   */
+  function approveMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
+    IERC20(reserveToken).approve(address(_merchant), type(uint256).max);
+    emit MerchantApproved(_merchant);
   }
   
   /**

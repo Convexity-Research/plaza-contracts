@@ -5,3 +5,4 @@ libs = ["lib"]
 build_info = true
 via-ir = true
 extra_output = ["storageLayout"]
+auto_detect_solc = true

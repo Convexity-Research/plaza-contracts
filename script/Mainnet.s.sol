@@ -15,7 +15,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MainnetScript is Script {
 
-  // Arbitrum Sepolia addresses
+  // Base Mainnet addresses
   address public constant merchant = address(0);
   address public constant reserveToken = address(0x4200000000000000000000000000000000000006);
   address public constant couponToken = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
@@ -61,9 +61,9 @@ contract MainnetScript is Script {
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    address _pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
-    Pool(_pool).setMerchant(merchant);
-    
+    address pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    Pool(pool).approveMerchant(address(merchant));
+
     vm.stopBroadcast();
   }
 }

@@ -57,9 +57,9 @@ contract TestnetScript is Script {
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
-
-    address _pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
-    Pool(_pool).setMerchant(merchant);
+    
+    address pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    Pool(pool).approveMerchant(address(merchant));
     
     vm.stopBroadcast();
   }
