@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 
 import {PoolFactory} from "../src/PoolFactory.sol";
-import {PoolFactoryV2} from "../src/PoolFactoryV2.sol";
+// import {PoolFactoryV2} from "../src/PoolFactoryV2.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/Upgrades.sol";
 
 contract UpgradePoolFactoryScript is Script {
