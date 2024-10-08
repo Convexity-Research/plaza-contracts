@@ -8,6 +8,7 @@ import {Utils} from "../src/lib/Utils.sol";
 import {MockPool} from "./mocks/MockPool.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {TestCases} from "./data/TestCases.sol";
+import {Decimals} from "../src/lib/Decimals.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {Validator} from "../src/utils/Validator.sol";
@@ -16,6 +17,8 @@ import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
 contract PoolTest is Test, TestCases {
+  using Decimals for uint256;
+  
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
 
@@ -26,8 +29,6 @@ contract PoolTest is Test, TestCases {
   address private governance = address(0x3);
   address private user = address(0x4);
   address private user2 = address(0x5);
-
-  
 
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
   uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
@@ -85,9 +86,9 @@ contract PoolTest is Test, TestCases {
   function resetReentrancy(address contractAddress) public {
     // Reset `_status` to allow the next call
     vm.store(
-        contractAddress,
-        bytes32(0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00), // Storage slot for `_status`
-        bytes32(uint256(1))  // Reset to `_NOT_ENTERED`
+      contractAddress,
+      bytes32(0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00), // Storage slot for `_status`
+      bytes32(uint256(1))  // Reset to `_NOT_ENTERED`
     );
   }
 
@@ -966,6 +967,64 @@ contract PoolTest is Test, TestCases {
         assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets - calcTestCases[i].inAmount);
         assertEq(calcTestCases[i].inAmount, startLevBalance-endLevBalance);
         assertEq(amount, endBondBalance-startBondBalance);
+      }
+
+      // Reset reserve state
+      rToken.burn(governance, rToken.balanceOf(governance));
+      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+    }
+  }
+
+  function testCreateTokensWithDifferentDecimals() public {
+    vm.startPrank(governance);
+    PoolFactory.PoolParams memory _params;
+    _params.fee = 0;
+    _params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
+    _params.sharesPerToken = 50 * 10 ** 18;
+    _params.distributionPeriod = 0;
+    _params.couponToken = address(new Token("USDC", "USDC", false));
+
+    uint8 reserveDecimals = 6;
+    Token(_params.reserveToken).setDecimals(reserveDecimals);
+
+    initializeRealisticTestCases();
+    
+    Token rToken = Token(_params.reserveToken);
+
+    for (uint256 i = 0; i < calcTestCases.length; i++) {
+      if (calcTestCases[i].inAmount == 0) {
+        continue;
+      }
+
+      // Mint reserve tokens
+      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals) + calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals));
+      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals));
+
+      setEthPrice(calcTestCases[i].ethPrice);
+
+      // Create pool and approve deposit amount
+      Pool _pool = Pool(poolFactory.CreatePool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      rToken.approve(address(_pool), calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals));
+
+      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      uint256 startReserveBalance = rToken.balanceOf(governance);
+
+      // Call create and assert minted tokens
+      uint256 amount = _pool.create(calcTestCases[i].assetType, calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals), 0);
+      assertEq(amount, calcTestCases[i].expectedCreate);
+
+      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
+      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
+      uint256 endReserveBalance = rToken.balanceOf(governance);
+      assertEq(calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals), startReserveBalance-endReserveBalance);
+
+      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
+        assertEq(amount, endBondBalance-startBondBalance);
+        assertEq(0, endLevBalance-startLevBalance);
+      } else {
+        assertEq(0, endBondBalance-startBondBalance);
+        assertEq(amount, endLevBalance-startLevBalance);
       }
 
       // Reset reserve state

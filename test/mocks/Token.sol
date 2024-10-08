@@ -4,6 +4,8 @@ pragma solidity ^0.8.26;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract Token is ERC20 {
+  uint8 private tokenDecimals;
+  
   mapping(address => bool) private whitelist;
   bool public restricted;
   address public deployer;
@@ -12,6 +14,7 @@ contract Token is ERC20 {
   string private _tokenSymbol;
 
   constructor (string memory _nameParam, string memory _symbolParam, bool _restricted) ERC20(_nameParam, _symbolParam) {
+    tokenDecimals = 18;
     _tokenName = _nameParam;
     _tokenSymbol = _symbolParam;
     restricted = _restricted;
@@ -36,7 +39,15 @@ contract Token is ERC20 {
   }
 
   function decimals() public view virtual override returns (uint8) {
-    return 18;
+    return tokenDecimals;
+  }
+
+  function setDecimals(uint8 _decimals) external {
+    if (totalSupply() > 0) {
+      revert("Cannot set decimals after minting");
+    }
+    
+    tokenDecimals = _decimals;
   }
 
   function name() public view virtual override returns (string memory) {
