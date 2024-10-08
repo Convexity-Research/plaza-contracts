@@ -74,7 +74,7 @@ contract MockRouterTest is Test {
     rToken.approve(address(poolFactory), 1000000000000000000000000);
 
     // Create pool and approve deposit amount
-    pool = Pool(poolFactory.CreatePool(params, 1000000000000000000000000, 25000000000000000000000000, 1000000000000000000000000));
+    pool = Pool(poolFactory.CreatePool(params, 1000000000000000000000000, 25000000000000000000000000, 1000000000000000000000000, "", "", "", ""));
     vm.stopPrank();
   }
 

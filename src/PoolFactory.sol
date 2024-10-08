@@ -97,7 +97,17 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @return Address of the newly created pool
    */
   // @todo: make it payable (to accept native ETH)
-  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 bondAmount, uint256 leverageAmount) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
+  function CreatePool(
+    PoolParams calldata params,
+    uint256 reserveAmount,
+    uint256 bondAmount,
+    uint256 leverageAmount,
+    string memory bondName,
+    string memory bondSymbol,
+    string memory leverageName,
+    string memory leverageSymbol
+  ) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
+
     // @todo: with this is safer but some cases are not testable (guess that's still good)
     // if (reserveAmount == 0) {
     //   revert ZeroReserveAmount();
@@ -110,13 +120,11 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     // if (leverageAmount == 0) {
     //   revert ZeroLeverageAmount();
     // }
-
-    string memory reserveSymbol = IERC20(params.reserveToken).safeSymbol();
-    
+        
     // Deploy Bond token
     BondToken bondToken = BondToken(tokenDeployer.deployDebtToken(
-      string.concat("Bond", reserveSymbol),
-      string.concat("bond", reserveSymbol),
+      bondName,
+      bondSymbol,
       address(this),
       address(this),
       distributor,
@@ -125,8 +133,8 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     // Deploy Leverage token
     LeverageToken lToken = LeverageToken(tokenDeployer.deployLeverageToken(
-      string.concat("Leverage", reserveSymbol),
-      string.concat("lev", reserveSymbol),
+      leverageName,
+      leverageSymbol,
       address(this),
       address(this)
     ));
