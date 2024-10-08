@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 
 import {Merchant} from "../src/Merchant.sol";
+import {Upgrades} from "@openzeppelin/foundry-upgrades/Upgrades.sol";
 
 contract MerchantScript is Script {
   // Uniswap V3 Router - Base Mainnet
@@ -19,7 +20,7 @@ contract MerchantScript is Script {
 
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-    new Merchant(ROUTER, QUOTER, FACTORY);
+    Upgrades.deployUUPSProxy("Merchant.sol", abi.encodeCall(Merchant.initialize, ()));
     vm.stopBroadcast();
   }
 }
