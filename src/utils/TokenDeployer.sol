@@ -44,7 +44,7 @@ contract TokenDeployer {
     address governance
   ) external returns(address) {
     return Utils.deploy(address(new LeverageToken()), abi.encodeCall(
-      LeverageToken.initialize, ("Leverage ETH", "levETH", minter, governance)
+      LeverageToken.initialize, ("Levered ETH", "levETH", minter, governance)
     ));
   }
 }

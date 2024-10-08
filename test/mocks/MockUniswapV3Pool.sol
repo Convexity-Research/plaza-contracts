@@ -26,9 +26,6 @@ contract MockUniswapV3Pool {
 		uint16 observationCardinality;
 		// the next maximum number of observations to store, triggered in observations.write
 		uint16 observationCardinalityNext;
-		// the current protocol fee as a percentage of the swap fee taken on withdrawal
-		// represented as an integer denominator (1/x)%
-		uint8 feeProtocol;
 		// whether the pool is locked
 		bool unlocked;
 	}
@@ -39,7 +36,7 @@ contract MockUniswapV3Pool {
 	uint256 public feeGrowthGlobal0X128;
 	uint256 public feeGrowthGlobal1X128;
 
-	uint128 public liquidity;
+	uint128 public liquidity = 9169178941640739570;
 
 	/// @notice Emitted when the pool is initialized
 	/// @param sqrtPriceX96 The initial sqrt price of the pool
@@ -96,10 +93,10 @@ contract MockUniswapV3Pool {
 	);
 
 	constructor() {
-		setStorage();
+		setStorage(0);
 	}
 
-	function setStorage() public {
+	function setStorage(uint160 _sqrtPriceX96) public {
 		// Initialize state variables with dummy data
 		factory = msg.sender;
 		token0 = address(0x0);
@@ -111,12 +108,11 @@ contract MockUniswapV3Pool {
 
 		// Initialize slot0 variables with dummy data
 		slot0 = Slot0({
-			sqrtPriceX96: 3996428064337469953968261,
+			sqrtPriceX96: _sqrtPriceX96 == 0 ? 3996428064337469953968261 : _sqrtPriceX96,
 			tick: -197904,
 			observationIndex: 0,
 			observationCardinality: 1,
 			observationCardinalityNext: 1,
-			feeProtocol: 0,
 			unlocked: true
 		});
 	}
@@ -255,6 +251,24 @@ contract MockUniswapV3Pool {
 		secondsPerLiquidityInsideX128 = 0;
 		secondsInside = 0;
 	}
+
+  function ticks(int24 tick)
+    external
+    view
+    returns (
+      uint128 liquidityGross,
+      int128 liquidityNet,
+      int128 stakedLiquidityNet,
+      uint256 feeGrowthOutside0X128,
+      uint256 feeGrowthOutside1X128,
+      uint256 rewardGrowthOutsideX128,
+      int56 tickCumulativeOutside,
+      uint160 secondsPerLiquidityOutsideX128,
+      uint32 secondsOutside,
+      bool initialized
+    ) {
+      return (1732736840509164, -173273684050916, 0, 0, 0, 0, 0, 0, 0, true);
+    }
 }
 
 /// @notice Mock interface for UniswapV3SwapCallback

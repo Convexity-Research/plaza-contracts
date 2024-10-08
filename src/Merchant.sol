@@ -21,6 +21,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     address buy;
     uint256 price;
     uint256 amount;
+    uint256 minAmount;
     bool filled;
   }
 
@@ -29,6 +30,8 @@ contract Merchant is AccessControl, Pausable, Trader {
 
   // Pool -> Period -> Has Stopped Selling
   mapping (address => mapping(uint256 => bool)) private hasStoppedSelling;
+
+  event StoppedSelling(address pool);
 
   error ZeroPrice();
   error UpdateNotRequired();
@@ -69,10 +72,10 @@ contract Merchant is AccessControl, Pausable, Trader {
     ordersTimestamp[_pool] = block.timestamp;
   }
 
-  function ordersPriceReached(address _pool) public /*view*/ returns(bool) {
+  function ordersPriceReached(address _pool) public view returns(bool) {
     LimitOrder[] memory limitOrders = orders[_pool];
 
-    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
+    uint256 currentPrice = getPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
     for (uint256 i = 0; i < limitOrders.length; i++) {
       if (limitOrders[i].buy == address(0) || limitOrders[i].filled) {
         continue;
@@ -100,7 +103,7 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     // @todo: duplicated checks from ordersPriceReached - refactor if gas becomes a problem
     LimitOrder[] memory limitOrders = orders[_pool];
-    uint256 currentPrice = getCurrentPrice(Pool(_pool).reserveToken(), couponToken);
+    uint256 currentPrice = getPrice(Pool(_pool).reserveToken(), couponToken);
     uint256 poolReserves = getPoolReserves(_pool);
 
     for (uint256 i = 0; i < limitOrders.length; i++) {
@@ -111,6 +114,7 @@ contract Merchant is AccessControl, Pausable, Trader {
       // if price is 0, it means it's a market order
       if (limitOrders[i].price == 0) {
         limitOrders[i].price = currentPrice;
+        limitOrders[i].minAmount = (currentPrice * limitOrders[i].amount * 995) / 1000; // 0.5% less than order.price
       }
 
       if (limitOrders[i].price <= currentPrice) {
@@ -144,7 +148,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     orders[_pool] = limitOrders;
   }
 
-  function getLimitOrders(address _pool) public /*view*/ returns(LimitOrder[] memory limitOrders) {
+  function getLimitOrders(address _pool) public returns(LimitOrder[] memory limitOrders) {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
 
@@ -156,37 +160,50 @@ contract Merchant is AccessControl, Pausable, Trader {
     ERC20 reserveToken = ERC20(pool.reserveToken());
     ERC20 couponToken = ERC20(pool.couponToken());
 
-    uint256 couponAmount = getCouponAmount(_pool);
+    uint256 remainingCouponAmount = getRemainingCouponAmount(_pool);
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
-    uint256 currentPrice = getCurrentPrice(address(reserveToken), address(couponToken));
-    uint256 liquidity = getLiquidity(address(reserveToken), address(couponToken));
-    
+    uint256 currentPrice = getPrice(address(reserveToken), address(couponToken));
+    (,uint256 liquidity) = getLiquidityAmounts(address(reserveToken), address(couponToken), 50);
+
     require (currentPrice > 0, ZeroPrice());
 
-    if (daysToPayment > 10 || couponAmount == 0) {
+    if (daysToPayment > 10 || remainingCouponAmount == 0) {
       return limitOrders;
     }
 
     // Ensure pool reserves is greater than coupon amount
-    assert(poolReserves * currentPrice > couponAmount);
+    if (poolReserves * currentPrice <= remainingCouponAmount) {
+      setHardStop(_pool);
+      return limitOrders;
+    }
 
     limitOrders = new LimitOrder[](5);
     uint256 maxOrder = 0;
     uint256 sellAmount = 0;
+    uint256 price = 0;
+    uint256 minAmount = 0;
+    uint256[10] memory values;
 
     if (daysToPayment > 5) {
-      maxOrder = min((250 * liquidity / PRECISION),
-                  min((1000 * couponAmount / (currentPrice * 10250)) / PRECISION, 
-                  (poolReserves * 9500) / PRECISION));
+      
+      values[0] = (250 * liquidity / PRECISION);
+      values[1] = (1000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      values[2] = (poolReserves * 9500) / PRECISION;
+
+      maxOrder = min(values, 3);
 
       sellAmount = (maxOrder * 2000) / PRECISION;
-
+      
       for (uint256 i = 1; i <= 5; i++) {
+        price = (currentPrice * (PRECISION + (200*i))) / PRECISION;
+        minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
+
         limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
           sell: address(reserveToken),
-          price: (currentPrice * (PRECISION + (200*i))) / PRECISION,
+          price: price,
+          minAmount: minAmount,
           amount: sellAmount,
           filled: false
         });
@@ -195,18 +212,24 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
 
     if (daysToPayment > 1) {
-      maxOrder = min((500 * liquidity / PRECISION),
-                  min((2000 * couponAmount / (currentPrice * 10250)) / PRECISION, 
-                  (poolReserves * 9500) / PRECISION));
+      values[0] = (500 * liquidity / PRECISION);
+      values[1] = (2000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      values[2] = (poolReserves * 9500) / PRECISION;
+
+      maxOrder = min(values, 3);
 
       sellAmount = (maxOrder * 2000) / PRECISION;
        
       for (uint256 i = 1; i <= 5; i++) {
+        price = (currentPrice * (PRECISION + (200*i))) / PRECISION;
+        minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
+
         limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
           sell: address(reserveToken),
-          price: (currentPrice * (PRECISION + (100*i))) / PRECISION,
+          price: price,
           amount: sellAmount,
+          minAmount: minAmount,
           filled: false
         });
       }
@@ -214,18 +237,24 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
 
     if (daysToPayment > 0) {
-      maxOrder = min((500 * liquidity / PRECISION),
-                  min((couponAmount / (currentPrice * 10250)) / PRECISION, 
-                  (poolReserves * 9500) / PRECISION));
+      values[0] = (500 * liquidity / PRECISION);
+      values[1] = (remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      values[2] = (poolReserves * 9500) / PRECISION;
+
+      maxOrder = min(values, 3);
 
       sellAmount = (maxOrder * 200000) / PRECISION;
        
       for (uint256 i = 1; i <= 5; i++) {
+        price = (currentPrice * (PRECISION + (200*i))) / PRECISION;
+        minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
+
         limitOrders[i-1] = LimitOrder({
           buy: address(couponToken),
           sell: address(reserveToken),
-          price: (currentPrice * (PRECISION + (10*i))) / PRECISION,
+          price: price,
           amount: sellAmount,
+          minAmount: minAmount,
           filled: false
         });
       }
@@ -233,29 +262,70 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
 
     // Sell what's left
-    maxOrder = min((1000 * liquidity / PRECISION),
-                min((couponAmount / currentPrice),
-                (poolReserves * 9500) / PRECISION));
+    values[0] = (1000 * liquidity / PRECISION);
+    values[1] = (remainingCouponAmount / currentPrice);
+    values[2] = (poolReserves * 9500) / PRECISION;
+
+    maxOrder = min(values, 3);
     
     limitOrders[0] = LimitOrder({
       buy: address(couponToken),
       sell: address(reserveToken),
       price: 0, // zero means market sell
       amount: maxOrder,
+      minAmount: 0,
       filled: false
     });
 
     return limitOrders;
   }
+  
+  function sellCouponExcess(uint256 couponExcess) external {
+    Pool pool = Pool(msg.sender);
+    ERC20 reserveToken = ERC20(address(pool.reserveToken()));
+    ERC20 couponToken = ERC20(address(pool.couponToken()));
+    
+    // @todo: update to safeDecimals when merged
+    uint8 reserveDecimals = reserveToken.decimals();
+    uint8 couponDecimals = couponToken.decimals();
+    
+    // Get the current price from Uniswap V3 router's quote method
+    // currentPrice: amount of couponToken per 1e18 units of reserveToken
+    uint256 currentPrice = getPrice(address(reserveToken), address(couponToken));
+    if (currentPrice == 0) { return; }
+    
+    // Normalize couponExcess to 18 decimals (if not already)
+    uint256 normalizedCouponExcess = couponExcess.normalizeAmount(couponDecimals, 18);
 
-  function min(uint256 a, uint256 b) public pure returns (uint256) {
-    return a < b ? a : b;
+    // Calculate the exchange rate: R = 1e18 / currentPrice
+    uint256 exchangeRate = (1e18 * 1e18) / currentPrice; // scaled by 1e18
+
+    // Calculate minAmount in 18 decimals
+    uint256 minAmount = (normalizedCouponExcess * exchangeRate) / 1e18; // Now minAmount is scaled to 18 decimals
+
+    // Adjust minAmount to reserveToken decimals
+    uint256 adjustedMinAmount = minAmount.normalizeAmount(18, reserveDecimals);
+    
+    swap(msg.sender, LimitOrder({
+      buy: address(reserveToken),
+      sell: address(couponToken),
+      price: 0, // not needed, market sell
+      amount: couponExcess,
+      minAmount: adjustedMinAmount,
+      filled: false
+    }));
   }
-
-  function getCurrentPrice(address token0, address token1) public returns(uint256) {
-    return quote(token0, token1, 1 ether);
+  
+  function min(uint256[10] memory values, uint8 length) public pure returns (uint256) {
+    uint256 m = values[0];
+    for (uint256 i = 1; i < length; i++) {
+      if (values[i] < m) {
+        m = values[i];
+      }
+    }
+    return m;
   }
-
+  
   function getDaysToPayment(address _pool) public view returns(uint8) {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
@@ -270,7 +340,7 @@ contract Merchant is AccessControl, Pausable, Trader {
     return uint8((poolInfo.lastDistribution + poolInfo.distributionPeriod - block.timestamp) / 86400);
   }
 
-  function getCouponAmount(address _pool) public view returns(uint256) {
+  function getRemainingCouponAmount(address _pool) public view returns(uint256) {
     Pool pool = Pool(_pool);
 
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
@@ -292,6 +362,8 @@ contract Merchant is AccessControl, Pausable, Trader {
 
     // remove all orders
     orders[_pool] = new LimitOrder[](0);
+
+    emit StoppedSelling(_pool);
   }
 
   function pause() external onlyRole(GOV_ROLE) {

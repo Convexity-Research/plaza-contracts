@@ -5,6 +5,9 @@ import {Pool} from "./Pool.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {OracleReader} from "./OracleReader.sol";
+import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Router
@@ -12,14 +15,15 @@ import {OracleReader} from "./OracleReader.sol";
  * @dev *******This contract is out of the scope of an audit.*******
  */
 contract Router is OracleReader {
+  using Decimals for uint256;
+  using SafeERC20 for IERC20;
+  using ERC20Extensions for IERC20;
 
   /**
    * @dev Error thrown when the minimum amount condition is not met.
    */
   error MinAmount();
-
-  using Decimals for uint256;
-
+  
   /**
    * @dev Constructor that initializes the OracleReader with the ETH price feed.
    * @param _ethPriceFeed The address of the ETH price feed.
@@ -63,19 +67,19 @@ contract Router is OracleReader {
     uint256 minAmount,
     uint256 deadline,
     address onBehalfOf) public returns (uint256) {
-    Token reserveToken = Token(Pool(_pool).reserveToken());
-    Token USDC = Token(Pool(_pool).couponToken());
+    address reserveToken = Pool(_pool).reserveToken();
+    address USDC = Pool(_pool).couponToken();
 
     require(depositToken == address(USDC), "invalid deposit token, only accepts fake USDC");
 
     // Transfer depositAmount of depositToken from user to contract
-    require(USDC.transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
+    IERC20(USDC).safeTransferFrom(msg.sender, address(this), depositAmount);
 
     // Get ETH price from OracleReader
-    uint256 ethPrice = getOraclePrice(address(reserveToken));
+    uint256 ethPrice = getOraclePrice(reserveToken);
 
-    uint8 oracleDecimals = getOracleDecimals(address(reserveToken));
-    uint8 usdcDecimals = USDC.decimals();
+    uint8 oracleDecimals = getOracleDecimals(reserveToken);
+    uint8 usdcDecimals = IERC20(USDC).safeDecimals();
 
     // Normalize the price if the oracle has more decimals than the coupon token
     if (oracleDecimals > usdcDecimals) {
@@ -87,16 +91,16 @@ contract Router is OracleReader {
     uint256 reserveAmount = depositAmount / ethPrice;
 
     // Normalize the reserve amount to its decimals
-    reserveAmount = reserveAmount.normalizeAmount(usdcDecimals-oracleDecimals, reserveToken.decimals());
+    reserveAmount = reserveAmount.normalizeAmount(usdcDecimals-oracleDecimals, IERC20(reserveToken).safeDecimals());
 
     // Burn depositAmount from contract
-    USDC.burn(address(this), depositAmount);
+    Token(USDC).burn(address(this), depositAmount);
 
     // Mint reserveToken to contract
-    reserveToken.mint(address(this), reserveAmount);
+    Token(reserveToken).mint(address(this), reserveAmount);
 
     // Approve reserveToken to pool
-    require(reserveToken.approve(_pool, reserveAmount), "Approval failed");
+    IERC20(reserveToken).safeIncreaseAllowance(_pool, reserveAmount);
 
     if (onBehalfOf == address(0)) {
       onBehalfOf = msg.sender;
@@ -141,40 +145,42 @@ contract Router is OracleReader {
     uint256 minAmount,
     uint256 deadline,
     address onBehalfOf) public returns (uint256) {
-    Token reserveToken = Token(Pool(_pool).reserveToken());
-    Token USDC = Token(Pool(_pool).couponToken());
+    address reserveToken = Pool(_pool).reserveToken();
+    address USDC = Pool(_pool).couponToken();
 
-    require(redeemToken == address(USDC), "invalid redeem token, only accepts fake USDC");
+    require(redeemToken == USDC, "invalid redeem token, only accepts fake USDC");
 
+    address tokenToTransfer;
     if (tokenType == Pool.TokenType.LEVERAGE) {
-      require(Pool(_pool).lToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
+      tokenToTransfer = address(Pool(_pool).lToken());
     } else {
-      require(Pool(_pool).bondToken().transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
+      tokenToTransfer = address(Pool(_pool).bondToken());
     }
+    IERC20(tokenToTransfer).safeTransferFrom(msg.sender, address(this), depositAmount);
 
     uint256 redeemAmount = Pool(_pool).redeem(tokenType, depositAmount, 0, deadline, address(this));
 
     // Get ETH price from OracleReader
-    uint256 ethPrice = getOraclePrice(address(reserveToken));
+    uint256 ethPrice = getOraclePrice(reserveToken);
 
-    uint8 oracleDecimals = getOracleDecimals(address(reserveToken));
+    uint8 oracleDecimals = getOracleDecimals(reserveToken);
 
     // Calculate the amount of reserveToken based on the price
-    uint256 usdcAmount = (redeemAmount * ethPrice).normalizeAmount(oracleDecimals + reserveToken.decimals(), USDC.decimals());
+    uint256 usdcAmount = (redeemAmount * ethPrice).normalizeAmount(oracleDecimals + IERC20(reserveToken).safeDecimals(), IERC20(USDC).safeDecimals());
 
     if (minAmount > usdcAmount) {
       revert MinAmount();
     }
 
     // Burn depositAmount from contract
-    reserveToken.burn(address(this), redeemAmount);
+    Token(reserveToken).burn(address(this), redeemAmount);
 
     if (onBehalfOf == address(0)) {
       onBehalfOf = msg.sender;
     }
 
     // Mint reserveToken to contract
-    USDC.mint(onBehalfOf, usdcAmount);
+    Token(USDC).mint(onBehalfOf, usdcAmount);
 
     return usdcAmount;
   }

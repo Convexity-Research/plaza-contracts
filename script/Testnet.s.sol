@@ -15,10 +15,10 @@ import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 
 contract TestnetScript is Script {
 
-  // Arbitrum Sepolia addresses
-  address public constant reserveToken = address(0xE46230A4963b8bBae8681b5c05F8a22B9469De18);
-  address public constant couponToken = address(0xDA1334a1084170eb1438E0d9d5C8799A07fbA7d3);
-  address public constant merchant = address(0x0);
+  // Base Sepolia addresses
+  address public constant merchant = address(0);
+  address public constant reserveToken = address(0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871);
+  address public constant couponToken = address(0xf7464321dE37BdE4C03AAeeF6b1e7b71379A9a64);
 
   address public constant ethPriceFeed = address(0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1);
 
@@ -57,7 +57,7 @@ contract TestnetScript is Script {
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
-
+    
     address pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
     Pool(pool).approveMerchant(address(merchant));
     
