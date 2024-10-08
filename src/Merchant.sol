@@ -4,13 +4,15 @@ pragma solidity ^0.8.26;
 import {Pool} from "./Pool.sol";
 import {Trader} from "./Trader.sol";
 import {Decimals} from "./lib/Decimals.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 // @todo: make it upgradable
 contract Merchant is AccessControl, Pausable, Trader {
   using Decimals for uint256;
+  using ERC20Extensions for IERC20;
 
   uint256 private constant PRECISION = 10000;
   // Define a constants for the access roles using keccak256 to generate a unique hash
@@ -72,16 +74,17 @@ contract Merchant is AccessControl, Pausable, Trader {
     ordersTimestamp[_pool] = block.timestamp;
   }
 
-  function ordersPriceReached(address _pool) public view returns(bool) {
+  function ordersPriceReached(address _pool) public returns(bool) {
     LimitOrder memory limitOrder = orders[_pool];
 
-    uint256 currentPrice = getPrice(Pool(_pool).reserveToken(), Pool(_pool).couponToken());
+    uint256 couponsBuying = quote(limitOrder.sell, limitOrder.buy, limitOrder.amount);
+    uint256 orderPrice = (limitOrder.amount * 10**(IERC20(limitOrder.sell).safeDecimals())) / couponsBuying;
     if (limitOrder.buy == address(0) || limitOrder.filled) {
       return false;
     }
 
     // if price is 0, it means it's a market order
-    if (limitOrder.price == 0 || limitOrder.price <= currentPrice) {
+    if (limitOrder.price == 0 || limitOrder.price <= orderPrice) {
       return true;
     }
     
@@ -110,31 +113,32 @@ contract Merchant is AccessControl, Pausable, Trader {
       limitOrder.minAmount = (currentPrice * limitOrder.amount * 995) / 1000; // 0.5% less than order.price
     }
 
-    if (limitOrder.price <= currentPrice) {
-      uint256 amountOut = quote(limitOrder.sell, limitOrder.buy, limitOrder.amount);
-      uint256 accruedCoupons = ERC20(couponToken).balanceOf(_pool);
+    uint256 amountOut = quote(limitOrder.sell, limitOrder.buy, limitOrder.amount);
+    uint256 accruedCoupons = IERC20(couponToken).balanceOf(_pool);
 
-      // This block implements a safety check to prevent over-selling of the pool's assets.
-      // It ensures that the total coupon tokens bought (accruedCoupons) plus the expected
-      // coupon tokens from this order (amountOut) does not exceed a certain threshold
-      // relative to the remaining reserve tokens in the pool.
-      // The threshold is dynamically calculated based on the current price of reserve token.
-      // If this threshold is reached, it triggers a hard stop to prevent further selling.
-      //
-      // Calculation breakdown:
-      // - (poolReserves - limitOrders[i].amount) represents the expected remaining reserve
-      //   tokens after this order
-      // - currentPrice is the current price of reserve tokens in coupon tokens
-      // - The multiplier (19 in this case) represents the maximum allowed ratio of coupon
-      //   tokens to reserve tokens (95% sell / 5% keep)
-      if (accruedCoupons + amountOut > 19 * (poolReserves - limitOrder.amount) * currentPrice) {
-        setHardStop(_pool);
-        return;
-      }
-
-      swap(_pool, limitOrder);
-      limitOrder.filled = true;
+    // This block implements a safety check to prevent over-selling of the pool's assets.
+    // It ensures that the total coupon tokens bought (accruedCoupons) plus the expected
+    // coupon tokens from this order (amountOut) does not exceed a certain threshold
+    // relative to the remaining reserve tokens in the pool.
+    // The threshold is dynamically calculated based on the current price of reserve token.
+    // If this threshold is reached, it triggers a hard stop to prevent further selling.
+    //
+    // Calculation breakdown:
+    // - (poolReserves - limitOrders[i].amount) represents the expected remaining reserve
+    //   tokens after this order
+    // - currentPrice is the current price of reserve tokens in coupon tokens
+    // - The multiplier (19 in this case) represents the maximum allowed ratio of coupon
+    //   tokens to reserve tokens (95% sell / 5% keep)
+    if (accruedCoupons + amountOut > 19 * (poolReserves - limitOrder.amount) * currentPrice) {
+      setHardStop(_pool);
+      return;
     }
+
+    swap(_pool, limitOrder);
+    limitOrder.filled = true;
+
+    // reset orders timestamp
+    ordersTimestamp[_pool] = 0;
 
     // Update storage
     orders[_pool] = limitOrder;
@@ -149,14 +153,14 @@ contract Merchant is AccessControl, Pausable, Trader {
       return limitOrder;
     }
 
-    ERC20 reserveToken = ERC20(pool.reserveToken());
-    ERC20 couponToken = ERC20(pool.couponToken());
+    address reserveToken = pool.reserveToken();
+    address couponToken = pool.couponToken();
 
     uint256 remainingCouponAmount = getRemainingCouponAmount(_pool);
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
-    uint256 currentPrice = getPrice(address(reserveToken), address(couponToken));
-    (,uint256 liquidity) = getLiquidityAmounts(address(reserveToken), address(couponToken), 50);
+    uint256 currentPrice = getPrice(reserveToken, couponToken);
+    (,uint256 liquidity) = getLiquidityAmounts(reserveToken, couponToken, 50);
 
     require (currentPrice > 0, ZeroPrice());
 
@@ -256,12 +260,12 @@ contract Merchant is AccessControl, Pausable, Trader {
   
   function sellCouponExcess(uint256 couponExcess) external {
     Pool pool = Pool(msg.sender);
-    ERC20 reserveToken = ERC20(address(pool.reserveToken()));
-    ERC20 couponToken = ERC20(address(pool.couponToken()));
+    IERC20 reserveToken = IERC20(pool.reserveToken());
+    IERC20 couponToken = IERC20(pool.couponToken());
     
     // @todo: update to safeDecimals when merged
-    uint8 reserveDecimals = reserveToken.decimals();
-    uint8 couponDecimals = couponToken.decimals();
+    uint8 reserveDecimals = reserveToken.safeDecimals();
+    uint8 couponDecimals = couponToken.safeDecimals();
     
     // Get the current price from Uniswap V3 router's quote method
     // currentPrice: amount of couponToken per 1e18 units of reserveToken
@@ -318,14 +322,14 @@ contract Merchant is AccessControl, Pausable, Trader {
     Pool pool = Pool(_pool);
 
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
-    uint256 accruedCoupons = ERC20(pool.couponToken()).balanceOf(_pool);
+    uint256 accruedCoupons = IERC20(pool.couponToken()).balanceOf(_pool);
 
     return (pool.bondToken().totalSupply() * poolInfo.sharesPerToken) - accruedCoupons;
   }
 
   function getPoolReserves(address _pool) public view returns(uint256) {
     Pool pool = Pool(_pool);
-    ERC20 reserveToken = ERC20(pool.reserveToken());
+    IERC20 reserveToken = IERC20(pool.reserveToken());
 
     return reserveToken.balanceOf(_pool);
   }

@@ -254,7 +254,7 @@ contract MockUniswapV3Pool {
 
   function ticks(int24 tick)
     external
-    view
+    pure
     returns (
       uint128 liquidityGross,
       int128 liquidityNet,
