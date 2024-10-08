@@ -3,6 +3,8 @@ pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
 import {BondToken} from "./BondToken.sol";
+import {Decimals} from "./lib/Decimals.sol";
+import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -18,6 +20,8 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
  */
 contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
   using SafeERC20 for IERC20;
+  using ERC20Extensions for IERC20;
+  using Decimals for uint256;
 
   /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
@@ -99,7 +103,8 @@ contract Distributor is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     (uint256 currentPeriod,) = bondToken.globalPool();
     uint256 balance = bondToken.balanceOf(msg.sender);
-    uint256 shares = bondToken.getIndexedUserAmount(msg.sender, balance, currentPeriod);
+    uint256 shares = bondToken.getIndexedUserAmount(msg.sender, balance, currentPeriod)
+                              .normalizeAmount(bondToken.decimals(), IERC20(couponToken).safeDecimals());
 
     if (IERC20(couponToken).balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
