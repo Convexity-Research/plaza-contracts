@@ -54,7 +54,8 @@ contract MainnetScript is Script {
       reserveToken: reserveToken,
       couponToken: couponToken,
       sharesPerToken: sharesPerToken,
-      distributionPeriod: distributionPeriod
+      distributionPeriod: distributionPeriod,
+      feeBeneficiary: deployerAddress
     });
 
     // Approve the factory the seed deposit

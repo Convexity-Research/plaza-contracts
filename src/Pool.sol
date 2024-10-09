@@ -36,6 +36,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   // Protocol
   PoolFactory public poolFactory;
   uint256 private fee;
+  address public feeBeneficiary;
 
   // Tokens
   address public reserveToken;
@@ -70,6 +71,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 currentPeriod;
     uint256 lastDistribution;
     uint256 distributionPeriod;
+    address feeBeneficiary;
   }
 
   // Custom errors
@@ -114,6 +116,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     address _couponToken,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
+    address _feeBeneficiary,
     address _ethPriceFeed
   ) initializer public {
     __OracleReader_init(_ethPriceFeed);
@@ -128,6 +131,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistribution = block.timestamp;
+    feeBeneficiary = _feeBeneficiary;
   }
 
   /**
@@ -614,7 +618,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       levSupply: lToken.totalSupply(),
       sharesPerToken: _sharesPerToken,
       currentPeriod: currentPeriod,
-      lastDistribution: lastDistribution
+      lastDistribution: lastDistribution,
+      feeBeneficiary: feeBeneficiary
     });
   }
   
@@ -645,6 +650,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    */
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
     fee = _fee;
+  }
+
+  /**
+   * @dev Sets the fee beneficiary for the pool.
+   * @param _feeBeneficiary The address of the new fee beneficiary.
+   */
+  function setFeeBeneficiary(address _feeBeneficiary) external onlyRole(poolFactory.GOV_ROLE()) {
+    feeBeneficiary = _feeBeneficiary;
   }
 
   /**

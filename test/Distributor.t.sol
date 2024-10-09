@@ -92,6 +92,7 @@ contract DistributorTest is Test {
 
     PoolFactory.PoolParams memory poolParams = PoolFactory.PoolParams({
       fee: 0,
+      feeBeneficiary: address(0x1),
       sharesPerToken: 50*10**6,
       reserveToken: address(new Token("Wrapped ETH", "WETH", false)),
       distributionPeriod: 0,

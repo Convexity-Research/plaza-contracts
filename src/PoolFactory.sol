@@ -33,6 +33,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     address couponToken;
     uint256 distributionPeriod;
     uint256 sharesPerToken;
+    address feeBeneficiary;
   }
 
   /// @dev Array to store addresses of created pools
@@ -142,6 +143,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         params.couponToken,
         params.sharesPerToken,
         params.distributionPeriod,
+        params.feeBeneficiary,
         ethPriceFeed
       )
     ));
