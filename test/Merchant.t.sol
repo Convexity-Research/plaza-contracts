@@ -135,7 +135,7 @@ contract MerchantTest is Test {
 		merchant.updateOrders(address(pool));
 
     // Mock price increase
-    MockQuoterV2(quoter).setAmountOut(1020000000000000000);
+    MockQuoterV2(quoter).setAmountOut(1000020000000000000000);
     MockUniswapV3Pool(uniPool3).setStorage(4206428064337469953968261);
 		assertTrue(merchant.ordersPriceReached(address(pool)));
 
@@ -149,7 +149,7 @@ contract MerchantTest is Test {
 
     // Mock price increase
     MockUniswapV3Pool(uniPool3).setStorage(4206428064337469953968261);
-    MockQuoterV2(quoter).setAmountOut(1020000000000000000);
+    MockQuoterV2(quoter).setAmountOut(1000020000000000000000);
 
 		merchant.executeOrders(address(pool));
 
