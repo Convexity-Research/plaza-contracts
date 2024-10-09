@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Merchant} from "./Merchant.sol";
 import {Tick} from "./lib/uniswap/Tick.sol";
+import {Decimals} from "./lib/Decimals.sol";
 import {TickMath} from "./lib/uniswap/TickMath.sol";
 import {FullMath} from "./lib/uniswap/FullMath.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
@@ -16,6 +17,8 @@ import {ICLPool} from "./lib/aerodrome/ICLPool.sol";
 
 contract Trader {
   using ERC20Extensions for IERC20;
+  using Decimals for uint256;
+
   ISwapRouter private router;
   IQuoter private quoter;
   ICLFactory private factory;
@@ -32,7 +35,7 @@ contract Trader {
     factory = ICLFactory(_factory);
   }
 
-  function swap(address pool, Merchant.LimitOrder memory order) internal returns (uint256) {
+  function swap(address pool, Merchant.Order memory order) internal returns (uint256) {
     if (order.sell == address(0) || order.buy == address(0)) revert InvalidTokenAddresses();
     if (order.amount == 0) revert InvalidSwapAmount();
 
@@ -92,6 +95,13 @@ contract Trader {
 
     // Get the quote
     amountOut = quoter.quoteExactInput(path, amountIn);
+  }
+
+  function quoteBasedPrice(address sell, address buy, uint256 amountIn) public returns (uint256) {
+    uint8 maxDecimals = getMaxDecimals(sell, buy);
+
+    return (quote(sell, buy, amountIn).normalizeTokenAmount(buy, maxDecimals) / amountIn.normalizeTokenAmount(sell, maxDecimals))
+      .normalizeAmount(maxDecimals, IERC20(buy).safeDecimals());
   }
 
   /**
@@ -192,5 +202,12 @@ contract Trader {
 
   function abs(int24 x) internal pure returns (uint24) {
     return x >= 0 ? uint24(x) : uint24(-x);
+  }
+
+  function getMaxDecimals(address _sell, address _buy) public view returns(uint8) {
+    uint8 sellDecimals = IERC20(_sell).safeDecimals();
+    uint8 buyDecimals = IERC20(_buy).safeDecimals();
+
+    return sellDecimals > buyDecimals ? sellDecimals : buyDecimals;
   }
 }
