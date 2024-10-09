@@ -5,8 +5,8 @@ import {Pool} from "./Pool.sol";
 import {Trader} from "./Trader.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 // @todo: make it upgradable
