@@ -120,15 +120,15 @@ contract MerchantTest is Test {
     vm.etch(destination, bytecode);
   }
 
-	function testHasPendingOrders() public {
+	function testNeedsNewOrders() public {
     // 15 days to distribution
-		assertFalse(merchant.hasPendingOrders(address(pool)));
+		assertFalse(merchant.needsNewOrders(address(pool)));
 
 		// Set up pool info to trigger pending orders
 		vm.warp(block.timestamp + 6 days);
 
     // 9 days to distribution
-		assertTrue(merchant.hasPendingOrders(address(pool)));
+		assertTrue(merchant.needsNewOrders(address(pool)));
 	}
 
 	function testUpdateLimitOrders() public {

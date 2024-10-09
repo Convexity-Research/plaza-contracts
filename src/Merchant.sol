@@ -54,7 +54,7 @@ contract Merchant is AccessControl, Pausable, Trader {
   }
   
   // this will be called by automation to check if there are any pending orders
-  function hasPendingOrders(address _pool) public /*view*/ returns(bool) {
+  function needsNewOrders(address _pool) public /*view*/ returns(bool) {
     if (ordersTimestamp[_pool] == 0) {
       return getOrder(_pool).sell != address(0);
     }
