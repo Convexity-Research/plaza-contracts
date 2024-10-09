@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Merchant} from "./Merchant.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Distributor} from "./Distributor.sol";
@@ -35,6 +36,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
 
   // Protocol
   PoolFactory public poolFactory;
+  address public merchant;
   uint256 private fee;
 
   // Tokens
@@ -86,6 +88,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event SharesPerTokenChanged(uint256 sharesPerToken);
+  event MerchantApproved(address merchant);
   event Distributed(uint256 amount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -597,6 +600,31 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     distributor.allocate(address(this), couponAmountToDistribute);
 
     emit Distributed(couponAmountToDistribute);
+    sellCouponExcess();
+  }
+
+  /**
+   * @dev Sells any excess coupon tokens.
+   * @return true if the excess was sold, false otherwise.
+   */
+  function sellCouponExcess() private returns(bool) {
+    if (merchant == address(0)) {
+      // this shouldn't stop the distribution
+      return false;
+    }
+
+    uint256 couponExcess = IERC20(couponToken).balanceOf(address(this));
+    if (couponExcess == 0) {
+      return false;
+    }
+
+    IERC20(couponToken).approve(merchant, couponExcess);
+    
+    try Merchant(merchant).sellCouponExcess(couponExcess) {
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -616,6 +644,17 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       currentPeriod: currentPeriod,
       lastDistribution: lastDistribution
     });
+  }
+
+  /**
+   * @dev Approves a merchant to spend the maximum amount of reserve tokens.
+   * @param _merchant The address of the merchant to approve.
+   * @notice Only callable by accounts with the GOV_ROLE.
+   * @notice Emits a MerchantApproved event upon successful approval.
+   */
+  function approveMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
+    IERC20(reserveToken).approve(address(_merchant), type(uint256).max);
+    emit MerchantApproved(_merchant);
   }
   
   /**
@@ -637,6 +676,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     sharesPerToken = _sharesPerToken;
 
     emit SharesPerTokenChanged(sharesPerToken);
+  }
+
+  /** 
+   * @dev Sets the merchant address.
+   * @param _merchant The new merchant address.
+   */
+  function setMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
+    merchant = _merchant;
   }
 
   /**

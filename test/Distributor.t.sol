@@ -118,7 +118,7 @@ contract DistributorTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool pool = Pool(poolFactory.CreatePool(poolParams, 10000000000, 10000*10**18, 10000*10**18));
+    Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
 
     pool.bondToken().grantRole(pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
     pool.bondToken().grantRole(pool.bondToken().MINTER_ROLE(), minter);

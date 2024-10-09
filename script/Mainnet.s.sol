@@ -18,7 +18,8 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 
 contract MainnetScript is Script {
 
-  // Base Addresses
+  // Base Mainnet addresses
+  address public constant merchant = address(0);
   address public constant reserveToken = address(0x4200000000000000000000000000000000000006);
   address public constant couponToken = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
@@ -68,7 +69,9 @@ contract MainnetScript is Script {
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
+    address pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
+    Pool(pool).approveMerchant(address(merchant));
+    
     vm.stopBroadcast();
   }
 }

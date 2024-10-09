@@ -1032,7 +1032,7 @@ contract PoolTest is Test, TestCases {
       setEthPrice(calcTestCases[i].ethPrice);
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.CreatePool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets));
+      Pool _pool = Pool(poolFactory.createPool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
       rToken.approve(address(_pool), calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals));
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
