@@ -160,8 +160,10 @@ contract Merchant is AccessControl, Pausable, Trader {
     uint256 remainingCouponAmount = getRemainingCouponAmount(_pool);
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
+
+    // price of reserveToken in couponToken/
     uint256 currentPrice = getPrice(reserveToken, couponToken);
-    (,uint256 liquidity) = getLiquidityAmounts(reserveToken, couponToken, 50);
+    (,uint256 liquidity) = getLiquidityAmounts(reserveToken, couponToken, 100);
 
     require (currentPrice > 0, ZeroPrice());
 
