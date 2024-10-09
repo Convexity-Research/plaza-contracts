@@ -136,6 +136,8 @@ contract Trader {
   
   // @todo: this always goes from current tick to a lower tick
   // It should be dynamic depending on what token is being sold
+  // https://blog.uniswap.org/uniswap-v3-math-primer
+  // https://blog.uniswap.org/uniswap-v3-math-primer-2
   function getLiquidityAmounts(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256 amount0, uint256 amount1) {
     (address pool,,int24 tickSpacing) = getPool(tokenA, tokenB);
 
@@ -151,7 +153,7 @@ contract Trader {
 
     while (true) {
       if (abs(lowerCurrentTick - tempTick) >= targetTickRange) { break; }
-      if (abs(lowerCurrentTick - tempTick) % uint24(tickSpacing) != 0) { break; }
+      if (abs(lowerCurrentTick - tempTick) % uint24(tickSpacing) != 0) { break; } // this shouldnt happen
       if (tempTick < TickMath.MIN_TICK && tempTick > TickMath.MAX_TICK) { break; }
 
       (,int128 liquidityNet,,,,,,,,bool initialized) = ICLPool(pool).ticks(tempTick);
