@@ -42,7 +42,7 @@ contract DistributorTest is Test {
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
 
     // PoolFactory deploy
-    PoolFactory poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
       (governance,tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
     )));
