@@ -181,19 +181,26 @@ contract Merchant is AccessControl, Pausable, Trader {
     uint256 sellAmount = 0;
     uint256 price = 0;
     uint256 minAmount = 0;
-    uint256[10] memory values;
+    uint256[10] memory potentialOrderSizes;
 
     if (daysToPayment > 5) {
       
-      values[0] = (250 * liquidity / PRECISION);
-      values[1] = (1000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
-      values[2] = (poolReserves * 9500) / PRECISION;
+      // 2.5% of liquidity
+      potentialOrderSizes[0] = (250 * liquidity / PRECISION);
+      // 10% of remainingCouponAmount / 102.5% of currentPrice
+      potentialOrderSizes[1] = (1000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      // 95% of poolReserves
+      potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
 
-      maxOrder = min(values, 3);
+      maxOrder = min(potentialOrderSizes, 3);
 
+      // 20% of maxOrder
       sellAmount = (maxOrder * 2000) / PRECISION;
       
+      // 102% of currentPrice
       price = (currentPrice * (PRECISION + 200)) / PRECISION;
+
+      // 99.5% of tokens to receive
       minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
 
       return Order({
@@ -208,13 +215,22 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
 
     if (daysToPayment > 1) {
-      values[0] = (500 * liquidity / PRECISION);
-      values[1] = (2000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
-      values[2] = (poolReserves * 9500) / PRECISION;
+      // 5% of liquidity
+      potentialOrderSizes[0] = (500 * liquidity / PRECISION);
+      // 20% of remainingCouponAmount / 102.5% of currentPrice
+      potentialOrderSizes[1] = (2000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      // 95% of poolReserves
+      potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
 
-      maxOrder = min(values, 3);
+      maxOrder = min(potentialOrderSizes, 3);
+
+      // 20% of maxOrder
       sellAmount = (maxOrder * 2000) / PRECISION;
+      
+      // 102% of currentPrice
       price = (currentPrice * (PRECISION + 200)) / PRECISION;
+      
+      // 99.5% of tokens to receive
       minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
 
       return Order({
@@ -229,12 +245,16 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
 
     if (daysToPayment > 0) {
-      values[0] = (500 * liquidity / PRECISION);
-      values[1] = (remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
-      values[2] = (poolReserves * 9500) / PRECISION;
+      // 10% of liquidity
+      potentialOrderSizes[0] = (1000 * liquidity / PRECISION);
+      // 100% of remainingCouponAmount / 102.5% of currentPrice
+      potentialOrderSizes[1] = (10000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      // 95% of poolReserves
+      potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
 
-      maxOrder = min(values, 3);
-      sellAmount = (maxOrder * 200000) / PRECISION;
+      maxOrder = min(potentialOrderSizes, 3);
+
+      sellAmount = (maxOrder * 2000) / PRECISION;
       
       return Order({
         orderType: OrderType.LIMIT,
@@ -248,18 +268,18 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
 
     // Sell what's left
-    values[0] = (1000 * liquidity / PRECISION);
-    values[1] = (remainingCouponAmount / currentPrice);
-    values[2] = (poolReserves * 9500) / PRECISION;
-
-    maxOrder = min(values, 3);
+    // 10% of liquidity
+    potentialOrderSizes[0] = (1000 * liquidity / PRECISION);
+    potentialOrderSizes[1] = (remainingCouponAmount / currentPrice);
+    // 95% of poolReserves
+    potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
     
     return Order({
       orderType: OrderType.MARKET,
       buy: address(couponToken),
       sell: address(reserveToken),
       price: 0,
-      amount: maxOrder,
+      amount: min(potentialOrderSizes, 3),
       minAmount: 0,
       filled: false
     });
