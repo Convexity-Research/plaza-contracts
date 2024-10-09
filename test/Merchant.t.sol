@@ -135,7 +135,7 @@ contract MerchantTest is Test {
 		merchant.updateLimitOrders(address(pool));
 
     // Mock price increase
-    MockQuoterV2(quoter).setAmountOut(1020000000000000000);
+    MockQuoterV2(quoter).setAmountOut(2000020000000000000000);
     MockUniswapV3Pool(uniPool3).setStorage(4206428064337469953968261);
 		assertTrue(merchant.ordersPriceReached(address(pool)));
 
@@ -149,7 +149,7 @@ contract MerchantTest is Test {
 
     // Mock price increase
     MockUniswapV3Pool(uniPool3).setStorage(4206428064337469953968261);
-    MockQuoterV2(quoter).setAmountOut(1020000000000000000);
+    MockQuoterV2(quoter).setAmountOut(2000020000000000000000);
 
 		merchant.executeOrders(address(pool));
 
@@ -170,7 +170,7 @@ contract MerchantTest is Test {
 		assertFalse(order.filled);
 	}
 
-	function testGetPrice() public {
+	function testGetPrice() public view {
 		uint256 price = merchant.getPrice(pool.reserveToken(), pool.couponToken());
 		assertEq(price, 2544396752);
 	}

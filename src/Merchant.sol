@@ -5,9 +5,11 @@ import {Pool} from "./Pool.sol";
 import {Trader} from "./Trader.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+
+import "forge-std/console.sol";
 
 // @todo: make it upgradable
 contract Merchant is AccessControl, Pausable, Trader {
@@ -77,11 +79,18 @@ contract Merchant is AccessControl, Pausable, Trader {
   function ordersPriceReached(address _pool) public returns(bool) {
     LimitOrder memory limitOrder = orders[_pool];
 
-    uint256 couponsBuying = quote(limitOrder.sell, limitOrder.buy, limitOrder.amount);
-    uint256 orderPrice = (limitOrder.amount * 10**(IERC20(limitOrder.sell).safeDecimals())) / couponsBuying;
+    uint8 maxDecimals = getMaxDecimals(limitOrder.sell, limitOrder.buy);
+
+    uint256 couponsBuying = quote(limitOrder.sell, limitOrder.buy, limitOrder.amount).normalizeTokenAmount(limitOrder.buy, maxDecimals);
+    uint256 orderPrice = couponsBuying / limitOrder.amount.normalizeTokenAmount(limitOrder.sell, maxDecimals);
+    orderPrice = orderPrice.normalizeAmount(maxDecimals, IERC20(limitOrder.buy).safeDecimals());
+
     if (limitOrder.buy == address(0) || limitOrder.filled) {
       return false;
     }
+
+    console.log("limitOrder.price", limitOrder.price);
+    console.log("orderPrice", orderPrice);
 
     // if price is 0, it means it's a market order
     if (limitOrder.price == 0 || limitOrder.price <= orderPrice) {
@@ -303,7 +312,14 @@ contract Merchant is AccessControl, Pausable, Trader {
     }
     return m;
   }
-  
+
+  function getMaxDecimals(address _sell, address _buy) public view returns(uint8) {
+    uint8 sellDecimals = IERC20(_sell).safeDecimals();
+    uint8 buyDecimals = IERC20(_buy).safeDecimals();
+
+    return sellDecimals > buyDecimals ? sellDecimals : buyDecimals;
+  }
+
   function getDaysToPayment(address _pool) public view returns(uint8) {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = pool.getPoolInfo();
