@@ -107,18 +107,17 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     string memory leverageSymbol
   ) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
 
-    // @todo: with this is safer but some cases are not testable (guess that's still good)
-    // if (reserveAmount == 0) {
-    //   revert ZeroReserveAmount();
-    // }
+    if (reserveAmount == 0) {
+      revert ZeroReserveAmount();
+    }
 
-    // if (bondAmount == 0) {
-    //   revert ZeroDebtAmount();
-    // }
+    if (bondAmount == 0) {
+      revert ZeroDebtAmount();
+    }
 
-    // if (leverageAmount == 0) {
-    //   revert ZeroLeverageAmount();
-    // }
+    if (leverageAmount == 0) {
+      revert ZeroLeverageAmount();
+    }
         
     // Deploy Bond token
     BondToken bondToken = BondToken(tokenDeployer.deployDebtToken(

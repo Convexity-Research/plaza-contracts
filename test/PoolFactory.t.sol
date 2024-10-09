@@ -81,14 +81,14 @@ contract PoolFactoryTest is Test {
   function testCreatePoolErrors() public {
     vm.startPrank(governance);
 
-    // vm.expectRevert(bytes4(keccak256("ZeroReserveAmount()")));
-    // poolFactory.createPool(params, 0, 10000, 20000);
+    vm.expectRevert(bytes4(keccak256("ZeroReserveAmount()")));
+    poolFactory.createPool(params, 0, 10000, 20000, "", "", "", "");
 
-    // vm.expectRevert(bytes4(keccak256("ZeroDebtAmount()")));
-    // poolFactory.createPool(params, 10000000000, 0, 20000);
+    vm.expectRevert(bytes4(keccak256("ZeroDebtAmount()")));
+    poolFactory.createPool(params, 10000000000, 0, 20000, "", "", "", "");
 
-    // vm.expectRevert(bytes4(keccak256("ZeroLeverageAmount()")));
-    // poolFactory.createPool(params, 10000000000, 10000, 0);
+    vm.expectRevert(bytes4(keccak256("ZeroLeverageAmount()")));
+    poolFactory.createPool(params, 10000000000, 10000, 0, "", "", "", "");
 
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
     poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
