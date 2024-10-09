@@ -86,6 +86,27 @@ contract PoolFactoryTest is Test {
     rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
   }
 
+  function testCreatePoolDeterministic() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 1);
+    rToken.approve(address(poolFactory), 1);
+    
+    address poolAddress = poolFactory.getPoolAddress(params.reserveToken, params.couponToken, "bondWETH", "levWETH");
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(poolFactory.CreatePool(params, 1, 1, 1));
+    uint256 endLength = poolFactory.poolsLength();
+
+    assertEq(address(_pool), poolAddress);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  }
+
   function testCreatePoolErrors() public {
     vm.startPrank(governance);
 

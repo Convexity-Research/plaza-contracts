@@ -6,6 +6,7 @@ import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "./BondToken.sol";
 import {Distributor} from "./Distributor.sol";
 import {LeverageToken} from "./LeverageToken.sol";
+import {Create3} from "@create3/contracts/Create3.sol";
 import {TokenDeployer} from "./utils/TokenDeployer.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -169,8 +170,21 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         ethPriceFeed
       )
     );
-    BeaconProxy poolProxy = new BeaconProxy(address(poolBeacon), initData);
-    address pool = address(poolProxy);
+
+    address pool = Create3.create3(
+      keccak256(
+        abi.encodePacked(
+          params.reserveToken,
+          params.couponToken,
+          bondToken.symbol(),
+          lToken.symbol()
+        )
+      ),
+      abi.encodePacked(
+        type(BeaconProxy).creationCode,
+        abi.encode(address(poolBeacon), initData)
+      )
+    );
 
     Distributor(distributor).registerPool(pool, params.couponToken);
 
@@ -200,6 +214,23 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     lToken.mint(msg.sender, leverageAmount);
 
     return pool;
+  }
+
+  /**
+   * @dev Get the address of a pool using the reserve token, coupon token, bond symbol, and leverage symbol.
+   * @param reserveToken The address of the reserve token.
+   * @param couponToken The address of the coupon token.
+   * @param bondSymbol The symbol of the bond token.
+   * @param leverageSymbol The symbol of the leverage token.
+   * @return The address of the pool.
+   */
+  function getPoolAddress(address reserveToken, address couponToken, string memory bondSymbol, string memory leverageSymbol) external view returns (address) {
+    return Create3.addressOf(keccak256(abi.encodePacked(
+      reserveToken,
+      couponToken,
+      bondSymbol,
+      leverageSymbol
+    )));
   }
   
   /**
