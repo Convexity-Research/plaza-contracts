@@ -14,7 +14,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -23,7 +22,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
  * @dev This contract is responsible for creating and managing pools.
  * It inherits from various OpenZeppelin upgradeable contracts for enhanced functionality and security.
  */
-contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
   using SafeERC20 for IERC20;
   using ERC20Extensions for IERC20;
 
@@ -244,7 +243,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    */
   function _authorizeUpgrade(address newImplementation)
     internal
-    onlyOwner
+    onlyRole(GOV_ROLE)
     override
   {}
 }
