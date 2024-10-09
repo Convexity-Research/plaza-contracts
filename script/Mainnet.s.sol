@@ -60,7 +60,7 @@ contract MainnetScript is Script {
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
     vm.stopBroadcast();
   }
 }
