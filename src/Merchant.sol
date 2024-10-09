@@ -9,8 +9,6 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-import "forge-std/console.sol";
-
 // @todo: make it upgradable
 contract Merchant is AccessControl, Pausable, Trader {
   using Decimals for uint256;
@@ -88,9 +86,6 @@ contract Merchant is AccessControl, Pausable, Trader {
     if (limitOrder.buy == address(0) || limitOrder.filled) {
       return false;
     }
-
-    console.log("limitOrder.price", limitOrder.price);
-    console.log("orderPrice", orderPrice);
 
     // if price is 0, it means it's a market order
     if (limitOrder.price == 0 || limitOrder.price <= orderPrice) {
