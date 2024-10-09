@@ -75,7 +75,7 @@ contract MerchantTest is Test {
     Token(params.reserveToken).approve(address(poolFactory), reserveAmount);
 
     // Create pool and approve deposit amount
-    pool = Pool(poolFactory.CreatePool(params, reserveAmount, bondAmount, leverageAmount));
+    pool = Pool(poolFactory.createPool(params, reserveAmount, bondAmount, leverageAmount, "", "", "", ""));
     
     WETH9 weth = new WETH9();
     mockContract(address(weth).code, WETH);
