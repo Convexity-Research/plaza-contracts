@@ -17,11 +17,21 @@ contract Faucet {
   mapping(address => bool) private whitelist;
 
   /// @notice Initializes the contract by creating new instances of reserve and coupon tokens
-  constructor() {
+  constructor(address _reserveToken, address _couponToken) {
     deployer = msg.sender;
     whitelist[deployer] = true;
-    reserveToken = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
-    couponToken = new Token("Circle Fake USD", "USDC", true);
+
+    if (_reserveToken != address(0)) {
+      reserveToken = Token(_reserveToken);
+    } else {
+      reserveToken = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
+    }
+
+    if (_couponToken != address(0)) {
+      couponToken = Token(_couponToken);
+    } else {
+      couponToken = new Token("Circle Fake USD", "USDC", true);
+    }
   }
   
   /// @notice Distributes a fixed amount of both reserve and coupon tokens to the caller
@@ -34,21 +44,36 @@ contract Faucet {
   /// @notice Distributes a specified amount of both reserve and coupon tokens to the caller
   /// @param amountReserve The amount of reserve tokens to mint
   /// @param amountCoupon The amount of coupon tokens to mint
-  function faucet(uint256 amountReserve, uint256 amountCoupon) public isWhitelisted() {
-    reserveToken.mint(msg.sender, amountReserve);
-    couponToken.mint(msg.sender, amountCoupon);
+  /// @param amountEth The amount of ETH to send to the caller
+  /// @param onBehalfOf The address to mint the tokens on behalf of
+  function faucet(uint256 amountReserve, uint256 amountCoupon, uint256 amountEth, address onBehalfOf) public isWhitelisted() {
+    address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+    if (amountReserve > 0) {
+      reserveToken.mint(user, amountReserve);
+    }
+    if (amountCoupon > 0) {
+      couponToken.mint(user, amountCoupon);
+    }
+    if (amountEth > 0) {
+      (bool success, ) = payable(user).call{value: amountEth}("");
+      require(success, "Faucet: ETH transfer failed");
+    }
   }
 
   /// @notice Distributes a specified amount of reserve tokens to the caller
   /// @param amount The amount of reserve tokens to mint
-  function faucetReserve(uint256 amount) public isWhitelisted() {
-    reserveToken.mint(msg.sender, amount);
+  /// @param onBehalfOf The address to mint the tokens on behalf of
+  function faucetReserve(uint256 amount, address onBehalfOf) public isWhitelisted() {
+    address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+    reserveToken.mint(user, amount);
   }
 
   /// @notice Distributes a specified amount of coupon tokens to the caller
   /// @param amount The amount of coupon tokens to mint
-  function faucetCoupon(uint256 amount) public isWhitelisted() {
-    couponToken.mint(msg.sender, amount);
+  /// @param onBehalfOf The address to mint the tokens on behalf of
+  function faucetCoupon(uint256 amount, address onBehalfOf) public isWhitelisted() {
+    address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
+    couponToken.mint(user, amount);
   }
 
   /// @notice Adds an address to the whitelist
@@ -56,6 +81,9 @@ contract Faucet {
   function addToWhitelist(address account) public isWhitelisted() {
     whitelist[account] = true;
   }
+
+  /// @notice Fallback function to receive ETH
+  receive() external payable {}
 
   modifier isWhitelisted() {
     require(whitelist[msg.sender], "Not whitelisted");
