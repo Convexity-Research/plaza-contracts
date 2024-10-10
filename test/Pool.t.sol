@@ -1011,13 +1011,18 @@ contract PoolTest is Test, TestCases {
   }
 
   function testCreateTokensWithDifferentDecimals() public {
-    vm.startPrank(governance);
+    vm.startPrank(deployer);
     PoolFactory.PoolParams memory _params;
     _params.fee = 0;
     _params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     _params.sharesPerToken = 50 * 10 ** 18;
     _params.distributionPeriod = 0;
     _params.couponToken = address(new Token("USDC", "USDC", false));
+
+    OracleFeeds(poolFactory.oracleFeeds()).setPriceFeed(_params.reserveToken, address(0), ethPriceFeed);
+    
+    vm.stopPrank();
+    vm.startPrank(governance);
 
     uint8 reserveDecimals = 6;
     Token(_params.reserveToken).setDecimals(reserveDecimals);
