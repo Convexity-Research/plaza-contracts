@@ -3,7 +3,6 @@ pragma solidity ^0.8.26;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -13,7 +12,7 @@ import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/
  * @title LeverageToken
  * @dev This contract implements a leverage token with upgradeable capabilities, access control, and pausability.
  */
-contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, OwnableUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable, PausableUpgradeable {
   
   /// @dev Role identifier for accounts with minting privileges
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -120,7 +119,7 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
    */
   function _authorizeUpgrade(address newImplementation)
     internal
-    onlyOwner
+    onlyRole(GOV_ROLE)
     override
   {}
 }

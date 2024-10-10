@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Merchant} from "./Merchant.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Distributor} from "./Distributor.sol";
@@ -12,8 +13,6 @@ import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
@@ -22,7 +21,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
  * @dev This contract manages a pool of assets, allowing for the creation, redemption, and swapping of bond and leverage tokens.
  * It also handles distribution periods and interacts with an oracle for price information.
  */
-contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
+contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
   using Decimals for uint256;
   using SafeERC20 for IERC20;
   using ERC20Extensions for IERC20;
@@ -37,6 +36,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
   // Protocol
   PoolFactory public poolFactory;
+  address public merchant;
   uint256 private fee;
 
   // Tokens
@@ -88,6 +88,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event SharesPerTokenChanged(uint256 sharesPerToken);
+  event MerchantApproved(address merchant);
   event Distributed(uint256 amount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -118,7 +119,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 _distributionPeriod,
     address _oracleFeeds
   ) initializer public {
-    __UUPSUpgradeable_init();
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
 
@@ -579,9 +579,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     // Calculate last distribution time
     lastDistribution = block.timestamp + distributionPeriod;
 
-    // Calculate the coupon amount to distribute
-    uint256 couponAmountToDistribute = (bondToken.totalSupply() * sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS());
+    uint8 bondDecimals = bondToken.decimals();
+    uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
+    uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
 
+    uint256 normalizedTotalSupply = bondToken.totalSupply().normalizeAmount(bondDecimals, maxDecimals);
+    uint256 normalizedShares = sharesPerToken.normalizeAmount(sharesDecimals, maxDecimals);
+
+    // Calculate the coupon amount to distribute
+    uint256 couponAmountToDistribute = (normalizedTotalSupply * normalizedShares)
+        .toBaseUnit(maxDecimals * 2 - IERC20(couponToken).safeDecimals());
+    
     // Increase the bond token period
     bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
@@ -592,6 +600,31 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     distributor.allocate(address(this), couponAmountToDistribute);
 
     emit Distributed(couponAmountToDistribute);
+    sellCouponExcess();
+  }
+
+  /**
+   * @dev Sells any excess coupon tokens.
+   * @return true if the excess was sold, false otherwise.
+   */
+  function sellCouponExcess() private returns(bool) {
+    if (merchant == address(0)) {
+      // this shouldn't stop the distribution
+      return false;
+    }
+
+    uint256 couponExcess = IERC20(couponToken).balanceOf(address(this));
+    if (couponExcess == 0) {
+      return false;
+    }
+
+    IERC20(couponToken).approve(merchant, couponExcess);
+    
+    try Merchant(merchant).sellCouponExcess(couponExcess) {
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -611,6 +644,17 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       currentPeriod: currentPeriod,
       lastDistribution: lastDistribution
     });
+  }
+
+  /**
+   * @dev Approves a merchant to spend the maximum amount of reserve tokens.
+   * @param _merchant The address of the merchant to approve.
+   * @notice Only callable by accounts with the GOV_ROLE.
+   * @notice Emits a MerchantApproved event upon successful approval.
+   */
+  function approveMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
+    IERC20(reserveToken).approve(address(_merchant), type(uint256).max);
+    emit MerchantApproved(_merchant);
   }
   
   /**
@@ -632,6 +676,14 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     sharesPerToken = _sharesPerToken;
 
     emit SharesPerTokenChanged(sharesPerToken);
+  }
+
+  /** 
+   * @dev Sets the merchant address.
+   * @param _merchant The new merchant address.
+   */
+  function setMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
+    merchant = _merchant;
   }
 
   /**
@@ -689,16 +741,4 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     }
     _;
   }
-
-  /**
-   * @dev Authorizes an upgrade to a new implementation.
-   * Can only be called by the owner of the contract.
-   * @param newImplementation The address of the new implementation.
-   */
-  // @todo: owner will be PoolFactory, make sure we can upgrade
-  function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyOwner
-    override
-  {}
 }

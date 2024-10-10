@@ -15,6 +15,7 @@ import {Validator} from "../src/utils/Validator.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract MockRouterTest is Test {
   PoolFactory private poolFactory;
@@ -43,7 +44,14 @@ contract MockRouterTest is Test {
     Distributor distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
 
     address oracleFeeds = address(new OracleFeeds());
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), oracleFeeds))));
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+      PoolFactory.initialize, 
+      (governance,tokenDeployer, address(distributor), oracleFeeds, poolBeacon, bondBeacon, levBeacon)
+    )));
 
     PoolFactory.PoolParams memory params;
     params.fee = 0;
@@ -79,7 +87,7 @@ contract MockRouterTest is Test {
     rToken.approve(address(poolFactory), 1000000000000000000000000);
 
     // Create pool and approve deposit amount
-    pool = Pool(poolFactory.CreatePool(params, 1000000000000000000000000, 25000000000000000000000000, 1000000000000000000000000));
+    pool = Pool(poolFactory.createPool(params, 1000000000000000000000000, 25000000000000000000000000, 1000000000000000000000000, "", "", "", ""));
     vm.stopPrank();
   }
 
@@ -119,4 +127,3 @@ contract MockRouterTest is Test {
     mockPriceFeed.setMockPrice(int256(price), uint8(CHAINLINK_DECIMAL));
   }
 }
-

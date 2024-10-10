@@ -10,8 +10,9 @@ import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
-import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract PoolFactoryTest is Test {
   PoolFactory private poolFactory;
@@ -36,7 +37,14 @@ contract PoolFactoryTest is Test {
 
     address tokenDeployer = address(new TokenDeployer());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance, tokenDeployer, address(distributor), ethPriceFeed))));
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+      PoolFactory.initialize, 
+      (governance, tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+    )));
 
     vm.stopPrank();
 
@@ -65,7 +73,7 @@ contract PoolFactoryTest is Test {
     emit PoolFactory.PoolCreated(address(0), 10000000000, 10000, 20000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000, 20000));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", ""));
     uint256 endLength = poolFactory.poolsLength();
 
     assertEq(1, endLength-startLength);
@@ -82,16 +90,16 @@ contract PoolFactoryTest is Test {
     vm.startPrank(governance);
 
     // vm.expectRevert(bytes4(keccak256("ZeroReserveAmount()")));
-    // poolFactory.CreatePool(params, 0, 10000, 20000);
+    // poolFactory.createPool(params, 0, 10000, 20000);
 
     // vm.expectRevert(bytes4(keccak256("ZeroDebtAmount()")));
-    // poolFactory.CreatePool(params, 10000000000, 0, 20000);
+    // poolFactory.createPool(params, 10000000000, 0, 20000);
 
     // vm.expectRevert(bytes4(keccak256("ZeroLeverageAmount()")));
-    // poolFactory.CreatePool(params, 10000000000, 10000, 0);
+    // poolFactory.createPool(params, 10000000000, 10000, 0);
 
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.CreatePool(params, 10000000000, 10000, 10000);
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
     
   }
 
@@ -100,10 +108,10 @@ contract PoolFactoryTest is Test {
     poolFactory.pause();
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    poolFactory.CreatePool(params, 10000000000, 10000, 10000);
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
     
     poolFactory.unpause();
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.CreatePool(params, 10000000000, 10000, 10000);
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
   }
 }
