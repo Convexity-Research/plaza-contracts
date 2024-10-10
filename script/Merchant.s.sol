@@ -20,7 +20,7 @@ contract MerchantScript is Script {
 
   function run() public {
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
-    Upgrades.deployUUPSProxy("Merchant.sol", abi.encodeCall(Merchant.initialize, ()));
+    Upgrades.deployUUPSProxy("Merchant.sol", abi.encodeCall(Merchant.initialize, (ROUTER, QUOTER, FACTORY)));
     vm.stopBroadcast();
   }
 }

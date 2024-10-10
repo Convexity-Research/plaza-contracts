@@ -101,7 +101,10 @@ contract MerchantTest is Test {
     MockUniswapV3Pool(uniPool2).setStorage(0);
     MockUniswapV3Pool(uniPool3).setStorage(0);
 
-    merchant = new Merchant(router, quoter, address(factory));
+    merchant = Merchant(Utils.deploy(address(new Merchant()), 
+      abi.encodeCall(Merchant.initialize,
+      (router, quoter, address(factory))))
+    );
 
     // Inifinite approve to Merchant
     pool.approveMerchant(address(merchant));
