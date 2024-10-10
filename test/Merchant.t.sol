@@ -6,10 +6,12 @@ import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {Merchant} from "../src/Merchant.sol";
+import {BondToken} from "../src/BondToken.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {WETH9} from "./mocks/MockWeth.sol";
 import {MockQuoterV2} from "./mocks/MockQuoterV2.sol";
@@ -37,10 +39,14 @@ contract MerchantTest is Test {
 
     address tokenDeployer = address(new TokenDeployer());
 
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+
     PoolFactory poolFactory = PoolFactory(
       Utils.deploy(address(new PoolFactory()), 
       abi.encodeCall(PoolFactory.initialize,
-      (governance, tokenDeployer, address(distributor), ethPriceFeed)))
+      (governance, tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)))
     );
 
     distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
@@ -51,10 +57,15 @@ contract MerchantTest is Test {
     uint256 sharesPerToken = 2_500_000;
     uint256 distributionPeriod = 1296000; // 15 days
 
+    // This is to ensure reserve token address is lower (in hex) than coupon token address
+    address deployedReserveToken = address(new Token("Wrapped ETH", "WETH", false));
+    mockContract(deployedReserveToken.code, address(0x1210000000000000000000000000000000000000));
+    copyStorage(deployedReserveToken, address(0x1210000000000000000000000000000000000000), 0, 10);
+
     PoolFactory.PoolParams memory params = PoolFactory.PoolParams({
       fee: 0,
       sharesPerToken: sharesPerToken,
-      reserveToken: address(new Token("Wrapped ETH", "WETH", false)),
+      reserveToken: address(0x1210000000000000000000000000000000000000),
       distributionPeriod: distributionPeriod,
       couponToken: address(new Token("Circle USD", "USDC", false))
     });
@@ -64,7 +75,7 @@ contract MerchantTest is Test {
     Token(params.reserveToken).approve(address(poolFactory), reserveAmount);
 
     // Create pool and approve deposit amount
-    pool = Pool(poolFactory.CreatePool(params, reserveAmount, bondAmount, leverageAmount));
+    pool = Pool(poolFactory.createPool(params, reserveAmount, bondAmount, leverageAmount, "", "", "", ""));
     
     WETH9 weth = new WETH9();
     mockContract(address(weth).code, WETH);
@@ -98,30 +109,37 @@ contract MerchantTest is Test {
     vm.stopPrank();
 	}
 
+  function copyStorage(address from, address to, uint256 startSlot, uint256 endSlot) public {
+    for (uint256 slot = startSlot; slot <= endSlot; slot++) {
+      bytes32 value = vm.load(from, bytes32(slot));
+      vm.store(to, bytes32(slot), value);
+    }
+  }
+
   function mockContract(bytes memory bytecode, address destination) public {
     vm.etch(destination, bytecode);
   }
 
-	function testHasPendingOrders() public {
+	function testNeedsNewOrders() public {
     // 15 days to distribution
-		assertFalse(merchant.hasPendingOrders(address(pool)));
+		assertFalse(merchant.needsNewOrders(address(pool)));
 
 		// Set up pool info to trigger pending orders
 		vm.warp(block.timestamp + 6 days);
 
     // 9 days to distribution
-		assertTrue(merchant.hasPendingOrders(address(pool)));
+		assertTrue(merchant.needsNewOrders(address(pool)));
 	}
 
 	function testUpdateLimitOrders() public {
 		vm.expectRevert(Merchant.UpdateNotRequired.selector);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
 		vm.warp(block.timestamp + 6 days);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
 		// Check that orders were updated
-		(address sell, address buy, uint256 price, uint256 amount, uint256 minAmount, bool filled) = merchant.orders(address(pool));
+		(, address sell, address buy, uint256 price, uint256 amount, uint256 minAmount, bool filled) = merchant.orders(address(pool));
 		assertEq(sell, pool.reserveToken());
 		assertEq(buy, pool.couponToken());
 		assertTrue(price > 0);
@@ -132,10 +150,10 @@ contract MerchantTest is Test {
 
 	function testOrdersPriceReached() public {
 		vm.warp(block.timestamp + 6 days);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
     // Mock price increase
-    MockQuoterV2(quoter).setAmountOut(1020000000000000000);
+    MockQuoterV2(quoter).setAmountOut(2000020000000000000000);
     MockUniswapV3Pool(uniPool3).setStorage(4206428064337469953968261);
 		assertTrue(merchant.ordersPriceReached(address(pool)));
 
@@ -145,23 +163,23 @@ contract MerchantTest is Test {
 
 	function testExecuteOrders() public {
 		vm.warp(block.timestamp + 6 days);
-		merchant.updateLimitOrders(address(pool));
+		merchant.updateOrders(address(pool));
 
     // Mock price increase
     MockUniswapV3Pool(uniPool3).setStorage(4206428064337469953968261);
-    MockQuoterV2(quoter).setAmountOut(1020000000000000000);
+    MockQuoterV2(quoter).setAmountOut(2000020000000000000000);
 
 		merchant.executeOrders(address(pool));
 
 		// Check that orders were executed
-		(,,,,,bool filled) = merchant.orders(address(pool));
+		(,,,,,,bool filled) = merchant.orders(address(pool));
 		assertTrue(filled);
     MockQuoterV2(quoter).setAmountOut(0);
 	}
 
 	function testGetLimitOrders() public {
     vm.warp(block.timestamp + 6 days);
-		Merchant.LimitOrder memory order = merchant.getLimitOrders(address(pool));
+		Merchant.Order memory order = merchant.getOrder(address(pool));
 		assertEq(order.sell, pool.reserveToken());
 		assertEq(order.buy, pool.couponToken());
 		assertTrue(order.price > 0);
@@ -171,6 +189,10 @@ contract MerchantTest is Test {
 	}
 
 	function testGetPrice() public {
+    MockUniswapV3Pool(uniPool3).setStorage(0);
+
+    console.log("reserve smaller", pool.reserveToken() < pool.couponToken() ? "true" : "false");
+
 		uint256 price = merchant.getPrice(pool.reserveToken(), pool.couponToken());
 		assertEq(price, 2544396752);
 	}

@@ -9,9 +9,12 @@ import {BondToken} from "../src/BondToken.sol";
 import {LifiRouter} from "../src/LifiRouter.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {Distributor} from "../src/Distributor.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Upgrades} from "@openzeppelin/foundry-upgrades/Upgrades.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract MainnetScript is Script {
 
@@ -39,12 +42,17 @@ contract MainnetScript is Script {
     address tokenDeployer = address(new TokenDeployer());
 
     // Deploys Distributor
-    address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
+    address distributor = Upgrades.deployUUPSProxy("Distributor.sol", abi.encodeCall(Distributor.initialize, (deployerAddress)));
 
+    // Pool, Bond & Leverage Beacon Deploy
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), deployerAddress));
+    
     // Deploys PoolFactory
-    PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+    PoolFactory factory = PoolFactory(Upgrades.deployUUPSProxy("PoolFactory.sol", abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed)
+      (deployerAddress, tokenDeployer, distributor, ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
     )));
 
     // Grant pool factory role to factory
@@ -61,9 +69,9 @@ contract MainnetScript is Script {
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    address pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    address pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
     Pool(pool).approveMerchant(address(merchant));
-
+    
     vm.stopBroadcast();
   }
 }

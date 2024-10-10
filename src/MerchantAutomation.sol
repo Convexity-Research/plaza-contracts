@@ -24,9 +24,9 @@ contract MerchantAutomation {
     address pool;
     for (uint256 i = 0; i < poolsLength; i++) {
       pool = factory.pools(i);
-      if (merchant.hasPendingOrders(pool)) {
+      if (merchant.needsNewOrders(pool)) {
         payload = abi.encodeWithSelector(
-          Merchant.updateLimitOrders.selector,
+          Merchant.updateOrders.selector,
           pool
         );
 

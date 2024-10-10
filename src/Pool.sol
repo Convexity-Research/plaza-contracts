@@ -13,8 +13,6 @@ import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
@@ -23,7 +21,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
  * @dev This contract manages a pool of assets, allowing for the creation, redemption, and swapping of bond and leverage tokens.
  * It also handles distribution periods and interacts with an oracle for price information.
  */
-contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
+contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
   using Decimals for uint256;
   using SafeERC20 for IERC20;
   using ERC20Extensions for IERC20;
@@ -121,7 +119,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     uint256 _distributionPeriod,
     address _ethPriceFeed
   ) initializer public {
-    __UUPSUpgradeable_init();
     __OracleReader_init(_ethPriceFeed);
     __ReentrancyGuard_init();
 
@@ -744,16 +741,4 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     }
     _;
   }
-
-  /**
-   * @dev Authorizes an upgrade to a new implementation.
-   * Can only be called by the owner of the contract.
-   * @param newImplementation The address of the new implementation.
-   */
-  // @todo: owner will be PoolFactory, make sure we can upgrade
-  function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyOwner
-    override
-  {}
 }

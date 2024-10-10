@@ -9,8 +9,9 @@ import {Utils} from "../src/lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
-import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract DistributorTest is Test {
   Distributor public distributor;
@@ -35,8 +36,16 @@ contract DistributorTest is Test {
     // Distributor deploy
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
 
+    // Pool, Bond & Leverage Beacon deploy
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+
     // PoolFactory deploy
-    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(PoolFactory.initialize, (governance,tokenDeployer, address(distributor), ethPriceFeed))));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+      PoolFactory.initialize, 
+      (governance,tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+    )));
 
     vm.stopPrank();
 
@@ -58,7 +67,7 @@ contract DistributorTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    _pool = Pool(poolFactory.CreatePool(params, 10000000000, 10000*10**18, 10000*10**18));
+    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
 
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
     _pool.bondToken().grantRole(_pool.bondToken().MINTER_ROLE(), minter);
@@ -109,7 +118,7 @@ contract DistributorTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool pool = Pool(poolFactory.CreatePool(poolParams, 10000000000, 10000*10**18, 10000*10**18));
+    Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
 
     pool.bondToken().grantRole(pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
     pool.bondToken().grantRole(pool.bondToken().MINTER_ROLE(), minter);

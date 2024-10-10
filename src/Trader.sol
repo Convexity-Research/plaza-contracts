@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Merchant} from "./Merchant.sol";
 import {Tick} from "./lib/uniswap/Tick.sol";
+import {Decimals} from "./lib/Decimals.sol";
 import {TickMath} from "./lib/uniswap/TickMath.sol";
 import {FullMath} from "./lib/uniswap/FullMath.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
@@ -17,6 +18,8 @@ import {ICLPool} from "./lib/aerodrome/ICLPool.sol";
 
 contract Trader is Initializable {
   using ERC20Extensions for IERC20;
+  using Decimals for uint256;
+
   ISwapRouter private router;
   IQuoter private quoter;
   ICLFactory private factory;
@@ -33,7 +36,7 @@ contract Trader is Initializable {
     factory = ICLFactory(_factory);
   }
 
-  function swap(address pool, Merchant.LimitOrder memory order) internal returns (uint256) {
+  function swap(address pool, Merchant.Order memory order) internal returns (uint256) {
     if (order.sell == address(0) || order.buy == address(0)) revert InvalidTokenAddresses();
     if (order.amount == 0) revert InvalidSwapAmount();
 
@@ -95,6 +98,13 @@ contract Trader is Initializable {
     amountOut = quoter.quoteExactInput(path, amountIn);
   }
 
+  function quoteBasedPrice(address sell, address buy, uint256 amountIn) public returns (uint256) {
+    uint8 maxDecimals = getMaxDecimals(sell, buy);
+
+    return (quote(sell, buy, amountIn).normalizeTokenAmount(buy, maxDecimals) / amountIn.normalizeTokenAmount(sell, maxDecimals))
+      .normalizeAmount(maxDecimals, IERC20(buy).safeDecimals());
+  }
+
   /**
    * @dev Returns the pool address and fee for the given token pair.
    * This function checks for the existence of a pool for the given token pair at various tick spacings.
@@ -127,6 +137,8 @@ contract Trader is Initializable {
   
   // @todo: this always goes from current tick to a lower tick
   // It should be dynamic depending on what token is being sold
+  // https://blog.uniswap.org/uniswap-v3-math-primer
+  // https://blog.uniswap.org/uniswap-v3-math-primer-2
   function getLiquidityAmounts(address tokenA, address tokenB, uint24 targetTickRange) public view returns (uint256 amount0, uint256 amount1) {
     (address pool,,int24 tickSpacing) = getPool(tokenA, tokenB);
 
@@ -142,7 +154,7 @@ contract Trader is Initializable {
 
     while (true) {
       if (abs(lowerCurrentTick - tempTick) >= targetTickRange) { break; }
-      if (abs(lowerCurrentTick - tempTick) % uint24(tickSpacing) != 0) { break; }
+      if (abs(lowerCurrentTick - tempTick) % uint24(tickSpacing) != 0) { break; } // this shouldnt happen
       if (tempTick < TickMath.MIN_TICK && tempTick > TickMath.MAX_TICK) { break; }
 
       (,int128 liquidityNet,,,,,,,,bool initialized) = ICLPool(pool).ticks(tempTick);
@@ -193,5 +205,12 @@ contract Trader is Initializable {
 
   function abs(int24 x) internal pure returns (uint24) {
     return x >= 0 ? uint24(x) : uint24(-x);
+  }
+
+  function getMaxDecimals(address _sell, address _buy) public view returns(uint8) {
+    uint8 sellDecimals = IERC20(_sell).safeDecimals();
+    uint8 buyDecimals = IERC20(_buy).safeDecimals();
+
+    return sellDecimals > buyDecimals ? sellDecimals : buyDecimals;
   }
 }

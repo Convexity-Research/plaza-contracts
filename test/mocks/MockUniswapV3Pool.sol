@@ -252,7 +252,7 @@ contract MockUniswapV3Pool {
 		secondsInside = 0;
 	}
 
-  function ticks(int24 tick)
+  function ticks(int24 /*tick*/)
     external
     pure
     returns (

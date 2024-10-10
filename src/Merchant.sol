@@ -19,7 +19,13 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
   // Define a constants for the access roles using keccak256 to generate a unique hash
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
-  struct LimitOrder {
+  enum OrderType {
+    LIMIT,
+    MARKET
+  }
+
+  struct Order {
+    OrderType orderType;
     address sell;
     address buy;
     uint256 price;
@@ -28,13 +34,15 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
     bool filled;
   }
 
-  mapping (address => LimitOrder) public orders;
+  mapping (address => Order) public orders;
   mapping (address => uint256) public ordersTimestamp;
 
   // Pool -> Period -> Has Stopped Selling
   mapping (address => mapping(uint256 => bool)) private hasStoppedSelling;
 
   event StoppedSelling(address pool);
+  event OrderPlaced(address pool, OrderType orderType, address sell, address buy, uint256 amount, uint256 price);
+  event OrderExecuted(address pool, OrderType orderType, address sell, address buy, uint256 amount, uint256 price);
 
   error ZeroPrice();
   error UpdateNotRequired();
@@ -54,49 +62,45 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
   }
   
   // this will be called by automation to check if there are any pending orders
-  function hasPendingOrders(address _pool) public /*view*/ returns(bool) {
+  function needsNewOrders(address _pool) public /*view*/ returns(bool) {
     if (ordersTimestamp[_pool] == 0) {
-      return getLimitOrders(_pool).sell != address(0);
+      return getOrder(_pool).sell != address(0);
     }
 
     if (ordersTimestamp[_pool] + 12 hours <= block.timestamp) {
-      return getLimitOrders(_pool).sell != address(0);
+      return getOrder(_pool).sell != address(0);
     }
 
     return false;
   }
 
-  function updateLimitOrders(address _pool) external whenNotPaused() {
+  function updateOrders(address _pool) external whenNotPaused() {
     // If 12 hours have not passed, revert
     if (ordersTimestamp[_pool] + 12 hours > block.timestamp) {
       revert UpdateNotRequired();
     }
 
-    LimitOrder memory limitOrder = getLimitOrders(_pool);
+    Order memory order = getOrder(_pool);
     // If there are no orders to update, revert
-    if (limitOrder.sell == address(0)) {
+    if (order.sell == address(0)) {
       revert UpdateNotRequired();
     }
 
-    orders[_pool] = limitOrder;
+    orders[_pool] = order;
     ordersTimestamp[_pool] = block.timestamp;
+
+    emit OrderPlaced(_pool, order.orderType, order.sell, order.buy, order.amount, order.price);
   }
 
   function ordersPriceReached(address _pool) public returns(bool) {
-    LimitOrder memory limitOrder = orders[_pool];
+    Order memory order = orders[_pool];
 
-    uint256 couponsBuying = quote(limitOrder.sell, limitOrder.buy, limitOrder.amount);
-    uint256 orderPrice = (limitOrder.amount * 10**(IERC20(limitOrder.sell).safeDecimals())) / couponsBuying;
-    if (limitOrder.buy == address(0) || limitOrder.filled) {
+    uint256 orderPrice = quoteBasedPrice(order.sell, order.buy, order.amount);
+    if (order.buy == address(0) || order.filled) {
       return false;
     }
 
-    // if price is 0, it means it's a market order
-    if (limitOrder.price == 0 || limitOrder.price <= orderPrice) {
-      return true;
-    }
-    
-    return false;
+    return order.orderType == OrderType.MARKET || order.price <= orderPrice;
   }
 
   function executeOrders(address _pool) external whenNotPaused() {
@@ -106,22 +110,17 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
 
     address couponToken = Pool(_pool).couponToken();
 
-    // @todo: duplicated checks from ordersPriceReached - refactor if gas becomes a problem
-    LimitOrder memory limitOrder = orders[_pool];
-    uint256 currentPrice = getPrice(Pool(_pool).reserveToken(), couponToken);
+    Order memory order = orders[_pool];
+    uint256 currentPrice = quoteBasedPrice(Pool(_pool).reserveToken(), couponToken, order.amount);
     uint256 poolReserves = getPoolReserves(_pool);
 
-    if (limitOrder.buy == address(0) || limitOrder.filled) {
-      return;
-    }
-
     // if price is 0, it means it's a market order
-    if (limitOrder.price == 0) {
-      limitOrder.price = currentPrice;
-      limitOrder.minAmount = (currentPrice * limitOrder.amount * 995) / 1000; // 0.5% less than order.price
+    if (order.orderType == OrderType.MARKET) {
+      order.price = currentPrice;
+      order.minAmount = (currentPrice * order.amount * 995) / 1000; // 0.5% less than order.price
     }
 
-    uint256 amountOut = quote(limitOrder.sell, limitOrder.buy, limitOrder.amount);
+    uint256 amountOut = quote(order.sell, order.buy, order.amount);
     uint256 accruedCoupons = IERC20(couponToken).balanceOf(_pool);
 
     // This block implements a safety check to prevent over-selling of the pool's assets.
@@ -132,33 +131,35 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
     // If this threshold is reached, it triggers a hard stop to prevent further selling.
     //
     // Calculation breakdown:
-    // - (poolReserves - limitOrders[i].amount) represents the expected remaining reserve
+    // - (poolReserves - order.amount) represents the expected remaining reserve
     //   tokens after this order
     // - currentPrice is the current price of reserve tokens in coupon tokens
     // - The multiplier (19 in this case) represents the maximum allowed ratio of coupon
     //   tokens to reserve tokens (95% sell / 5% keep)
-    if (accruedCoupons + amountOut > 19 * (poolReserves - limitOrder.amount) * currentPrice) {
+    if (accruedCoupons + amountOut > 19 * (poolReserves - order.amount) * currentPrice) {
       setHardStop(_pool);
       return;
     }
 
-    swap(_pool, limitOrder);
-    limitOrder.filled = true;
+    swap(_pool, order);
+    order.filled = true;
 
     // reset orders timestamp
     ordersTimestamp[_pool] = 0;
 
     // Update storage
-    orders[_pool] = limitOrder;
+    orders[_pool] = order;
+
+    emit OrderExecuted(_pool, order.orderType, order.sell, order.buy, order.amount, order.price);
   }
 
-  function getLimitOrders(address _pool) public returns(LimitOrder memory limitOrder) {
+  function getOrder(address _pool) public returns(Order memory order) {
     Pool pool = Pool(_pool);
     Pool.PoolInfo memory poolInfo = Pool(_pool).getPoolInfo();
 
     // Hard stop
     if (hasStoppedSelling[_pool][poolInfo.currentPeriod]) {
-      return limitOrder;
+      return order;
     }
 
     address reserveToken = pool.reserveToken();
@@ -167,41 +168,51 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
     uint256 remainingCouponAmount = getRemainingCouponAmount(_pool);
     uint256 daysToPayment = getDaysToPayment(_pool);
     uint256 poolReserves = getPoolReserves(_pool);
+
+    // price of reserveToken in couponToken/
     uint256 currentPrice = getPrice(reserveToken, couponToken);
-    (,uint256 liquidity) = getLiquidityAmounts(reserveToken, couponToken, 50);
+    (,uint256 liquidity) = getLiquidityAmounts(reserveToken, couponToken, 100);
 
     require (currentPrice > 0, ZeroPrice());
 
     if (daysToPayment > 10 || remainingCouponAmount == 0) {
-      return limitOrder;
+      return order;
     }
 
     // Ensure pool reserves is greater than coupon amount
     if (poolReserves * currentPrice <= remainingCouponAmount) {
       setHardStop(_pool);
-      return limitOrder;
+        return order;
     }
 
     uint256 maxOrder = 0;
     uint256 sellAmount = 0;
     uint256 price = 0;
     uint256 minAmount = 0;
-    uint256[10] memory values;
+    uint256[10] memory potentialOrderSizes;
 
     if (daysToPayment > 5) {
       
-      values[0] = (250 * liquidity / PRECISION);
-      values[1] = (1000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
-      values[2] = (poolReserves * 9500) / PRECISION;
+      // 2.5% of liquidity
+      potentialOrderSizes[0] = (250 * liquidity / PRECISION);
+      // 10% of remainingCouponAmount / 102.5% of currentPrice
+      potentialOrderSizes[1] = (1000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      // 95% of poolReserves
+      potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
 
-      maxOrder = min(values, 3);
+      maxOrder = min(potentialOrderSizes, 3);
 
+      // 20% of maxOrder
       sellAmount = (maxOrder * 2000) / PRECISION;
       
+      // 102% of currentPrice
       price = (currentPrice * (PRECISION + 200)) / PRECISION;
+
+      // 99.5% of tokens to receive
       minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
 
-      return LimitOrder({
+      return Order({
+        orderType: OrderType.LIMIT,
         buy: address(couponToken),
         sell: address(reserveToken),
         price: price,
@@ -212,16 +223,26 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
     }
 
     if (daysToPayment > 1) {
-      values[0] = (500 * liquidity / PRECISION);
-      values[1] = (2000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
-      values[2] = (poolReserves * 9500) / PRECISION;
+      // 5% of liquidity
+      potentialOrderSizes[0] = (500 * liquidity / PRECISION);
+      // 20% of remainingCouponAmount / 102.5% of currentPrice
+      potentialOrderSizes[1] = (2000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      // 95% of poolReserves
+      potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
 
-      maxOrder = min(values, 3);
+      maxOrder = min(potentialOrderSizes, 3);
+
+      // 20% of maxOrder
       sellAmount = (maxOrder * 2000) / PRECISION;
+      
+      // 102% of currentPrice
       price = (currentPrice * (PRECISION + 200)) / PRECISION;
+      
+      // 99.5% of tokens to receive
       minAmount = (price * sellAmount * 995) / 1000; // 0.5% less than order.price
 
-      return LimitOrder({
+      return Order({
+        orderType: OrderType.LIMIT,
         buy: address(couponToken),
         sell: address(reserveToken),
         price: price,
@@ -232,14 +253,19 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
     }
 
     if (daysToPayment > 0) {
-      values[0] = (500 * liquidity / PRECISION);
-      values[1] = (remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
-      values[2] = (poolReserves * 9500) / PRECISION;
+      // 10% of liquidity
+      potentialOrderSizes[0] = (1000 * liquidity / PRECISION);
+      // 100% of remainingCouponAmount / 102.5% of currentPrice
+      potentialOrderSizes[1] = (10000 * remainingCouponAmount / (currentPrice * 10250)) / PRECISION;
+      // 95% of poolReserves
+      potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
 
-      maxOrder = min(values, 3);
-      sellAmount = (maxOrder * 200000) / PRECISION;
+      maxOrder = min(potentialOrderSizes, 3);
+
+      sellAmount = (maxOrder * 2000) / PRECISION;
       
-      return LimitOrder({
+      return Order({
+        orderType: OrderType.LIMIT,
         buy: address(couponToken),
         sell: address(reserveToken),
         price: price,
@@ -250,17 +276,18 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
     }
 
     // Sell what's left
-    values[0] = (1000 * liquidity / PRECISION);
-    values[1] = (remainingCouponAmount / currentPrice);
-    values[2] = (poolReserves * 9500) / PRECISION;
-
-    maxOrder = min(values, 3);
+    // 10% of liquidity
+    potentialOrderSizes[0] = (1000 * liquidity / PRECISION);
+    potentialOrderSizes[1] = (remainingCouponAmount / currentPrice);
+    // 95% of poolReserves
+    potentialOrderSizes[2] = (poolReserves * 9500) / PRECISION;
     
-    return LimitOrder({
+    return Order({
+      orderType: OrderType.MARKET,
       buy: address(couponToken),
       sell: address(reserveToken),
-      price: 0, // zero means market sell
-      amount: maxOrder,
+      price: 0,
+      amount: min(potentialOrderSizes, 3),
       minAmount: 0,
       filled: false
     });
@@ -292,14 +319,19 @@ contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradea
     // Adjust minAmount to reserveToken decimals
     uint256 adjustedMinAmount = minAmount.normalizeAmount(18, reserveDecimals);
     
-    swap(msg.sender, LimitOrder({
+    Order memory order = Order({
+      orderType: OrderType.MARKET,
       buy: address(reserveToken),
       sell: address(couponToken),
       price: 0, // not needed, market sell
       amount: couponExcess,
       minAmount: adjustedMinAmount,
       filled: false
-    }));
+    });
+
+    emit OrderPlaced(msg.sender, order.orderType, order.sell, order.buy, order.amount, order.price);
+    swap(msg.sender, order);
+    emit OrderExecuted(msg.sender, order.orderType, order.sell, order.buy, order.amount, order.price);
   }
   
   function min(uint256[10] memory values, uint8 length) public pure returns (uint256) {
