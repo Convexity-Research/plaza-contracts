@@ -7,3 +7,4 @@ via-ir = true
 ffi = true
 ast = true
 extra_output = ["storageLayout"]
+auto_detect_solc = true
