@@ -15,11 +15,13 @@ import {Validator} from "../src/utils/Validator.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract PoolTest is Test, TestCases {
   using Decimals for uint256;
-  
+  using Strings for uint256;
+
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
 
@@ -110,7 +112,8 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      string memory salt = i.toString();
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 amount = _pool.getCreateAmount(
         calcTestCases[i].assetType, 
@@ -159,8 +162,10 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets + calcTestCases[i].inAmount);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
+      string memory salt = i.toString();
+      
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
       useMockPool(address(_pool));
       rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
@@ -209,8 +214,11 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets + calcTestCases[i].inAmount);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
       rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(user2);
@@ -378,7 +386,10 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 amount = _pool.getRedeemAmount(
         calcTestCases[i].assetType, 
@@ -416,8 +427,11 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -462,8 +476,11 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 startBalance = rToken.balanceOf(user2);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -550,8 +567,11 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -604,8 +624,11 @@ contract PoolTest is Test, TestCases {
       rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -874,8 +897,11 @@ contract PoolTest is Test, TestCases {
 
       setEthPrice(calcTestCases[i].ethPrice);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
       rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -922,8 +948,11 @@ contract PoolTest is Test, TestCases {
 
       setEthPrice(calcTestCases[i].ethPrice);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -969,8 +998,11 @@ contract PoolTest is Test, TestCases {
 
       setEthPrice(calcTestCases[i].ethPrice);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
 
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -1031,8 +1063,11 @@ contract PoolTest is Test, TestCases {
 
       setEthPrice(calcTestCases[i].ethPrice);
 
+      // Create salt to create the pool at a different address
+      string memory salt = i.toString();
+
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", "", "", ""));
+      Pool _pool = Pool(poolFactory.createPool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
       rToken.approve(address(_pool), calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals));
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);

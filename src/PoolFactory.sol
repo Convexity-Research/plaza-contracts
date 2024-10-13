@@ -223,23 +223,6 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     return pool;
   }
-
-  /**
-   * @dev Get the address of a pool using the reserve token, coupon token, bond symbol, and leverage symbol.
-   * @param reserveToken The address of the reserve token.
-   * @param couponToken The address of the coupon token.
-   * @param bondSymbol The symbol of the bond token.
-   * @param leverageSymbol The symbol of the leverage token.
-   * @return The address of the pool.
-   */
-  function getPoolAddress(address reserveToken, address couponToken, string memory bondSymbol, string memory leverageSymbol) external view returns (address) {
-    return Create3.addressOf(keccak256(abi.encodePacked(
-      reserveToken,
-      couponToken,
-      bondSymbol,
-      leverageSymbol
-    )));
-  }
   
   /**
    * @dev Grants `role` to `account`.

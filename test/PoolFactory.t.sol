@@ -14,6 +14,8 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
+import {Create3} from "@create3/contracts/Create3.sol";
+
 contract PoolFactoryTest is Test {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
@@ -94,11 +96,30 @@ contract PoolFactoryTest is Test {
     rToken.mint(governance, 1);
     rToken.approve(address(poolFactory), 1);
     
-    address poolAddress = poolFactory.getPoolAddress(params.reserveToken, params.couponToken, "bondWETH", "levWETH");
+    // address poolAddress = poolFactory.getPoolAddress(params.reserveToken, params.couponToken, "bondWETH", "levWETH");
+
+    bytes32 salt = keccak256(abi.encodePacked(
+      params.reserveToken,
+      params.couponToken,
+      "bondWETH",
+      "levWETH"
+    ));
+
+    address proxyAddress = address(uint160(uint256(keccak256(abi.encodePacked(
+      hex'ff',
+      address(poolFactory),
+      salt,
+      Create3.KECCAK256_PROXY_CHILD_BYTECODE
+    )))));
+
+    address poolAddress = address(uint160(uint256(keccak256(abi.encodePacked(
+      hex"d6_94",
+      proxyAddress,
+      hex"01"
+    )))));
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.CreatePool(params, 1, 1, 1));
-    uint256 endLength = poolFactory.poolsLength();
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH"));
 
     assertEq(address(_pool), poolAddress);
 
