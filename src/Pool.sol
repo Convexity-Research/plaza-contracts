@@ -231,6 +231,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
     uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    // Calculate and subtract fees from poolReserves
+    poolReserves = poolReserves - (poolReserves * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
+
     depositAmount = depositAmount.normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
     uint8 assetDecimals = 0;
@@ -385,6 +389,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
+    // Calculate and subtract fees from poolReserves
+    poolReserves = poolReserves - (poolReserves * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
+
     if (tokenType == TokenType.LEVERAGE) {
       depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
     } else {
@@ -537,6 +544,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
     uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    // Calculate and subtract fees from poolReserves
+    poolReserves = poolReserves - (poolReserves * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);  
 
     if (tokenType == TokenType.LEVERAGE) {
       depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
@@ -723,10 +733,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    */
   function claimFees() external nonReentrant {
     require(msg.sender == feeBeneficiary, NotBeneficiary());
-    
-    uint256 timeSinceLastClaim = block.timestamp - lastFeeClaimTime;
-    uint256 reserveBalance = IERC20(reserveToken).balanceOf(address(this));
-    uint256 feeAmount = (reserveBalance * fee * timeSinceLastClaim) / (PRECISION * SECONDS_PER_YEAR);
+    uint256 feeAmount = (IERC20(reserveToken).balanceOf(address(this)) * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
     
     if (feeAmount == 0) {
       revert NoFeesToClaim();
