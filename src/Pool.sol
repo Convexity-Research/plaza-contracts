@@ -32,11 +32,13 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   uint256 private constant PRECISION = 1000000;
   uint256 private constant BOND_TARGET_PRICE = 100;
   uint8 private constant COMMON_DECIMALS = 18;
+  uint256 private constant SECONDS_PER_YEAR = 365 days;
 
   // Protocol
   PoolFactory public poolFactory;
   uint256 private fee;
   address public feeBeneficiary;
+  uint256 private lastFeeClaimTime;
 
   // Tokens
   address public reserveToken;
@@ -77,7 +79,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   // Custom errors
   error MinAmount();
   error ZeroAmount();
+  error FeeTooHigh();
   error AccessDenied();
+  error NoFeesToClaim();
+  error NotBeneficiary();
   error ZeroDebtSupply();
   error ZeroLeverageSupply();
   error DistributionPeriod();
@@ -89,6 +94,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event SharesPerTokenChanged(uint256 sharesPerToken);
   event Distributed(uint256 amount);
+  event FeeClaimed(address beneficiary, uint256 amount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -123,6 +129,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     __ReentrancyGuard_init();
 
     poolFactory = PoolFactory(_poolFactory);
+    // Fee cannot exceed 10%
+    require(_fee <= 100000, FeeTooHigh());
     fee = _fee;
     reserveToken = _reserveToken;
     bondToken = BondToken(_dToken);
@@ -132,6 +140,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     distributionPeriod = _distributionPeriod;
     lastDistribution = block.timestamp;
     feeBeneficiary = _feeBeneficiary;
+    lastFeeClaimTime = block.timestamp;
   }
 
   /**
@@ -649,6 +658,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @param _fee The new fee value.
    */
   function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
+    // Fee cannot exceed 10%
+    require(_fee <= 100000, FeeTooHigh());
     fee = _fee;
   }
 
@@ -658,6 +669,26 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    */
   function setFeeBeneficiary(address _feeBeneficiary) external onlyRole(poolFactory.GOV_ROLE()) {
     feeBeneficiary = _feeBeneficiary;
+  }
+
+  /**
+   * @dev Allows the fee beneficiary to claim the accumulated protocol fees.
+   */
+  function claimFees() external nonReentrant {
+    require(msg.sender == feeBeneficiary, NotBeneficiary());
+    
+    uint256 timeSinceLastClaim = block.timestamp - lastFeeClaimTime;
+    uint256 reserveBalance = IERC20(reserveToken).balanceOf(address(this));
+    uint256 feeAmount = (reserveBalance * fee * timeSinceLastClaim) / (PRECISION * SECONDS_PER_YEAR);
+    
+    if (feeAmount == 0) {
+      revert NoFeesToClaim();
+    }
+    
+    lastFeeClaimTime = block.timestamp;
+    IERC20(reserveToken).safeTransfer(feeBeneficiary, feeAmount);
+    
+    emit FeeClaimed(feeBeneficiary, feeAmount);
   }
 
   /**

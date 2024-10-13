@@ -1032,4 +1032,44 @@ contract PoolTest is Test, TestCases {
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
     }
   }
+
+  function testClaimFees() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    Pool pool = Pool(poolFactory.CreatePool(params, 1000 ether, 500 ether, 250 ether));
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(address(this), 1000 ether);
+    rToken.approve(address(pool), 1000 ether);
+
+    // Deposit into the pool
+    pool.create(Pool.TokenType.BOND, 1000 ether, 0);
+
+    // Fast forward one year
+    vm.warp(block.timestamp + 365 days);
+
+    // Calculate expected fee
+    uint256 expectedFee = (1000 ether * 20000) / 1000000; // 2% of 1000 ether
+
+    // Check initial balance of fee beneficiary
+    address feeBeneficiary = pool.feeBeneficiary();
+    uint256 initialBalance = reserveToken.balanceOf(feeBeneficiary);
+
+    // Claim fees
+    vm.prank(feeBeneficiary);
+    pool.claimFees();
+
+    // Check final balance of fee beneficiary
+    uint256 finalBalance = reserveToken.balanceOf(feeBeneficiary);
+
+    // Assert that the claimed fee is correct (allowing for small rounding errors)
+    assertApproxEqAbs(finalBalance - initialBalance, expectedFee, 1e15);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
 }
