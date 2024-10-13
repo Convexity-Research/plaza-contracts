@@ -55,6 +55,7 @@ contract PoolTest is Test, TestCases {
     )));
 
     params.fee = 0;
+    params.feeBeneficiary = governance;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
@@ -1067,15 +1068,14 @@ contract PoolTest is Test, TestCases {
 
     // Create a pool with 2% fee
     params.fee = 20000; // 2% fee (1000000 precision)
-    Pool pool = Pool(poolFactory.CreatePool(params, 1000 ether, 500 ether, 250 ether));
+    params.feeBeneficiary = address(0x942);
 
     // Mint and approve reserve tokens
     Token rToken = Token(params.reserveToken);
-    rToken.mint(address(this), 1000 ether);
-    rToken.approve(address(pool), 1000 ether);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
 
-    // Deposit into the pool
-    pool.create(Pool.TokenType.BOND, 1000 ether, 0);
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
 
     // Fast forward one year
     vm.warp(block.timestamp + 365 days);
@@ -1085,17 +1085,71 @@ contract PoolTest is Test, TestCases {
 
     // Check initial balance of fee beneficiary
     address feeBeneficiary = pool.feeBeneficiary();
-    uint256 initialBalance = reserveToken.balanceOf(feeBeneficiary);
+    uint256 initialBalance = rToken.balanceOf(feeBeneficiary);
+    
+    vm.stopPrank();
 
     // Claim fees
-    vm.prank(feeBeneficiary);
+    vm.startPrank(feeBeneficiary);
     pool.claimFees();
 
+    vm.stopPrank();
+
     // Check final balance of fee beneficiary
-    uint256 finalBalance = reserveToken.balanceOf(feeBeneficiary);
+    uint256 finalBalance = rToken.balanceOf(feeBeneficiary);
 
     // Assert that the claimed fee is correct (allowing for small rounding errors)
-    assertApproxEqAbs(finalBalance - initialBalance, expectedFee, 1e15);
+    assertEq(finalBalance - initialBalance, expectedFee);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testClaimFeesNothingToClaim() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    
+    vm.stopPrank();
+
+    // Claim fees
+    vm.startPrank(params.feeBeneficiary);
+    vm.expectRevert(Pool.NoFeesToClaim.selector);
+    pool.claimFees();
+    vm.stopPrank();
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testClaimNotBeneficiary() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+
+    // Claim fees
+    vm.expectRevert(Pool.NotBeneficiary.selector);
+    pool.claimFees();
 
     // Reset reserve state
     rToken.burn(governance, rToken.balanceOf(governance));

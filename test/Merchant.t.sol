@@ -64,6 +64,7 @@ contract MerchantTest is Test {
 
     PoolFactory.PoolParams memory params = PoolFactory.PoolParams({
       fee: 0,
+      feeBeneficiary: governance,
       sharesPerToken: sharesPerToken,
       reserveToken: address(0x1210000000000000000000000000000000000000),
       distributionPeriod: distributionPeriod,
