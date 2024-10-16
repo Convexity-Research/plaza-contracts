@@ -6,6 +6,7 @@ import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "./BondToken.sol";
 import {Distributor} from "./Distributor.sol";
 import {LeverageToken} from "./LeverageToken.sol";
+import {Create3} from "@create3/contracts/Create3.sol";
 import {TokenDeployer} from "./utils/TokenDeployer.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -176,8 +177,21 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         ethPriceFeed
       )
     );
-    BeaconProxy poolProxy = new BeaconProxy(address(poolBeacon), initData);
-    address pool = address(poolProxy);
+
+    address pool = Create3.create3(
+      keccak256(
+        abi.encodePacked(
+          params.reserveToken,
+          params.couponToken,
+          bondToken.symbol(),
+          lToken.symbol()
+        )
+      ),
+      abi.encodePacked(
+        type(BeaconProxy).creationCode,
+        abi.encode(address(poolBeacon), initData)
+      )
+    );
 
     Distributor(distributor).registerPool(pool, params.couponToken);
 

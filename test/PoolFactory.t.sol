@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {Distributor} from "../src/Distributor.sol";
 import "forge-std/Test.sol";
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {Distributor} from "../src/Distributor.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
+import {Create3} from "@create3/contracts/Create3.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -80,6 +81,46 @@ contract PoolFactoryTest is Test {
     assertEq(rToken.totalSupply(), 10000000000);
     assertEq(_pool.bondToken().totalSupply(), 10000);
     assertEq(_pool.lToken().totalSupply(), 20000);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  }
+
+  function testCreatePoolDeterministic() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 1);
+    rToken.approve(address(poolFactory), 1);
+    
+    // address poolAddress = poolFactory.getPoolAddress(params.reserveToken, params.couponToken, "bondWETH", "levWETH");
+
+    bytes32 salt = keccak256(abi.encodePacked(
+      params.reserveToken,
+      params.couponToken,
+      "bondWETH",
+      "levWETH"
+    ));
+
+    address proxyAddress = address(uint160(uint256(keccak256(abi.encodePacked(
+      hex'ff',
+      address(poolFactory),
+      salt,
+      Create3.KECCAK256_PROXY_CHILD_BYTECODE
+    )))));
+
+    address poolAddress = address(uint160(uint256(keccak256(abi.encodePacked(
+      hex"d6_94",
+      proxyAddress,
+      hex"01"
+    )))));
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH"));
+
+    assertEq(address(_pool), poolAddress);
 
     // Reset reserve state
     rToken.burn(governance, rToken.balanceOf(governance));
