@@ -5,12 +5,13 @@ import {Pool} from "./Pool.sol";
 import {Trader} from "./Trader.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-// @todo: make it upgradable
-contract Merchant is AccessControl, Pausable, Trader {
+contract Merchant is AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradeable, Trader {
   using Decimals for uint256;
   using ERC20Extensions for IERC20;
 
@@ -47,9 +48,16 @@ contract Merchant is AccessControl, Pausable, Trader {
   error UpdateNotRequired();
   error NoOrdersToExecute();
 
-  constructor(address _router, address _quoter, address _dexFactory) Trader(_router, _quoter, _dexFactory) {
-    // @todo: update access control to copy Pool mechanism
-    _setRoleAdmin(GOV_ROLE, GOV_ROLE);
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  function initialize(address _router, address _quoter, address _dexFactory) initializer public {
+    __AccessControl_init();
+    __Pausable_init();
+    __Trader_init(_router, _quoter, _dexFactory);
+
     _grantRole(GOV_ROLE, msg.sender);
   }
   
@@ -376,6 +384,26 @@ contract Merchant is AccessControl, Pausable, Trader {
     emit StoppedSelling(_pool);
   }
 
+  /**
+   * @dev Grants `role` to `account`.
+   * If `account` had not been already granted `role`, emits a {RoleGranted} event.
+   * @param role The role to grant
+   * @param account The account to grant the role to
+   */
+  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _grantRole(role, account);
+  }
+
+  /**
+   * @dev Revokes `role` from `account`.
+   * If `account` had been granted `role`, emits a {RoleRevoked} event.
+   * @param role The role to revoke
+   * @param account The account to revoke the role from
+   */
+  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
+    _revokeRole(role, account);
+  }
+
   function pause() external onlyRole(GOV_ROLE) {
     _pause();
   }
@@ -383,4 +411,15 @@ contract Merchant is AccessControl, Pausable, Trader {
   function unpause() external onlyRole(GOV_ROLE) {
     _unpause();
   }
+
+  /**
+   * @dev Authorizes an upgrade to a new implementation.
+   * Can only be called by the owner of the contract.
+   * @param newImplementation Address of the new implementation
+   */
+  function _authorizeUpgrade(address newImplementation)
+    internal
+    onlyRole(GOV_ROLE)
+    override
+  {}
 }
