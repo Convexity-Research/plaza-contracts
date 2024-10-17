@@ -16,7 +16,6 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 contract TestnetScript is Script {
 
   // Base Sepolia addresses
-  address public constant merchant = address(0);
   address public constant reserveToken = address(0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871);
   address public constant couponToken = address(0xf7464321dE37BdE4C03AAeeF6b1e7b71379A9a64);
 
@@ -64,7 +63,6 @@ contract TestnetScript is Script {
     Token(params.reserveToken).approve(address(factory), reserveAmount);
     
     address pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
-    Pool(pool).approveMerchant(address(merchant));
     
     vm.stopBroadcast();
   }
