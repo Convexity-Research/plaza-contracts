@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract Auction {
+  using SafeERC20 for IERC20;
 
   // Auction beneficiary
   address public beneficiary;
@@ -15,7 +17,14 @@ contract Auction {
   // Auction end time and total sell amount
   uint256 public endTime;
   uint256 public totalBuyAmount;
-  bool public auctionEnded;
+
+  enum State {
+    BIDDING,
+    SUCCEEDED,
+    FAILED
+  }
+
+  State public state;
 
   struct Bid {
     address bidder;
@@ -32,11 +41,12 @@ contract Auction {
   uint256 private lowestBidIndex; // New variable to track the lowest bid
   uint256 private totalBidsAmount; // Aggregated buy amount (coupon) for the auction
 
-  event AuctionEnded();
+  event AuctionEnded(State state);
   event BidClaimed(address indexed bidder, uint256 sellAmount);
   event BidPlaced(address indexed bidder, uint256 buyAmount, uint256 sellAmount);
   event BidRemoved(address indexed bidder, uint256 buyAmount, uint256 sellAmount);
 
+  error AuctionFailed();
   error AuctionHasEnded();
   error AuctionStillOngoing();
   error InvalidSellAmount();
@@ -70,6 +80,11 @@ contract Auction {
     _;
   }
 
+  modifier auctionSucceeded() {
+    if (state != State.SUCCEEDED) revert AuctionFailed();
+    _;
+  }
+
   // Function to place bids on a portion of the pool
   // buyAmount = reserve (bidder perspective)
   // sellAmount = coupon (bidder perspective)
@@ -96,16 +111,53 @@ contract Auction {
     // Insert the new bid into the sorted linked list
     insertSortedBid(newBidIndex);
 
-    // Check if we've exceeded maxBids and remove the lowest bid if necessary
-    if (bidCount > maxBids) {
-      removeLowestBid();
+    // Remove excess bids and update totalBidsAmount
+    removeBids();
+
+    emit BidPlaced(msg.sender, buyAmount, sellAmount);
+  }
+
+  function removeBids() internal {
+    uint256 currentBidIndex = highestBidIndex;
+    uint256 cumulativeSellAmount = 0;
+    uint256 lastValidBidIndex = 0;
+    uint256 validBidCount = 0;
+
+    while (currentBidIndex != 0 && validBidCount < maxBids) {
+      cumulativeSellAmount += bids[currentBidIndex].sellAmount;
+      
+      if (cumulativeSellAmount >= totalBuyAmount) {
+        break;
+      }
+      
+      lastValidBidIndex = currentBidIndex;
+      currentBidIndex = bids[currentBidIndex].nextBidIndex;
+      validBidCount++;
     }
 
-    // @todo: Was it actually placed? It could have been removed
+    if (lastValidBidIndex != 0) {
+      // Remove all bids after lastValidBidIndex
+      uint256 removedBidIndex = bids[lastValidBidIndex].nextBidIndex;
+      bids[lastValidBidIndex].nextBidIndex = 0;
+      lowestBidIndex = lastValidBidIndex;
 
-    totalBidsAmount += sellAmount;
-    
-    emit BidPlaced(msg.sender, buyAmount, sellAmount);
+      while (removedBidIndex != 0) {
+        uint256 nextBidIndex = bids[removedBidIndex].nextBidIndex;
+        
+        // Refund the buy tokens for the removed bid
+        IERC20(buyToken).transfer(bids[removedBidIndex].bidder, bids[removedBidIndex].buyAmount);
+        
+        emit BidRemoved(bids[removedBidIndex].bidder, bids[removedBidIndex].buyAmount, bids[removedBidIndex].sellAmount);
+        
+        delete bids[removedBidIndex];
+        bidCount--;
+        
+        removedBidIndex = nextBidIndex;
+      }
+    }
+
+    // Update totalBidsAmount
+    totalBidsAmount = cumulativeSellAmount > totalBuyAmount ? totalBuyAmount : cumulativeSellAmount;
   }
 
   // Inserts the bid into the linked list based on the price (buyAmount/sellAmount) in descending order, then by sellAmount
@@ -189,14 +241,19 @@ contract Auction {
 
   // End auction
   function endAuction() external auctionExpired {
-    if (auctionEnded) revert AuctionAlreadyEnded();
-    auctionEnded = true;
-    emit AuctionEnded();
+    if (state != State.BIDDING) revert AuctionAlreadyEnded();
+    
+    if (totalBidsAmount < totalBuyAmount) {
+      state = State.FAILED;
+    } else {
+      state = State.SUCCEEDED;
+    }
+
+    emit AuctionEnded(state);
   }
 
   // Claim tokens for a winning bid
-  function claimBid(uint256 bidIndex) external {
-    if (!auctionEnded) revert AuctionNotEnded();
+  function claimBid(uint256 bidIndex) auctionExpired auctionSucceeded external {
     Bid storage bidInfo = bids[bidIndex];
     if (bidInfo.bidder != msg.sender) revert NothingToClaim();
     if (bidInfo.claimed) revert AlreadyClaimed();
@@ -208,9 +265,8 @@ contract Auction {
   }
 
   // Allow the beneficiary to withdraw buy token after auction ends
-  function withdraw() external auctionExpired {
-    uint256 balance = IERC20(buyToken).balanceOf(address(this));
-    IERC20(buyToken).transfer(beneficiary, balance);
+  function withdraw() external auctionExpired auctionSucceeded {
+    IERC20(buyToken).safeTransfer(beneficiary, IERC20(buyToken).balanceOf(address(this)));
   }
 
   function slotSize() internal view returns (uint256) {
