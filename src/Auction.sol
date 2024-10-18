@@ -70,21 +70,6 @@ contract Auction {
     }
   }
 
-  modifier auctionActive() {
-    if (block.timestamp >= endTime) revert AuctionHasEnded();
-    _;
-  }
-
-  modifier auctionExpired() {
-    if (block.timestamp < endTime) revert AuctionStillOngoing();
-    _;
-  }
-
-  modifier auctionSucceeded() {
-    if (state != State.SUCCEEDED) revert AuctionFailed();
-    _;
-  }
-
   // Function to place bids on a portion of the pool
   // buyAmount = reserve (bidder perspective)
   // sellAmount = coupon (bidder perspective)
@@ -208,37 +193,6 @@ contract Auction {
     }
   }
 
-  // Remove the lowest bid when maxBids is exceeded
-  function removeLowestBid() internal {
-    require(bidCount > 1, "Cannot remove the only bid");
-
-    Bid storage lowestBid = bids[lowestBidIndex];
-    uint256 previousBidIndex = highestBidIndex;
-
-    // Find the bid that points to the lowest bid
-    while (bids[previousBidIndex].nextBidIndex != lowestBidIndex) {
-      previousBidIndex = bids[previousBidIndex].nextBidIndex;
-    }
-
-    // Update the next pointer of the previous bid
-    bids[previousBidIndex].nextBidIndex = 0;
-    
-    // Refund the buy tokens to the bidder
-    IERC20(buyToken).transfer(lowestBid.bidder, lowestBid.buyAmount);
-
-    totalBidsAmount -= lowestBid.sellAmount;
-
-    // Emit an event for the removed bid
-    emit BidRemoved(lowestBid.bidder, lowestBid.buyAmount, lowestBid.sellAmount);
-
-    // Update the lowest bid index
-    lowestBidIndex = previousBidIndex;
-
-    // Remove the bid from storage
-    delete bids[lowestBidIndex];
-    bidCount--;
-  }
-
   // End auction
   function endAuction() external auctionExpired {
     if (state != State.BIDDING) revert AuctionAlreadyEnded();
@@ -271,5 +225,20 @@ contract Auction {
 
   function slotSize() internal view returns (uint256) {
     return totalBuyAmount / maxBids;
+  }
+
+  modifier auctionActive() {
+    if (block.timestamp >= endTime) revert AuctionHasEnded();
+    _;
+  }
+
+  modifier auctionExpired() {
+    if (block.timestamp < endTime) revert AuctionStillOngoing();
+    _;
+  }
+
+  modifier auctionSucceeded() {
+    if (state != State.SUCCEEDED) revert AuctionFailed();
+    _;
   }
 }
