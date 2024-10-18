@@ -99,6 +99,11 @@ contract Auction {
     // Remove excess bids and update totalBidsAmount
     removeBids();
 
+    // Check if the new bid is still on the map after removeBids
+    if (bids[newBidIndex].bidder == address(0)) {
+      revert BidAmountTooLow();
+    }
+
     emit BidPlaced(msg.sender, buyAmount, sellAmount);
   }
 
