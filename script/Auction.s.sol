@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {SortedAuction} from "../src/SortedAuction.sol";
+import {Auction} from "../src/Auction.sol";
 
 // @todo: remove - not meant for production - just for testing
 

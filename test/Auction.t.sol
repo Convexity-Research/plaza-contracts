@@ -6,10 +6,10 @@ import {Test, console} from "forge-std/Test.sol";
 import {GasMeter} from "./utils/GasMeter.sol";
 import {Auction} from "../src/Auction.sol";
 
-import {Token} from "./utils/Token.sol";
+import {Token} from "../test/mocks/Token.sol";
 
 contract AuctionTest is Test, GasMeter {
-  SortedAuction auction;
+  Auction auction;
   Token usdc;
   Token weth;
 
@@ -35,7 +35,7 @@ contract AuctionTest is Test, GasMeter {
     weth = new Token("WETH", "WETH", false);
 
     vm.startPrank(house);
-    auction = new SortedAuction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house);
+    auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house);
     vm.stopPrank();
   }
 
