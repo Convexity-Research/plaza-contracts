@@ -17,6 +17,8 @@ contract PreDeposit is Ownable, ReentrancyGuard {
   PoolFactory.PoolParams private params;
 
   uint256 public reserveAmount;
+  uint256 public reserveCap;
+
   uint256 private bondAmount;
   uint256 private leverageAmount;
 
@@ -41,28 +43,25 @@ contract PreDeposit is Ownable, ReentrancyGuard {
   error InvalidReserveToken();
   error ClaimPeriodNotStarted();
   error InvalidBondOrLeverageAmount();
+  error DepositCapReached();
+  error CapMustIncrease();
 
-  constructor(PoolFactory.PoolParams memory _params, address _factory, uint256 _depositEndTime) Ownable(msg.sender) {
+  constructor(PoolFactory.PoolParams memory _params, address _factory, uint256 _depositEndTime, uint256 _reserveCap) Ownable(msg.sender) {
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
     params = _params;
     depositEndTime = _depositEndTime;
+    reserveCap = _reserveCap;
     factory = PoolFactory(_factory);
-  }
-
-  function setParams(PoolFactory.PoolParams memory _params) external onlyOwner {
-    if (_params.reserveToken == address(0)) revert InvalidReserveToken();
-    if (_params.reserveToken != params.reserveToken) revert InvalidReserveToken();
-
-    params = _params;
-  }
-
-  function setBondAndLeverageAmount(uint256 _bondAmount, uint256 _leverageAmount) external onlyOwner {
-    bondAmount = _bondAmount;
-    leverageAmount = _leverageAmount;
   }
 
   function deposit(uint256 amount) external nonReentrant {
     if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (reserveAmount >= reserveCap) revert DepositCapReached();
+
+    // if user would like to put more than available in cap, fill the rest up to cap and add that to reserves
+    if (reserveAmount + amount >= reserveCap) {
+      amount = reserveCap - reserveAmount;
+    }
 
     balances[msg.sender] += amount;
     reserveAmount += amount;
@@ -118,5 +117,23 @@ contract PreDeposit is Ownable, ReentrancyGuard {
     }
 
     emit Claimed(msg.sender, userBondShare, userLeverageShare);
+  }
+
+  // admin functions
+  function setParams(PoolFactory.PoolParams memory _params) external onlyOwner {
+    if (_params.reserveToken == address(0)) revert InvalidReserveToken();
+    if (_params.reserveToken != params.reserveToken) revert InvalidReserveToken();
+
+    params = _params;
+  }
+
+  function setBondAndLeverageAmount(uint256 _bondAmount, uint256 _leverageAmount) external onlyOwner {
+    bondAmount = _bondAmount;
+    leverageAmount = _leverageAmount;
+  }
+
+  function increaseReserveCap(uint256 newReserveCap) external onlyOwner {
+    if (newReserveCap <= reserveCap) revert CapMustIncrease();
+    reserveCap = newReserveCap;
   }
 }
