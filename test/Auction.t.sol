@@ -60,6 +60,16 @@ contract AuctionTest is Test, GasMeter {
       console.log(usdcBid, ethBid, gas, gas * 3 * 2400 / 10**7);
     }
 
+    gasMeterStart();
+    auction.bid(10000 * 2, 1000000000);
+    gas = gasMeterStop();
+    console.log("Gas used (last bid) - low:", gas);
+
+    gasMeterStart();
+    auction.bid(1, 1000000000);
+    gas = gasMeterStop();
+    console.log("Gas used (last bid) - high:", gas);
+
     // gasMeterStart();
     // auction.bid(generateRandomBetween(1, 10000), generateRandomBetween(1, 10000));
     // gas = gasMeterStop();
