@@ -38,7 +38,7 @@ contract AuctionScript is Script, GasMeter {
         }
 
         gasMeterStart();
-        auction.bid(ethBid, usdcBid);
+        auction.bid(ethBid, usdcBid * 2);
         uint256 gas = gasMeterStop();
         console.log("Gas used:", gas);
 

@@ -99,7 +99,7 @@ contract Auction {
     insertSortedBid(newBidIndex);
 
     // Remove excess bids and update totalBidsAmount
-    removeBids();
+    // removeBids();
 
     // Check if the new bid is still on the map after removeBids
     if (bids[newBidIndex].bidder == address(0)) {
