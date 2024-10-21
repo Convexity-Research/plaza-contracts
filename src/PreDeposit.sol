@@ -5,11 +5,12 @@ import {Pool} from "./Pool.sol";
 import {BondToken} from "./BondToken.sol";
 import {PoolFactory} from "./PoolFactory.sol";
 import {LeverageToken} from "./LeverageToken.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-contract PreDeposit is Ownable, ReentrancyGuard {
+contract PreDeposit is Ownable, ReentrancyGuardUpgradeable, PausableUpgradeable {
 
   // Initializing pool params
   address pool;
@@ -22,6 +23,7 @@ contract PreDeposit is Ownable, ReentrancyGuard {
   uint256 private bondAmount;
   uint256 private leverageAmount;
 
+  uint256 public depositStartTime;
   uint256 public depositEndTime;
 
   // Deposit balances
@@ -37,6 +39,11 @@ contract PreDeposit is Ownable, ReentrancyGuard {
   error DepositEnded();
   error WithdrawEnded();
   error NothingToClaim();
+  error DepositAlreadyStarted();
+  error DepositStartMustOnlyBeExtended();
+  error DepositEndMustOnlyBeExtended();
+  error DepositEndMustBeAfterStart();
+  error DepositNotYetStarted();
   error DepositNotEnded();
   error NoReserveAmount();
   error InsufficientBalance();
@@ -46,15 +53,17 @@ contract PreDeposit is Ownable, ReentrancyGuard {
   error DepositCapReached();
   error CapMustIncrease();
 
-  constructor(PoolFactory.PoolParams memory _params, address _factory, uint256 _depositEndTime, uint256 _reserveCap) Ownable(msg.sender) {
+  constructor(PoolFactory.PoolParams memory _params, address _factory, uint256 _depositStartTime, uint256 _depositEndTime, uint256 _reserveCap) Ownable(msg.sender) {
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
     params = _params;
+    depositStartTime = _depositStartTime;
     depositEndTime = _depositEndTime;
     reserveCap = _reserveCap;
     factory = PoolFactory(_factory);
   }
 
-  function deposit(uint256 amount) external nonReentrant {
+  function deposit(uint256 amount) external nonReentrant whenNotPaused {
+    if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
     if (block.timestamp > depositEndTime) revert DepositEnded();
     if (reserveAmount >= reserveCap) revert DepositCapReached();
 
@@ -71,7 +80,8 @@ contract PreDeposit is Ownable, ReentrancyGuard {
     emit Deposit(msg.sender, amount);
   }
 
-  function withdraw(uint256 amount) external nonReentrant {
+  function withdraw(uint256 amount) external nonReentrant whenNotPaused {
+    if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
     if (block.timestamp > depositEndTime) revert WithdrawEnded();
 
     if (balances[msg.sender] < amount) revert InsufficientBalance();
@@ -83,7 +93,7 @@ contract PreDeposit is Ownable, ReentrancyGuard {
     emit Withdraw(msg.sender, amount);
   }
 
-  function createPool() external onlyOwner {
+  function createPool() external nonReentrant whenNotPaused {
     if (block.timestamp < depositEndTime) revert DepositNotEnded();
     if (reserveAmount == 0) revert NoReserveAmount();
     if (bondAmount == 0 || leverageAmount == 0) revert InvalidBondOrLeverageAmount();
@@ -94,7 +104,7 @@ contract PreDeposit is Ownable, ReentrancyGuard {
     emit PoolCreated(pool);
   }
 
-  function claim() external nonReentrant {
+  function claim() external nonReentrant whenNotPaused {
     if (block.timestamp < depositEndTime) revert DepositNotEnded();
     if (pool == address(0)) revert ClaimPeriodNotStarted();
     
@@ -121,6 +131,7 @@ contract PreDeposit is Ownable, ReentrancyGuard {
 
   // admin functions
   function setParams(PoolFactory.PoolParams memory _params) external onlyOwner {
+    if (block.timestamp > depositEndTime) revert DepositEnded();
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
     if (_params.reserveToken != params.reserveToken) revert InvalidReserveToken();
 
@@ -128,12 +139,55 @@ contract PreDeposit is Ownable, ReentrancyGuard {
   }
 
   function setBondAndLeverageAmount(uint256 _bondAmount, uint256 _leverageAmount) external onlyOwner {
+    if (block.timestamp > depositEndTime) revert DepositEnded();
     bondAmount = _bondAmount;
     leverageAmount = _leverageAmount;
   }
 
   function increaseReserveCap(uint256 newReserveCap) external onlyOwner {
     if (newReserveCap <= reserveCap) revert CapMustIncrease();
+    if (block.timestamp > depositEndTime) revert DepositEnded();
     reserveCap = newReserveCap;
   }
+
+  function setDepositStartTime (uint256 newDepositStartTime) external onlyOwner {
+    if (block.timestamp > newDepositStartTime) revert DepositAlreadyStarted();
+    if (newDepositStartTime <= depositStartTime) revert DepositStartMustOnlyBeExtended();
+    if (newDepositStartTime >= depositEndTime) revert DepositEndMustBeAfterStart();
+    depositStartTime = newDepositStartTime;
+  }
+
+  function setDepositEndTime (uint256 newDepositEndTime) external onlyOwner {
+    if (newDepositEndTime <= depositEndTime) revert DepositEndMustOnlyBeExtended();
+    if (newDepositEndTime <= depositStartTime) revert DepositEndMustBeAfterStart();
+    if (block.timestamp > depositEndTime) revert DepositEnded();
+    depositEndTime = newDepositEndTime;
+  }
+
+  /**
+   * @dev Pauses the contract. Reverts any interaction except upgrade.
+   */
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /**
+   * @dev Unpauses the contract.
+   */
+  function unpause() external onlyOwner {
+    _unpause();
+  }
+
+  /**
+   * @dev Authorizes an upgrade to a new implementation.
+   * Can only be called by the owner of the contract.
+   * @param newImplementation The address of the new implementation.
+   */
+  // @todo: owner will be PoolFactory, make sure we can upgrade
+  function _authorizeUpgrade(address newImplementation)
+    internal
+    onlyOwner
+    override
+  {}
+
 }
