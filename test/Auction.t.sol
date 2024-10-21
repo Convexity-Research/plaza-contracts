@@ -51,11 +51,11 @@ contract AuctionTest is Test, GasMeter {
     uint256 usdcBid;
     uint256 ethBid;
 
-    for (uint256 i = 0; i < 2000; i++) {
+    for (uint256 i = 0; i < 1000; i++) {
       gasMeterStart();
-      usdcBid = generateRandomBetween(1, 10000);
+      usdcBid = /*generateRandomBetween(1, 10) * */1000000000;
       ethBid = generateRandomBetween(1, 10000);
-      auction.bid(usdcBid, ethBid);
+      auction.bid(ethBid, usdcBid);
       gas = gasMeterStop();
       console.log(usdcBid, ethBid, gas, gas * 3 * 2400 / 10**7);
     }
