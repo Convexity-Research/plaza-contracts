@@ -709,29 +709,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   }
 
   /**
-   * @dev Recovers any ERC20 tokens or native tokens sent to this contract.
-   * @param token The address of the ERC20 token to recover.
-   * @notice This function should be removed before production deployment.
-   */
-  // @todo: remove before prod
-  function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
-    // Transfer ERC20 token balance
-    uint256 tokenBalance = IERC20(token).balanceOf(address(this));
-    if (tokenBalance > 0) {
-      IERC20(token).safeTransfer(msg.sender, tokenBalance);
-    }
-
-    // Transfer native token balance
-    uint256 nativeBalance = address(this).balance;
-    if (nativeBalance > 0) {
-      (bool success,) = payable(msg.sender).call{value: nativeBalance}("");
-      if (!success) {
-        return;
-      }
-    }
-  }
-
-  /**
    * @dev Modifier to check if the caller has the specified role.
    * @param role The role to check for.
    */
