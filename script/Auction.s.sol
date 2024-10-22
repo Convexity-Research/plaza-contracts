@@ -5,11 +5,9 @@ import {Script, console} from "forge-std/Script.sol";
 import {Auction} from "../src/Auction.sol";
 import {Token} from "../test/mocks/Token.sol";
 
-import {GasMeter} from "../test/utils/GasMeter.sol";
-
 // @todo: remove - not meant for production - just for testing
 
-contract AuctionScript is Script, GasMeter {
+contract AuctionScript is Script {
     Auction public auction;
 
     function setUp() public {}
@@ -37,10 +35,7 @@ contract AuctionScript is Script, GasMeter {
           auction.bid(ethBid, usdcBid);
         }
 
-        gasMeterStart();
         auction.bid(ethBid, usdcBid * 2);
-        uint256 gas = gasMeterStop();
-        console.log("Gas used:", gas);
 
         vm.stopBroadcast();
     }
