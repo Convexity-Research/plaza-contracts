@@ -50,11 +50,11 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   /// @dev Instance of the TokenDeployer contract
   TokenDeployer private tokenDeployer;
   /// @dev Address of the UpgradeableBeacon for Pool
-  UpgradeableBeacon public poolBeacon;
+  address public poolBeacon;
   /// @dev Address of the UpgradeableBeacon for BondToken
-  UpgradeableBeacon public bondBeacon;
+  address public bondBeacon;
   /// @dev Address of the UpgradeableBeacon for LeverageToken
-  UpgradeableBeacon public leverageBeacon;
+  address public leverageBeacon;
 
   /// @dev Error thrown when bond amount is zero
   error ZeroDebtAmount();
@@ -106,9 +106,9 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     _grantRole(GOV_ROLE, _governance);
 
     // Deploy UpgradeableBeacon for Pool
-    poolBeacon = UpgradeableBeacon(_poolImplementation);
-    bondBeacon = UpgradeableBeacon(_bondImplementation);
-    leverageBeacon = UpgradeableBeacon(_leverageImplementation);
+    poolBeacon = _poolImplementation;
+    bondBeacon = _bondImplementation;
+    leverageBeacon = _leverageImplementation;
   }
 
   /**
@@ -119,7 +119,6 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * @param leverageAmount Amount of leverage tokens to mint
    * @return Address of the newly created pool
    */
-  // @todo: make it payable (to accept native ETH)
   function createPool(
     PoolParams calldata params,
     uint256 reserveAmount,
@@ -142,9 +141,10 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     if (leverageAmount == 0) {
       revert ZeroLeverageAmount();
     }
-        
+    
     // Deploy Bond token
-    BondToken bondToken = BondToken(tokenDeployer.deployDebtToken(
+    BondToken bondToken = BondToken(tokenDeployer.deployBondToken(
+      bondBeacon,
       bondName,
       bondSymbol,
       address(this),
@@ -155,6 +155,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     // Deploy Leverage token
     LeverageToken lToken = LeverageToken(tokenDeployer.deployLeverageToken(
+      leverageBeacon,
       leverageName,
       leverageSymbol,
       address(this),
@@ -188,7 +189,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
       ),
       abi.encodePacked(
         type(BeaconProxy).creationCode,
-        abi.encode(address(poolBeacon), initData)
+        abi.encode(poolBeacon, initData)
       )
     );
 
