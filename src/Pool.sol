@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {Merchant} from "./Merchant.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Distributor} from "./Distributor.sol";
@@ -37,7 +36,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
 
   // Protocol
   PoolFactory public poolFactory;
-  address public merchant;
   uint256 private fee;
   address public feeBeneficiary;
   uint256 private lastFeeClaimTime;
@@ -95,7 +93,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event SharesPerTokenChanged(uint256 sharesPerToken);
-  event MerchantApproved(address merchant);
   event Distributed(uint256 amount);
   event FeeClaimed(address beneficiary, uint256 amount);
   event FeeChanged(uint256 oldFee, uint256 newFee);
@@ -115,7 +112,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @param _couponToken Address of the coupon token.
    * @param _sharesPerToken Initial shares per bond per distribution period.
    * @param _distributionPeriod Initial distribution period in seconds.
-   * @param _ethPriceFeed Address of the ETH price feed.
+   * @param _oracleFeeds Address of the OracleFeeds contract.
    */
   function initialize(
     address _poolFactory,
@@ -127,9 +124,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
     address _feeBeneficiary,
-    address _ethPriceFeed
+    address _oracleFeeds
   ) initializer public {
-    __OracleReader_init(_ethPriceFeed);
+    __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
 
     poolFactory = PoolFactory(_poolFactory);
@@ -251,8 +248,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
@@ -405,8 +402,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, IERC20(reserveToken).safeDecimals());
   }
 
@@ -561,8 +558,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     );
     
     uint8 assetDecimals = 0;
@@ -584,8 +581,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
@@ -624,31 +621,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     distributor.allocate(address(this), couponAmountToDistribute);
 
     emit Distributed(couponAmountToDistribute);
-    sellCouponExcess();
-  }
-
-  /**
-   * @dev Sells any excess coupon tokens.
-   * @return true if the excess was sold, false otherwise.
-   */
-  function sellCouponExcess() private returns(bool) {
-    if (merchant == address(0)) {
-      // this shouldn't stop the distribution
-      return false;
-    }
-
-    uint256 couponExcess = IERC20(couponToken).balanceOf(address(this));
-    if (couponExcess == 0) {
-      return false;
-    }
-
-    IERC20(couponToken).approve(merchant, couponExcess);
-    
-    try Merchant(merchant).sellCouponExcess(couponExcess) {
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   /**
@@ -670,17 +642,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       feeBeneficiary: feeBeneficiary
     });
   }
-
-  /**
-   * @dev Approves a merchant to spend the maximum amount of reserve tokens.
-   * @param _merchant The address of the merchant to approve.
-   * @notice Only callable by accounts with the GOV_ROLE.
-   * @notice Emits a MerchantApproved event upon successful approval.
-   */
-  function approveMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
-    IERC20(reserveToken).approve(address(_merchant), type(uint256).max);
-    emit MerchantApproved(_merchant);
-  }
   
   /**
    * @dev Sets the distribution period.
@@ -701,14 +662,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     sharesPerToken = _sharesPerToken;
 
     emit SharesPerTokenChanged(sharesPerToken);
-  }
-
-  /** 
-   * @dev Sets the merchant address.
-   * @param _merchant The new merchant address.
-   */
-  function setMerchant(address _merchant) external onlyRole(poolFactory.GOV_ROLE()) {
-    merchant = _merchant;
   }
 
   /**
@@ -761,29 +714,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    */
   function unpause() external onlyRole(poolFactory.GOV_ROLE()) {
     _unpause();
-  }
-
-  /**
-   * @dev Recovers any ERC20 tokens or native tokens sent to this contract.
-   * @param token The address of the ERC20 token to recover.
-   * @notice This function should be removed before production deployment.
-   */
-  // @todo: remove before prod
-  function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
-    // Transfer ERC20 token balance
-    uint256 tokenBalance = IERC20(token).balanceOf(address(this));
-    if (tokenBalance > 0) {
-      IERC20(token).safeTransfer(msg.sender, tokenBalance);
-    }
-
-    // Transfer native token balance
-    uint256 nativeBalance = address(this).balance;
-    if (nativeBalance > 0) {
-      (bool success,) = payable(msg.sender).call{value: nativeBalance}("");
-      if (!success) {
-        return;
-      }
-    }
   }
 
   /**

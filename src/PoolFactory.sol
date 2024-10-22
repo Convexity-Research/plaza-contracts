@@ -6,6 +6,7 @@ import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "./BondToken.sol";
 import {Distributor} from "./Distributor.sol";
 import {LeverageToken} from "./LeverageToken.sol";
+import {Create3} from "@create3/contracts/Create3.sol";
 import {TokenDeployer} from "./utils/TokenDeployer.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -46,8 +47,8 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   address public governance;
   /// @dev Address of the distributor contract
   address public distributor;
-  /// @dev Address of the ETH price feed
-  address private ethPriceFeed;
+  /// @dev Address of the OracleFeeds contract
+  address public oracleFeeds;
   /// @dev Instance of the TokenDeployer contract
   TokenDeployer private tokenDeployer;
   /// @dev Address of the UpgradeableBeacon for Pool
@@ -84,7 +85,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * @param _governance Address of the governance account that will have the GOV_ROLE.
    * @param _tokenDeployer Address of the TokenDeployer contract.
    * @param _distributor Address of the Distributor contract.
-   * @param _ethPriceFeed Address of the ETH price feed.
+   * @param _oracleFeeds Address of the OracleFeeds contract.
    * @param _poolImplementation Address of the Pool implementation contract.
    * @param _bondImplementation Address of the BondToken implementation contract.
    * @param _leverageImplementation Address of the LeverageToken implementation contract.
@@ -93,17 +94,17 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     address _governance,
     address _tokenDeployer,
     address _distributor,
-    address _ethPriceFeed,
+    address _oracleFeeds,
     address _poolImplementation,
     address _bondImplementation,
     address _leverageImplementation
   ) initializer public {
     __UUPSUpgradeable_init();
-
+    
     tokenDeployer = TokenDeployer(_tokenDeployer);
     governance = _governance;
     distributor = _distributor;
-    ethPriceFeed = _ethPriceFeed;
+    oracleFeeds = _oracleFeeds;
     _grantRole(GOV_ROLE, _governance);
 
     // Deploy UpgradeableBeacon for Pool
@@ -132,18 +133,17 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     string memory leverageSymbol
   ) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
 
-    // @todo: with this is safer but some cases are not testable (guess that's still good)
-    // if (reserveAmount == 0) {
-    //   revert ZeroReserveAmount();
-    // }
+    if (reserveAmount == 0) {
+      revert ZeroReserveAmount();
+    }
 
-    // if (bondAmount == 0) {
-    //   revert ZeroDebtAmount();
-    // }
+    if (bondAmount == 0) {
+      revert ZeroDebtAmount();
+    }
 
-    // if (leverageAmount == 0) {
-    //   revert ZeroLeverageAmount();
-    // }
+    if (leverageAmount == 0) {
+      revert ZeroLeverageAmount();
+    }
         
     // Deploy Bond token
     BondToken bondToken = BondToken(tokenDeployer.deployDebtToken(
@@ -176,11 +176,24 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         params.sharesPerToken,
         params.distributionPeriod,
         params.feeBeneficiary,
-        ethPriceFeed
+        oracleFeeds
       )
     );
-    BeaconProxy poolProxy = new BeaconProxy(address(poolBeacon), initData);
-    address pool = address(poolProxy);
+
+    address pool = Create3.create3(
+      keccak256(
+        abi.encodePacked(
+          params.reserveToken,
+          params.couponToken,
+          bondToken.symbol(),
+          lToken.symbol()
+        )
+      ),
+      abi.encodePacked(
+        type(BeaconProxy).creationCode,
+        abi.encode(address(poolBeacon), initData)
+      )
+    );
 
     Distributor(distributor).registerPool(pool, params.couponToken);
 

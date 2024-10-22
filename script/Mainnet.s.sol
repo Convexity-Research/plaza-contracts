@@ -9,7 +9,7 @@ import {BondToken} from "../src/BondToken.sol";
 import {LifiRouter} from "../src/LifiRouter.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
-import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {Upgrades} from "@openzeppelin/foundry-upgrades/Upgrades.sol";
@@ -19,7 +19,6 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 contract MainnetScript is Script {
 
   // Base Mainnet addresses
-  address public constant merchant = address(0);
   address public constant reserveToken = address(0x4200000000000000000000000000000000000006);
   address public constant couponToken = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
@@ -44,6 +43,9 @@ contract MainnetScript is Script {
     // Deploys Distributor
     address distributor = Upgrades.deployUUPSProxy("Distributor.sol", abi.encodeCall(Distributor.initialize, (deployerAddress)));
 
+    // Deploys OracleFeeds
+    address oracleFeeds = address(new OracleFeeds());
+
     // Pool, Bond & Leverage Beacon Deploy
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
@@ -52,7 +54,7 @@ contract MainnetScript is Script {
     // Deploys PoolFactory
     PoolFactory factory = PoolFactory(Upgrades.deployUUPSProxy("PoolFactory.sol", abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      (deployerAddress, tokenDeployer, distributor, oracleFeeds, poolBeacon, bondBeacon, levBeacon)
     )));
 
     // Grant pool factory role to factory
@@ -67,11 +69,13 @@ contract MainnetScript is Script {
       feeBeneficiary: deployerAddress
     });
 
+    // Set price feed
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
+
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
     address pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
-    Pool(pool).approveMerchant(address(merchant));
     
     vm.stopBroadcast();
   }
