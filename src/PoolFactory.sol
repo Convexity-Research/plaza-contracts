@@ -42,8 +42,8 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   address public governance;
   /// @dev Address of the distributor contract
   address public distributor;
-  /// @dev Address of the ETH price feed
-  address private ethPriceFeed;
+  /// @dev Address of the OracleFeeds contract
+  address public oracleFeeds;
   /// @dev Instance of the TokenDeployer contract
   TokenDeployer private tokenDeployer;
   /// @dev Address of the UpgradeableBeacon for Pool
@@ -80,7 +80,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * @param _governance Address of the governance account that will have the GOV_ROLE.
    * @param _tokenDeployer Address of the TokenDeployer contract.
    * @param _distributor Address of the Distributor contract.
-   * @param _ethPriceFeed Address of the ETH price feed.
+   * @param _oracleFeeds Address of the OracleFeeds contract.
    * @param _poolImplementation Address of the Pool implementation contract.
    * @param _bondImplementation Address of the BondToken implementation contract.
    * @param _leverageImplementation Address of the LeverageToken implementation contract.
@@ -89,7 +89,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     address _governance,
     address _tokenDeployer,
     address _distributor,
-    address _ethPriceFeed,
+    address _oracleFeeds,
     address _poolImplementation,
     address _bondImplementation,
     address _leverageImplementation
@@ -100,7 +100,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     tokenDeployer = TokenDeployer(_tokenDeployer);
     governance = _governance;
     distributor = _distributor;
-    ethPriceFeed = _ethPriceFeed;
+    oracleFeeds = _oracleFeeds;
     _grantRole(GOV_ROLE, _governance);
 
     // Stores beacon implementation addresses
@@ -172,7 +172,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         params.couponToken,
         params.sharesPerToken,
         params.distributionPeriod,
-        ethPriceFeed
+        oracleFeeds
       )
     );
 
