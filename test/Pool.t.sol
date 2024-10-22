@@ -11,6 +11,7 @@ import {TestCases} from "./data/TestCases.sol";
 import {Decimals} from "../src/lib/Decimals.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {Validator} from "../src/utils/Validator.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
@@ -46,14 +47,16 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(deployer);
 
     address tokenDeployer = address(new TokenDeployer());
+    address oracleFeeds = address(new OracleFeeds());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance,tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      (governance,tokenDeployer, address(distributor), oracleFeeds, poolBeacon, bondBeacon, levBeacon)
     )));
 
     params.fee = 0;
@@ -61,6 +64,9 @@ contract PoolTest is Test, TestCases {
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
+
+    console.log("reserveToken", address(params.reserveToken));
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();
@@ -1037,13 +1043,18 @@ contract PoolTest is Test, TestCases {
   }
 
   function testCreateTokensWithDifferentDecimals() public {
-    vm.startPrank(governance);
+    vm.startPrank(deployer);
     PoolFactory.PoolParams memory _params;
     _params.fee = 0;
     _params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     _params.sharesPerToken = 50 * 10 ** 18;
     _params.distributionPeriod = 0;
     _params.couponToken = address(new Token("USDC", "USDC", false));
+
+    OracleFeeds(poolFactory.oracleFeeds()).setPriceFeed(_params.reserveToken, address(0), ethPriceFeed);
+    
+    vm.stopPrank();
+    vm.startPrank(governance);
 
     uint8 reserveDecimals = 6;
     Token(_params.reserveToken).setDecimals(reserveDecimals);

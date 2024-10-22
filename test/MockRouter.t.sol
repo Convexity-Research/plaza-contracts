@@ -9,6 +9,7 @@ import {Router} from "../src/MockRouter.sol";
 import {MockPool} from "./mocks/MockPool.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Validator} from "../src/utils/Validator.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
@@ -41,13 +42,15 @@ contract MockRouterTest is Test {
 
     address tokenDeployer = address(new TokenDeployer());
     Distributor distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+
+    address oracleFeeds = address(new OracleFeeds());
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance,tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      (governance,tokenDeployer, address(distributor), oracleFeeds, poolBeacon, bondBeacon, levBeacon)
     )));
 
     PoolFactory.PoolParams memory params;
@@ -56,6 +59,8 @@ contract MockRouterTest is Test {
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
+
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();
@@ -68,7 +73,7 @@ contract MockRouterTest is Test {
     mockPriceFeed = MockPriceFeed(ethPriceFeed);
     mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
     
-    mockRouter = new Router(ethPriceFeed);
+    mockRouter = new Router(oracleFeeds);
     vm.stopPrank();
 
     vm.startPrank(governance);
@@ -122,4 +127,3 @@ contract MockRouterTest is Test {
     mockPriceFeed.setMockPrice(int256(price), uint8(CHAINLINK_DECIMAL));
   }
 }
-

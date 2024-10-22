@@ -106,7 +106,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @param _couponToken Address of the coupon token.
    * @param _sharesPerToken Initial shares per bond per distribution period.
    * @param _distributionPeriod Initial distribution period in seconds.
-   * @param _ethPriceFeed Address of the ETH price feed.
+   * @param _oracleFeeds Address of the OracleFeeds contract.
    */
   function initialize(
     address _poolFactory,
@@ -117,9 +117,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     address _couponToken,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
-    address _ethPriceFeed
+    address _oracleFeeds
   ) initializer public {
-    __OracleReader_init(_ethPriceFeed);
+    __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
 
     poolFactory = PoolFactory(_poolFactory);
@@ -233,8 +233,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
@@ -384,8 +384,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, IERC20(reserveToken).safeDecimals());
   }
 
@@ -537,8 +537,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     );
     
     uint8 assetDecimals = 0;
@@ -560,8 +560,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 

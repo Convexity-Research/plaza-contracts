@@ -22,8 +22,8 @@ contract MockMerchant is OracleReader {
     Token couponToken = Token(Pool(_pool).couponToken());
     Token reserveToken = Token(Pool(_pool).reserveToken());
     
-    uint8 oracleDecimals = getOracleDecimals(address(0x0));
-    uint256 reservePrice = getOraclePrice(address(0x0)).normalizeAmount(oracleDecimals, couponToken.decimals());
+    uint8 oracleDecimals = getOracleDecimals(address(0), address(0));
+    uint256 reservePrice = getOraclePrice(address(0), address(0)).normalizeAmount(oracleDecimals, couponToken.decimals());
     require(reservePrice > 0, "Merchant: Invalid reserve price");
 
     uint256 couponAmount = getCouponAmount(_pool);
