@@ -25,55 +25,6 @@ contract AuctionTest is Test, GasMeter {
     vm.stopPrank();
   }
 
-  function testBid() public {
-    vm.startPrank(bidder);
-
-    usdc.mint(bidder, 1000000000000 ether);
-    usdc.approve(address(auction), 1000000000000 ether);
-
-    weth.mint(address(auction), 1000000000000 ether);
-
-    uint256 gas;
-    uint256 usdcBid;
-    uint256 ethBid;
-
-    for (uint256 i = 0; i < 998; i++) {
-      gasMeterStart();
-      usdcBid = /*generateRandomBetween(1, 10) * */1000000000;
-      ethBid = /*generateRandomBetween(1, 20000);*/20000;
-      auction.bid(ethBid, usdcBid);
-      gas = gasMeterStop();
-      console.log(usdcBid, ethBid, gas, gas * 1 * 2400 / 10**6);
-    }
-
-    gasMeterStart();
-    auction.bid(10000 * 3, 1000000000);
-    gas = gasMeterStop();
-    console.log("Gas used (last bid) - low:", gas);
-
-    gasMeterStart();
-    auction.bid(10000, 1000000000);
-    gas = gasMeterStop();
-    console.log("Gas used (last bid) - high:", gas);
-
-    // gasMeterStart();
-    // auction.bid(generateRandomBetween(1, 10000), generateRandomBetween(1, 10000));
-    // gas = gasMeterStop();
-    // console.log("Gas used last bid:", gas);
-
-    vm.stopPrank();
-
-    vm.startPrank(house);
-
-    vm.warp(block.timestamp + 10 days);
-
-    gasMeterStart();
-    auction.endAuction();
-    gas = gasMeterStop();
-    console.log("Gas used end auction:", gas, gas * 3 * 2400 / 10**7);
-    vm.stopPrank();
-  }
-
   function testConstructor() public view {
     assertEq(auction.buyToken(), address(usdc));
     assertEq(auction.sellToken(), address(weth));
