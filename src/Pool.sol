@@ -83,13 +83,13 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   error DistributionPeriod();
 
   // Events
-  event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
-  event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
-  event SharesPerTokenChanged(uint256 sharesPerToken);
-  event MerchantApproved(address merchant);
   event Distributed(uint256 amount);
+  event MerchantApproved(address merchant);
+  event SharesPerTokenChanged(uint256 sharesPerToken);
+  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+  event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
+  event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -121,6 +121,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   ) initializer public {
     __OracleReader_init(_ethPriceFeed);
     __ReentrancyGuard_init();
+    __Pausable_init();
 
     poolFactory = PoolFactory(_poolFactory);
     fee = _fee;
