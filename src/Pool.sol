@@ -98,6 +98,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event MerchantApproved(address merchant);
   event Distributed(uint256 amount);
   event FeeClaimed(address beneficiary, uint256 amount);
+  event FeeChanged(uint256 oldFee, uint256 newFee);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -714,10 +715,13 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @dev Sets the fee for the pool.
    * @param _fee The new fee value.
    */
-  function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
+  function setFee(uint256 _fee) external onlyRole(poolFactory.GOV_ROLE()) {
     // Fee cannot exceed 10%
     require(_fee <= 100000, FeeTooHigh());
+
+    uint256 oldFee = fee;
     fee = _fee;
+    emit FeeChanged(oldFee, _fee);
   }
 
   /**
