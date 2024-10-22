@@ -576,8 +576,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
 
     Distributor distributor = Distributor(poolFactory.distributor());
 
-    // Calculate last distribution time
-    lastDistribution = block.timestamp + distributionPeriod;
+    // Update last distribution time
+    lastDistribution = block.timestamp;
 
     uint8 bondDecimals = bondToken.decimals();
     uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
