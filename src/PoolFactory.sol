@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
-import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "./BondToken.sol";
 import {Distributor} from "./Distributor.sol";
 import {LeverageToken} from "./LeverageToken.sol";
