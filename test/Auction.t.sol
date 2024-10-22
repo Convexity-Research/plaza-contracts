@@ -4,10 +4,9 @@ pragma solidity ^0.8.13;
 import {Test, console} from "forge-std/Test.sol";
 
 import {Auction} from "../src/Auction.sol";
-
 import {Token} from "../test/mocks/Token.sol";
 
-contract AuctionTest is Test, GasMeter {
+contract AuctionTest is Test {
   Auction auction;
   Token usdc;
   Token weth;
