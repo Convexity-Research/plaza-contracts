@@ -4,8 +4,6 @@ pragma solidity ^0.8.26;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract Auction {
   using SafeERC20 for IERC20;
 
@@ -33,15 +31,17 @@ contract Auction {
     uint256 buyAmount;
     uint256 sellAmount;
     uint256 nextBidIndex;
+    uint256 prevBidIndex;
     bool claimed;
   }
 
   mapping(uint256 => Bid) public bids; // Mapping to store all bids by their index
   uint256 public bidCount;
+  uint256 public lastBidIndex;
   uint256 public highestBidIndex; // The index of the highest bid in the sorted list
-  uint256 private maxBids;
-  uint256 private lowestBidIndex; // New variable to track the lowest bid
-  uint256 private totalBidsAmount; // Aggregated buy amount (coupon) for the auction
+  uint256 public maxBids;
+  uint256 public lowestBidIndex; // New variable to track the lowest bid
+  uint256 public totalBidsAmount; // Aggregated buy amount (coupon) for the auction
 
   event AuctionEnded(State state);
   event BidClaimed(address indexed bidder, uint256 sellAmount);
@@ -75,7 +75,7 @@ contract Auction {
   // Function to place bids on a portion of the pool
   // buyAmount = reserve (bidder perspective)
   // sellAmount = coupon (bidder perspective)
-  function bid(uint256 buyAmount, uint256 sellAmount) external auctionActive {
+  function bid(uint256 buyAmount, uint256 sellAmount) external auctionActive returns(uint256) {
     if (sellAmount == 0 || sellAmount > totalBuyAmount) revert InvalidSellAmount();
     if (sellAmount % slotSize() != 0) revert InvalidSellAmount();
     if (buyAmount == 0) revert BidAmountTooLow();
@@ -88,18 +88,28 @@ contract Auction {
       buyAmount: buyAmount,
       sellAmount: sellAmount,
       nextBidIndex: 0, // Default to 0, which indicates the end of the list
+      prevBidIndex: 0, // Default to 0, which indicates the start of the list
       claimed: false
     });
 
-    uint256 newBidIndex = bidCount;
+    lastBidIndex++; // Avoids 0 index
+    uint256 newBidIndex = lastBidIndex;
     bids[newBidIndex] = newBid;
     bidCount++;
 
     // Insert the new bid into the sorted linked list
     insertSortedBid(newBidIndex);
+    totalBidsAmount += sellAmount;
 
-    // Remove excess bids and update totalBidsAmount
-    // removeBids();
+    if (bidCount > maxBids) {
+      if (lowestBidIndex == newBidIndex) {
+        revert BidAmountTooLow();
+      }
+      _removeBid(lowestBidIndex);
+    }
+
+    // Remove and refund out of range bids
+    removeExcessBids();
 
     // Check if the new bid is still on the map after removeBids
     if (bids[newBidIndex].bidder == address(0)) {
@@ -107,54 +117,17 @@ contract Auction {
     }
 
     emit BidPlaced(msg.sender, buyAmount, sellAmount);
-  }
 
-  function removeBids() internal {
-    uint256 currentBidIndex = highestBidIndex;
-    uint256 cumulativeSellAmount = 0;
-    uint256 lastValidBidIndex = 0;
-    uint256 validBidCount = 0;
-
-    while (currentBidIndex != 0 && validBidCount < maxBids) {
-      cumulativeSellAmount += bids[currentBidIndex].sellAmount;
-      
-      if (cumulativeSellAmount >= totalBuyAmount) {
-        break;
-      }
-      
-      lastValidBidIndex = currentBidIndex;
-      currentBidIndex = bids[currentBidIndex].nextBidIndex;
-      validBidCount++;
-    }
-
-    if (lastValidBidIndex != 0) {
-      // Remove all bids after lastValidBidIndex
-      uint256 removedBidIndex = bids[lastValidBidIndex].nextBidIndex;
-      bids[lastValidBidIndex].nextBidIndex = 0;
-      lowestBidIndex = lastValidBidIndex;
-
-      while (removedBidIndex != 0) {
-        uint256 nextBidIndex = bids[removedBidIndex].nextBidIndex;
-        
-        // Refund the buy tokens for the removed bid
-        IERC20(buyToken).transfer(bids[removedBidIndex].bidder, bids[removedBidIndex].buyAmount);
-        
-        emit BidRemoved(bids[removedBidIndex].bidder, bids[removedBidIndex].buyAmount, bids[removedBidIndex].sellAmount);
-        
-        delete bids[removedBidIndex];
-        bidCount--;
-        
-        removedBidIndex = nextBidIndex;
-      }
-    }
-
-    // Update totalBidsAmount
-    totalBidsAmount = cumulativeSellAmount > totalBuyAmount ? totalBuyAmount : cumulativeSellAmount;
+    return newBidIndex;
   }
 
   // Inserts the bid into the linked list based on the price (buyAmount/sellAmount) in descending order, then by sellAmount
   function insertSortedBid(uint256 newBidIndex) internal {
-    uint256 newPrice = bids[newBidIndex].buyAmount / bids[newBidIndex].sellAmount;
+    Bid storage newBid = bids[newBidIndex];
+    uint256 newSellAmount = newBid.sellAmount;
+    uint256 newBuyAmount = newBid.buyAmount;
+    uint256 leftSide;
+    uint256 rightSide;
 
     if (highestBidIndex == 0) {
       // First bid being inserted
@@ -163,28 +136,40 @@ contract Auction {
     } else {
       uint256 currentBidIndex = highestBidIndex;
       uint256 previousBidIndex = 0;
-      uint256 currentPrice = 0;
 
       // Traverse the linked list to find the correct spot for the new bid
       while (currentBidIndex != 0) {
-        currentPrice = bids[currentBidIndex].buyAmount / bids[currentBidIndex].sellAmount;
+        // Cache the current bid's data into local variables
+        Bid storage currentBid = bids[currentBidIndex];
+        uint256 currentSellAmount = currentBid.sellAmount;
+        uint256 currentBuyAmount = currentBid.buyAmount;
+        uint256 currentNextBidIndex = currentBid.nextBidIndex;
 
-        if (newPrice > currentPrice || (newPrice == currentPrice && bids[newBidIndex].sellAmount > bids[currentBidIndex].sellAmount)) {
+        // Compare without division by cross-multiplying (it's more gas efficient)
+        leftSide = newSellAmount * currentBuyAmount;
+        rightSide = currentSellAmount * newBuyAmount;
+
+        if (leftSide > rightSide || (leftSide == rightSide && newSellAmount > currentSellAmount)) {
           break;
         }
         
         previousBidIndex = currentBidIndex;
-        currentBidIndex = bids[currentBidIndex].nextBidIndex;
+        currentBidIndex = currentNextBidIndex;
       }
 
       if (previousBidIndex == 0) {
         // New bid is the highest bid
-        bids[newBidIndex].nextBidIndex = highestBidIndex;
+        newBid.nextBidIndex = highestBidIndex;
+        bids[highestBidIndex].prevBidIndex = newBidIndex;
         highestBidIndex = newBidIndex;
       } else {
         // Insert bid in the middle or at the end
-        bids[newBidIndex].nextBidIndex = currentBidIndex;
+        newBid.nextBidIndex = currentBidIndex;
+        newBid.prevBidIndex = previousBidIndex;
         bids[previousBidIndex].nextBidIndex = newBidIndex;
+        if (currentBidIndex != 0) {
+          bids[currentBidIndex].prevBidIndex = newBidIndex;
+        }
       }
 
       // If the new bid is inserted at the end, update the lowest bid index
@@ -193,11 +178,83 @@ contract Auction {
       }
     }
 
-    // Update the lowest bid index if the new bid has a lower price or equal price but lower sellAmount
-    uint256 lowestPrice = bids[lowestBidIndex].buyAmount / bids[lowestBidIndex].sellAmount;
-    if (newPrice < lowestPrice || (newPrice == lowestPrice && bids[newBidIndex].sellAmount < bids[lowestBidIndex].sellAmount)) {
+    // Cache the lowest bid's data into local variables
+    Bid storage lowestBid = bids[lowestBidIndex];
+    uint256 lowestSellAmount = lowestBid.sellAmount;
+    uint256 lowestBuyAmount = lowestBid.buyAmount;
+
+    // Compare without division by cross-multiplying (it's more gas efficient)
+    leftSide = newSellAmount * lowestBuyAmount;
+    rightSide = lowestSellAmount * newBuyAmount;
+
+    if (leftSide < rightSide || (leftSide == rightSide && newSellAmount < lowestSellAmount)) {
       lowestBidIndex = newBidIndex;
     }
+  }
+  
+  function removeExcessBids() internal {
+    if (totalBidsAmount <= totalBuyAmount) {
+      return;
+    }
+
+    uint256 amountToRemove = totalBidsAmount - totalBuyAmount;
+    uint256 currentIndex = lowestBidIndex;
+
+    while (currentIndex != 0 && amountToRemove != 0) {
+      // Cache the current bid's data into local variables
+      Bid storage currentBid = bids[currentIndex];
+      uint256 sellAmount = currentBid.sellAmount;
+      uint256 prevIndex = currentBid.prevBidIndex;
+
+      if (amountToRemove >= sellAmount) {
+        // Subtract the sellAmount from amountToRemove
+        amountToRemove -= sellAmount;
+
+        // Remove the bid
+        _removeBid(currentIndex);
+
+        // Move to the previous bid (higher price)
+        currentIndex = prevIndex;
+      } else {
+        // Reduce the current bid's sellAmount
+        currentBid.sellAmount = sellAmount - amountToRemove;
+        amountToRemove = 0;
+      }
+    }
+  }
+
+  function _removeBid(uint256 bidIndex) internal {
+    Bid storage bidToRemove = bids[bidIndex];
+    uint256 nextIndex = bidToRemove.nextBidIndex;
+    uint256 prevIndex = bidToRemove.prevBidIndex;
+
+    // Update linked list pointers
+    if (prevIndex == 0) {
+      // Removing the highest bid
+      highestBidIndex = nextIndex;
+    } else {
+      bids[prevIndex].nextBidIndex = nextIndex;
+    }
+
+    if (nextIndex == 0) {
+      // Removing the lowest bid
+      lowestBidIndex = prevIndex;
+    } else {
+      bids[nextIndex].prevBidIndex = prevIndex;
+    }
+
+    address bidder = bidToRemove.bidder;
+    uint256 buyAmount = bidToRemove.buyAmount;
+    uint256 sellAmount = bidToRemove.sellAmount;
+    totalBidsAmount -= sellAmount;
+
+    // Refund the buy tokens for the removed bid
+    IERC20(buyToken).transfer(bidder, buyAmount);
+
+    emit BidRemoved(bidder, buyAmount, sellAmount);
+
+    delete bids[bidIndex];
+    bidCount--;
   }
 
   // End auction
