@@ -60,7 +60,12 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     _disableInitializers();
   }
 
-  function initialize(PoolFactory.PoolParams memory _params, address _factory, uint256 _depositStartTime, uint256 _depositEndTime, uint256 _reserveCap) initializer public {
+  function initialize(
+    PoolFactory.PoolParams memory _params,
+    address _factory,
+    uint256 _depositStartTime,
+    uint256 _depositEndTime,
+    uint256 _reserveCap) initializer public {
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
     __UUPSUpgradeable_init();
     __ReentrancyGuard_init();
