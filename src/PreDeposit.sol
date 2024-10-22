@@ -6,11 +6,13 @@ import {BondToken} from "./BondToken.sol";
 import {PoolFactory} from "./PoolFactory.sol";
 import {LeverageToken} from "./LeverageToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-contract PreDeposit is Ownable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable, PausableUpgradeable {
 
   // Initializing pool params
   address pool;
@@ -53,8 +55,16 @@ contract PreDeposit is Ownable, ReentrancyGuardUpgradeable, PausableUpgradeable 
   error DepositCapReached();
   error CapMustIncrease();
 
-  constructor(PoolFactory.PoolParams memory _params, address _factory, uint256 _depositStartTime, uint256 _depositEndTime, uint256 _reserveCap) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  function initialize(PoolFactory.PoolParams memory _params, address _factory, uint256 _depositStartTime, uint256 _depositEndTime, uint256 _reserveCap) initializer public {
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
+    __UUPSUpgradeable_init();
+    __ReentrancyGuard_init();
+    __Ownable_init(msg.sender);
     params = _params;
     depositStartTime = _depositStartTime;
     depositEndTime = _depositEndTime;
