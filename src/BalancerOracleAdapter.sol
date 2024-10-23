@@ -69,7 +69,6 @@ contract BalancerOracleAdapter is Initializable, PausableUpgradeable, Reentrancy
       revert PriceTooLargeForIntConversion();
     }
 
-
     return (uint80(0), int256(uintPrice), block.timestamp, block.timestamp, uint80(0));
   }
 
