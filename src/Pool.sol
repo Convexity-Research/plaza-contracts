@@ -48,6 +48,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   // Distribution
   uint256 private sharesPerToken;
   uint256 private distributionPeriod; // in seconds
+  uint256 private auctionPeriod; // in seconds
   uint256 private lastDistribution; // timestamp in seconds
 
   /**
@@ -70,6 +71,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 currentPeriod;
     uint256 lastDistribution;
     uint256 distributionPeriod;
+    uint256 auctionPeriod;
   }
 
   // Custom errors
@@ -84,10 +86,11 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event Distributed(uint256 amount);
   event MerchantApproved(address merchant);
   event SharesPerTokenChanged(uint256 sharesPerToken);
+  event AuctionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  
+    
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -495,7 +498,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       levSupply: lToken.totalSupply(),
       sharesPerToken: _sharesPerToken,
       currentPeriod: currentPeriod,
-      lastDistribution: lastDistribution
+      lastDistribution: lastDistribution,
+      auctionPeriod: auctionPeriod
     });
   }
   
@@ -508,6 +512,17 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     distributionPeriod = _distributionPeriod;
 
     emit DistributionPeriodChanged(oldPeriod, _distributionPeriod);
+  }
+
+  /**
+   * @dev Sets the auction period.
+   * @param _auctionPeriod The new auction period.
+   */
+  function setAuctionPeriod(uint256 _auctionPeriod) external onlyRole(poolFactory.GOV_ROLE()) {
+    uint256 oldPeriod = auctionPeriod;
+    auctionPeriod = _auctionPeriod;
+
+    emit AuctionPeriodChanged(oldPeriod, _auctionPeriod);
   }
   
   /**
