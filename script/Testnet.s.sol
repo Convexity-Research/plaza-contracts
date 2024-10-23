@@ -9,6 +9,7 @@ import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -35,13 +36,16 @@ contract TestnetScript is Script {
     address tokenDeployer = address(new TokenDeployer());
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
 
+    // Deploys OracleFeeds
+    address oracleFeeds = address(new OracleFeeds());
+    
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), deployerAddress));
 
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      (deployerAddress, tokenDeployer, distributor, oracleFeeds, poolBeacon, bondBeacon, levBeacon)
     )));
 
     // Grant pool factory role to factory
@@ -58,6 +62,9 @@ contract TestnetScript is Script {
       distributionPeriod: distributionPeriod,
       couponToken: couponToken
     });
+
+    // Set price feed
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
