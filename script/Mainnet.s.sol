@@ -4,12 +4,11 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 
 import {Pool} from "../src/Pool.sol";
-import {Utils} from "../src/lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {LifiRouter} from "../src/LifiRouter.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
-import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {Upgrades} from "@openzeppelin/foundry-upgrades/Upgrades.sol";
@@ -43,6 +42,9 @@ contract MainnetScript is Script {
     // Deploys Distributor
     address distributor = Upgrades.deployUUPSProxy("Distributor.sol", abi.encodeCall(Distributor.initialize, (deployerAddress)));
 
+    // Deploys OracleFeeds
+    address oracleFeeds = address(new OracleFeeds());
+
     // Pool, Bond & Leverage Beacon Deploy
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
@@ -51,7 +53,7 @@ contract MainnetScript is Script {
     // Deploys PoolFactory
     PoolFactory factory = PoolFactory(Upgrades.deployUUPSProxy("PoolFactory.sol", abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      (deployerAddress, tokenDeployer, distributor, oracleFeeds, poolBeacon, bondBeacon, levBeacon)
     )));
 
     // Grant pool factory role to factory
@@ -64,6 +66,9 @@ contract MainnetScript is Script {
       sharesPerToken: sharesPerToken,
       distributionPeriod: distributionPeriod
     });
+
+    // Set price feed
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);

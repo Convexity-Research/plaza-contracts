@@ -26,10 +26,10 @@ contract Router is OracleReader {
   
   /**
    * @dev Constructor that initializes the OracleReader with the ETH price feed.
-   * @param _ethPriceFeed The address of the ETH price feed.
+   * @param _oracleFeeds The address of the OracleFeeds contract.
    */
-  constructor(address _ethPriceFeed) {
-    __OracleReader_init(_ethPriceFeed);
+  constructor(address _oracleFeeds) {
+    __OracleReader_init(_oracleFeeds);
   }
 
   /**
@@ -76,9 +76,9 @@ contract Router is OracleReader {
     IERC20(USDC).safeTransferFrom(msg.sender, address(this), depositAmount);
 
     // Get ETH price from OracleReader
-    uint256 ethPrice = getOraclePrice(reserveToken);
+    uint256 ethPrice =  getOraclePrice(reserveToken, USD);
 
-    uint8 oracleDecimals = getOracleDecimals(reserveToken);
+    uint8 oracleDecimals = getOracleDecimals(reserveToken, USD);
     uint8 usdcDecimals = IERC20(USDC).safeDecimals();
 
     // Normalize the price if the oracle has more decimals than the coupon token
@@ -161,9 +161,9 @@ contract Router is OracleReader {
     uint256 redeemAmount = Pool(_pool).redeem(tokenType, depositAmount, 0, deadline, address(this));
 
     // Get ETH price from OracleReader
-    uint256 ethPrice = getOraclePrice(reserveToken);
+    uint256 ethPrice = getOraclePrice(reserveToken, USD);
 
-    uint8 oracleDecimals = getOracleDecimals(reserveToken);
+    uint8 oracleDecimals = getOracleDecimals(reserveToken, USD);
 
     // Calculate the amount of reserveToken based on the price
     uint256 usdcAmount = (redeemAmount * ethPrice).normalizeAmount(oracleDecimals + IERC20(reserveToken).safeDecimals(), IERC20(USDC).safeDecimals());
