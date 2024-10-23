@@ -19,3 +19,6 @@
 [submodule "lib/create3"]
 	path = lib/create3
 	url = https://github.com/0xsequence/create3
+[submodule "lib/balancer-v2-monorepo"]
+	path = lib/balancer-v2-monorepo
+	url = https://github.com/balancer/balancer-v2-monorepo.git
