@@ -24,6 +24,7 @@ contract BalancerOracleAdapter is Initializable, PausableUpgradeable, Reentrancy
   ) initializer public {
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
+    __Pausable_init();
     vaultAddress = _vaultAddress;
   }
 
