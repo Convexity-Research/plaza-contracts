@@ -445,6 +445,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     // Calculate and return the final redeem amount
     return ((depositAmount * redeemRate).fromBaseUnit(oracleDecimals) / ethPrice) / PRECISION;
   }
+
+  function startAuction() external {
+    
+  }
   
   /**
    * @dev Distributes coupon tokens to bond token holders.
