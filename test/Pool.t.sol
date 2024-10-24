@@ -2,8 +2,10 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
+
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
+import {Auction} from "../src/Auction.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {MockPool} from "./mocks/MockPool.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -64,8 +66,7 @@ contract PoolTest is Test, TestCases {
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
-
-    console.log("reserveToken", address(params.reserveToken));
+    
     OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Deploy the mock price feed
@@ -106,6 +107,17 @@ contract PoolTest is Test, TestCases {
       bytes32(0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00), // Storage slot for `_status`
       bytes32(uint256(1))  // Reset to `_NOT_ENTERED`
     );
+  }
+
+  function fakeSucceededAuction(address poolAddress, uint256 period) public {
+    address auction = address(new Auction(params.couponToken, params.reserveToken, 1000000000000, block.timestamp + 10 days, 1000, address(0)));
+
+    uint256 auctionSlot = 11;
+    bytes32 auctionPeriodSlot = keccak256(abi.encode(period, auctionSlot));
+    vm.store(address(poolAddress), auctionPeriodSlot, bytes32(uint256(uint160(auction))));
+
+    uint256 stateSlot = 6;
+    vm.store(auction, bytes32(stateSlot), bytes32(uint256(1)));
   }
 
   function testGetCreateAmount() public {
@@ -705,6 +717,9 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(governance);
     vm.expectEmit(true, true, true, true);
     emit Pool.Distributed(expectedDistribution);
+
+    fakeSucceededAuction(address(_pool), 0);
+
     _pool.distribute();
     vm.stopPrank();
 
@@ -733,6 +748,10 @@ contract PoolTest is Test, TestCases {
     vm.stopPrank();
 
     vm.startPrank(governance);
+    fakeSucceededAuction(address(_pool), 0);
+    fakeSucceededAuction(address(_pool), 1);
+    fakeSucceededAuction(address(_pool), 2);
+
     _pool.distribute();
     _pool.distribute();
     _pool.distribute();

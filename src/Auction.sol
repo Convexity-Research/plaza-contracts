@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {Pool} from "./Pool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract Auction {
   using SafeERC20 for IERC20;
+
+  // Pool contract
+  address public pool;
 
   // Auction beneficiary
   address public beneficiary;
@@ -14,7 +18,7 @@ contract Auction {
   address public buyToken;
   address public sellToken;
 
-  // Auction end time and total sell amount
+  // Auction end time and total buy amount
   uint256 public endTime;
   uint256 public totalBuyAmount;
 
@@ -42,21 +46,22 @@ contract Auction {
   uint256 public maxBids;
   uint256 public lowestBidIndex; // New variable to track the lowest bid
   uint256 public totalBidsAmount; // Aggregated buy amount (coupon) for the auction
+  uint256 public totalSellAmount; // Aggregated sell amount (reserve) for the auction
 
-  event AuctionEnded(State state);
+  event AuctionEnded(State state, uint256 totalSellAmount, uint256 totalBuyAmount);
   event BidClaimed(address indexed bidder, uint256 sellAmount);
   event BidPlaced(address indexed bidder, uint256 buyAmount, uint256 sellAmount);
   event BidRemoved(address indexed bidder, uint256 buyAmount, uint256 sellAmount);
 
   error AuctionFailed();
-  error AuctionHasEnded();
-  error AuctionStillOngoing();
-  error InvalidSellAmount();
-  error BidAmountTooLow();
-  error AuctionAlreadyEnded();
-  error AuctionNotEnded();
   error NothingToClaim();
   error AlreadyClaimed();
+  error AuctionHasEnded();
+  error AuctionNotEnded();
+  error BidAmountTooLow();
+  error InvalidSellAmount();
+  error AuctionStillOngoing();
+  error AuctionAlreadyEnded();
 
   constructor(address _buyToken, address _sellToken, uint256 _totalBuyAmount, uint256 _endTime, uint256 _maxBids, address _beneficiary) {
     buyToken = _buyToken; // coupon
@@ -64,6 +69,7 @@ contract Auction {
     totalBuyAmount = _totalBuyAmount; // coupon amount
     endTime = _endTime;
     maxBids = _maxBids;
+    pool = msg.sender;
 
     if (_beneficiary == address(0)) {
       beneficiary = msg.sender;
@@ -100,6 +106,7 @@ contract Auction {
     // Insert the new bid into the sorted linked list
     insertSortedBid(newBidIndex);
     totalBidsAmount += sellAmount;
+    totalSellAmount += buyAmount;
 
     if (bidCount > maxBids) {
       if (lowestBidIndex == newBidIndex) {
@@ -247,6 +254,7 @@ contract Auction {
     uint256 buyAmount = bidToRemove.buyAmount;
     uint256 sellAmount = bidToRemove.sellAmount;
     totalBidsAmount -= sellAmount;
+    totalSellAmount -= buyAmount;
 
     // Refund the buy tokens for the removed bid
     IERC20(buyToken).transfer(bidder, buyAmount);
@@ -265,9 +273,11 @@ contract Auction {
       state = State.FAILED;
     } else {
       state = State.SUCCEEDED;
+      Pool(pool).transferReserveToAuction(totalSellAmount);
+      IERC20(buyToken).safeTransfer(beneficiary, IERC20(buyToken).balanceOf(address(this)));
     }
 
-    emit AuctionEnded(state);
+    emit AuctionEnded(state, totalSellAmount, totalBuyAmount);
   }
 
   // Claim tokens for a winning bid
@@ -280,11 +290,6 @@ contract Auction {
     IERC20(sellToken).transfer(bidInfo.bidder, bidInfo.sellAmount);
 
     emit BidClaimed(bidInfo.bidder, bidInfo.sellAmount);
-  }
-
-  // Allow the beneficiary to withdraw buy token after auction ends
-  function withdraw() external auctionExpired auctionSucceeded {
-    IERC20(buyToken).safeTransfer(beneficiary, IERC20(buyToken).balanceOf(address(this)));
   }
 
   function slotSize() internal view returns (uint256) {
