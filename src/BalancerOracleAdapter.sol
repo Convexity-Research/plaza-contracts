@@ -9,12 +9,14 @@ import {IVault} from "@balancer/contracts/interfaces/contracts/vault/IVault.sol"
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {IBalancerV2WeightedPool} from "./lib/balancer/IBalancerV2WeightedPool.sol";
+import {FixedPoint} from "./lib/balancer/FixedPoint.sol";
 
 contract BalancerOracleAdapter is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable, AggregatorV3Interface, OracleReader {
   using Decimals for uint256;
+  using FixedPoint for uint256;
 
-  address public vaultAddress;
-  bytes32 public poolId;
+  address public poolAddress;
   uint8 DECIMALS;
 
   error PriceTooLargeForIntConversion();
@@ -25,16 +27,14 @@ contract BalancerOracleAdapter is Initializable, PausableUpgradeable, Reentrancy
   }
 
   function initialize(
-    address _vaultAddress,
-    bytes32 _poolId,
+    address _poolAddress,
     uint8 _decimals,
     address _oracleFeeds
   ) initializer public {
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
     __Pausable_init();
-    vaultAddress = _vaultAddress;
-    poolId = _poolId;
+    poolAddress = _poolAddress;
     DECIMALS = _decimals;
   }
 
@@ -52,24 +52,25 @@ contract BalancerOracleAdapter is Initializable, PausableUpgradeable, Reentrancy
 
   function getRoundData(
     uint80 _roundId
-  ) public view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
-    (IERC20[] memory tokens, uint256[] memory balances, uint256 lastChangedBlock) = IVault(vaultAddress).getPoolTokens(poolId);
-    
-    uint256 totalPriceWeight = 0;
-    uint256 totalWeight = 0;
-    for(uint256 i = 0; i < tokens.length; i++) {
-      uint8 oracleDecimals = getOracleDecimals(address(tokens[i]), USD);
-      // this already handles all errors that have to do with price freshness
-      totalPriceWeight += (getOraclePrice(address(tokens[i]), USD) * balances[i]).normalizeAmount(oracleDecimals, DECIMALS);
-      totalWeight += balances[i].normalizeAmount(oracleDecimals, DECIMALS);
+  ) public view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) {
+    IBalancerV2WeightedPool pool = IBalancerV2WeightedPool(poolAddress);
+    (IERC20[] memory tokens, uint256[] memory balances,) = IVault(pool.getVault()).getPoolTokens(pool.getPoolId());
+    //get weights
+    uint256[] memory weights = pool.getNormalizedWeights();
+
+    uint256[] memory prices = new uint256[](tokens.length);
+    for(uint8 i = 0; i < tokens.length; i++) {
+      getOraclePrice(address(tokens[i]), ETH);
     }
 
-    uint256 uintPrice = totalPriceWeight/totalWeight;
-    if (uintPrice > (2^256>>1)-1) {
+    uint256 fairUintETHPrice = _calculateFairUintPrice(prices, weights, pool.getInvariant(), pool.getActualSupply());
+    uint256 fairUintUSDPrice = fairUintETHPrice * getOraclePrice(ETH, USD);
+
+    if (fairUintUSDPrice > (2^256>>1)-1) {
       revert PriceTooLargeForIntConversion();
     }
 
-    return (uint80(0), int256(uintPrice), block.timestamp, block.timestamp, uint80(0));
+    return (uint80(0), int256(fairUintUSDPrice), block.timestamp, block.timestamp, uint80(0));
   }
 
   function latestRoundData()
@@ -78,4 +79,16 @@ contract BalancerOracleAdapter is Initializable, PausableUpgradeable, Reentrancy
     returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound){
       return getRoundData(0);
     }
+    
+  function calculateFairUintPrice(uint256[] memory prices, uint256[] memory weights, uint256 invariant, uint256 totalBPTSupply) external view returns (uint256) {
+    return _calculateFairUintPrice(prices, weights, invariant, totalBPTSupply);
+  }
+
+  function _calculateFairUintPrice(uint256[] memory prices, uint256[] memory weights, uint256 invariant, uint256 totalBPTSupply) internal view returns (uint256) {
+    uint256 priceWeightPower = 1;
+    for(uint8 i = 0; i < prices.length; i ++) {
+      priceWeightPower *= (prices[i].divDown(weights[i])).powDown(weights[i]);
+    }
+    return (invariant * priceWeightPower / totalBPTSupply).toBaseUnit(DECIMALS);
+  }
 }

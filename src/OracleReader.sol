@@ -14,6 +14,8 @@ contract OracleReader {
 
   // @note: address(0) is a special address that represents USD (IRL asset)
   address public constant USD = address(0);
+  // @note: address(1) is a special address that represents ETH (Chainlink asset)
+  address public constant ETH = address(1);
 
   /**
    * @dev Error thrown when no valid price is found
