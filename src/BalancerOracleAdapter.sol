@@ -13,6 +13,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {IBalancerV2WeightedPool} from "./lib/balancer/IBalancerV2WeightedPool.sol";
 import {FixedPoint} from "./lib/balancer/FixedPoint.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {VaultReentrancyLib} from "./lib/balancer/VaultReentrancyLib.sol";
 
 contract BalancerOracleAdapter is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable, AggregatorV3Interface, OracleReader {
   using Decimals for uint256;
@@ -28,6 +29,13 @@ contract BalancerOracleAdapter is Initializable, OwnableUpgradeable, UUPSUpgrade
     _disableInitializers();
   }
 
+  /**
+   * @dev Initializes the BalancerOracleAdapter.
+   * This function is called once during deployment or upgrading to initialize state variables.
+   * @param _poolAddress Address of the BALANCER Pool used for the oracle.
+   * @param _decimals Number of decimals returned by the oracle.
+   * @param _oracleFeeds Address of the OracleReader feeds contract, containing the Chainlink price feeds for each asset in the pool.
+   */
   function initialize(
     address _poolAddress,
     uint8 _decimals,
@@ -36,27 +44,48 @@ contract BalancerOracleAdapter is Initializable, OwnableUpgradeable, UUPSUpgrade
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
     __Pausable_init();
-    // __setOracleFeeds(_oracleFeeds);
     poolAddress = _poolAddress;
     DECIMALS = _decimals;
   }
 
+  /**
+   * @dev Returns the number of decimals used by the oracle.
+   * @return uint8 The number of decimals.
+   */
   function decimals() external view returns (uint8){
     return DECIMALS;
   }
 
+  /**
+   * @dev Returns the description of the oracle.
+   * @return string The description.
+   */
   function description() external pure returns (string memory){
     return "Balancer Pool Chainlink Adapter";
   }
 
+  /**
+   * @dev Returns the version of the oracle.
+   * @return uint256 The version.
+   */
   function version() external pure returns (uint256){
     return 1;
   }
 
+  /**
+   * @dev Returns the round data for a given round ID. The errors for this portion of the oracle regarding freshness are handled in the OracleReader contract.
+   * @param _roundId The round ID. Always 0 for this oracle.
+   * @return roundId The round ID.
+   * @return answer The price.
+   * @return startedAt The timestamp of the round.
+   * @return updatedAt The timestamp of the round.
+   * @return answeredInRound The round ID.
+   */
   function getRoundData(
     uint80 _roundId
   ) public view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) {
     IBalancerV2WeightedPool pool = IBalancerV2WeightedPool(poolAddress);
+    VaultReentrancyLib.ensureNotInVaultContext(IVault(pool.getVault()));
     (IERC20[] memory tokens,,) = IVault(pool.getVault()).getPoolTokens(pool.getPoolId());
     //get weights
     uint256[] memory weights = pool.getNormalizedWeights(); // 18 dec fractions
@@ -73,9 +102,16 @@ contract BalancerOracleAdapter is Initializable, OwnableUpgradeable, UUPSUpgrade
     }
 
     return (uint80(0), int256(fairUintUSDPrice), block.timestamp, block.timestamp, uint80(0));
-    // return (uint80(0), int256(0), block.timestamp, block.timestamp, uint80(0));
   }
 
+  /**
+   * @dev Returns the latest round data. Calls getRoundData with round ID 0.
+   * @return roundId The round ID. Always 0 for this oracle.
+   * @return answer The price.
+   * @return startedAt The timestamp of the round.
+   * @return updatedAt The timestamp of the round.
+   * @return answeredInRound The round ID. Always 0 for this oracle.
+   */
   function latestRoundData()
     external
     view
@@ -83,6 +119,14 @@ contract BalancerOracleAdapter is Initializable, OwnableUpgradeable, UUPSUpgrade
       return getRoundData(0);
     }
 
+  /**
+   * @dev Calculates the fair price of the pool in USD using the Balancer invariant formula: https://docs.balancer.fi/concepts/advanced/valuing-bpt/valuing-bpt.html#on-chain-price-evaluation.
+   * @param prices Array of prices of the assets in the pool.
+   * @param weights Array of weights of the assets in the pool.
+   * @param invariant The invariant of the pool.
+   * @param totalBPTSupply The total supply of BPT in the pool.
+   * @return uint256 The fair price of the pool in USD.
+   */
   function _calculateFairUintPrice(
     uint256[] memory prices,
     uint256[] memory weights,
