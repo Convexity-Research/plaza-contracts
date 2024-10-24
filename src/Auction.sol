@@ -63,6 +63,15 @@ contract Auction {
   error AuctionStillOngoing();
   error AuctionAlreadyEnded();
 
+  /**
+   * @dev Constructor for the Auction contract.
+   * @param _buyToken The address of the buy token (coupon).
+   * @param _sellToken The address of the sell token (reserve).
+   * @param _totalBuyAmount The total amount of buy tokens (coupon) for the auction.
+   * @param _endTime The end time of the auction.
+   * @param _maxBids The maximum number of bids allowed in the auction.
+   * @param _beneficiary The address of the auction beneficiary.
+   */
   constructor(address _buyToken, address _sellToken, uint256 _totalBuyAmount, uint256 _endTime, uint256 _maxBids, address _beneficiary) {
     buyToken = _buyToken; // coupon
     sellToken = _sellToken; // reserve
@@ -78,9 +87,12 @@ contract Auction {
     }
   }
 
-  // Function to place bids on a portion of the pool
-  // buyAmount = reserve (bidder perspective)
-  // sellAmount = coupon (bidder perspective)
+  /**
+   * @dev Places a bid on a portion of the pool.
+   * @param buyAmount The amount of buy tokens (reserve) to bid.
+   * @param sellAmount The amount of sell tokens (coupon) to bid.
+   * @return The index of the bid.
+   */
   function bid(uint256 buyAmount, uint256 sellAmount) external auctionActive returns(uint256) {
     if (sellAmount == 0 || sellAmount > totalBuyAmount) revert InvalidSellAmount();
     if (sellAmount % slotSize() != 0) revert InvalidSellAmount();
@@ -128,7 +140,10 @@ contract Auction {
     return newBidIndex;
   }
 
-  // Inserts the bid into the linked list based on the price (buyAmount/sellAmount) in descending order, then by sellAmount
+  /**
+   * @dev Inserts the bid into the linked list based on the price (buyAmount/sellAmount) in descending order, then by sellAmount.
+   * @param newBidIndex The index of the bid to insert.
+   */
   function insertSortedBid(uint256 newBidIndex) internal {
     Bid storage newBid = bids[newBidIndex];
     uint256 newSellAmount = newBid.sellAmount;
@@ -199,6 +214,9 @@ contract Auction {
     }
   }
   
+  /**
+   * @dev Removes excess bids from the auction.
+   */
   function removeExcessBids() internal {
     if (totalBidsAmount <= totalBuyAmount) {
       return;
@@ -230,6 +248,10 @@ contract Auction {
     }
   }
 
+  /**
+   * @dev Removes a bid from the linked list.
+   * @param bidIndex The index of the bid to remove.
+   */
   function _removeBid(uint256 bidIndex) internal {
     Bid storage bidToRemove = bids[bidIndex];
     uint256 nextIndex = bidToRemove.nextBidIndex;
@@ -265,7 +287,9 @@ contract Auction {
     bidCount--;
   }
 
-  // End auction
+  /**
+   * @dev Ends the auction and transfers the reserve to the auction.
+   */
   function endAuction() external auctionExpired {
     if (state != State.BIDDING) revert AuctionAlreadyEnded();
     
@@ -280,7 +304,10 @@ contract Auction {
     emit AuctionEnded(state, totalSellAmount, totalBuyAmount);
   }
 
-  // Claim tokens for a winning bid
+  /**
+   * @dev Claims the tokens for a winning bid.
+   * @param bidIndex The index of the bid to claim.
+   */
   function claimBid(uint256 bidIndex) auctionExpired auctionSucceeded external {
     Bid storage bidInfo = bids[bidIndex];
     if (bidInfo.bidder != msg.sender) revert NothingToClaim();
@@ -292,20 +319,33 @@ contract Auction {
     emit BidClaimed(bidInfo.bidder, bidInfo.sellAmount);
   }
 
+  /**
+   * @dev Returns the size of a bid slot.
+   * @return uint256 The size of a bid slot.
+   */
   function slotSize() internal view returns (uint256) {
     return totalBuyAmount / maxBids;
   }
 
+  /**
+   * @dev Modifier to check if the auction is still active.
+   */
   modifier auctionActive() {
     if (block.timestamp >= endTime) revert AuctionHasEnded();
     _;
   }
 
+  /**
+   * @dev Modifier to check if the auction has expired.
+   */
   modifier auctionExpired() {
     if (block.timestamp < endTime) revert AuctionStillOngoing();
     _;
   }
 
+  /**
+   * @dev Modifier to check if the auction succeeded.
+   */
   modifier auctionSucceeded() {
     if (state != State.SUCCEEDED) revert AuctionFailed();
     _;
