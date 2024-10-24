@@ -3,8 +3,18 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 
+import {Pool} from "../src/Pool.sol";
+import {Token} from "./mocks/Token.sol";
+import {Utils} from "../src/lib/Utils.sol";
 import {Auction} from "../src/Auction.sol";
-import {Token} from "../test/mocks/Token.sol";
+import {MockPool} from "./mocks/MockPool.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
+import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
+import {BondToken} from "../src/BondToken.sol";
+import {LeverageToken} from "../src/LeverageToken.sol";
+import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract AuctionTest is Test {
   Auction auction;
@@ -13,14 +23,59 @@ contract AuctionTest is Test {
 
   address bidder = address(0x1);
   address house = address(0x2);
+  address minter = address(0x3);
+  address governance = address(0x4);
+
+  address pool;
 
   function setUp() public {
     usdc = new Token("USDC", "USDC", false);
     weth = new Token("WETH", "WETH", false);
+    
+    pool = createPool(address(weth), address(usdc));
+    useMockPool(pool);
 
-    vm.startPrank(house);
+    vm.startPrank(pool);
     auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house);
     vm.stopPrank();
+  }
+
+  function createPool(address reserve, address coupon) public returns (address) {
+    vm.startPrank(governance);
+    address tokenDeployer = address(new TokenDeployer());
+    address oracleFeeds = address(new OracleFeeds());
+    address distributor = address(Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance)))));
+
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+
+    PoolFactory poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+      PoolFactory.initialize, 
+      (governance, tokenDeployer, distributor, oracleFeeds, poolBeacon, bondBeacon, levBeacon)
+    )));
+
+    PoolFactory.PoolParams memory params;
+    params.fee = 0;
+    params.reserveToken = reserve;
+    params.sharesPerToken = 50 * 10 ** 18;
+    params.distributionPeriod = 10;
+    params.couponToken = coupon;
+
+    Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(poolFactory));
+    
+    Token(reserve).mint(governance, 500000000000000000000000000000);
+    Token(reserve).approve(address(poolFactory), 500000000000000000000000000000);
+    
+    return poolFactory.createPool(params, 500000000000000000000000000000, 10000, 10000, "Bond ETH", "bondETH", "Leverage ETH", "levETH");
+  }
+
+  function useMockPool(address poolAddress) public {
+    // Deploy the mock pool
+    MockPool mockPool = new MockPool();
+
+    // Use vm.etch to deploy the mock contract at the specific address
+    vm.etch(poolAddress, address(mockPool).code);
   }
 
   function testConstructor() public view {
@@ -93,7 +148,7 @@ contract AuctionTest is Test {
     vm.stopPrank();
 
     vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
+    vm.prank(pool);
     auction.endAuction();
 
     assertEq(uint256(auction.state()), uint256(Auction.State.SUCCEEDED));
@@ -101,7 +156,7 @@ contract AuctionTest is Test {
 
   function testEndAuctionFailed() public {
     vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
+    vm.prank(pool);
     auction.endAuction();
 
     assertEq(uint256(auction.state()), uint256(Auction.State.FAILED));
@@ -121,7 +176,7 @@ contract AuctionTest is Test {
     vm.stopPrank();
 
     vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
+    vm.prank(pool);
     auction.endAuction();
 
     uint256 initialBalance = weth.balanceOf(bidder);
@@ -146,7 +201,7 @@ contract AuctionTest is Test {
 
   function testClaimBidAuctionFailed() public {
     vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
+    vm.prank(pool);
     auction.endAuction();
 
     vm.expectRevert(Auction.AuctionFailed.selector);
@@ -161,7 +216,7 @@ contract AuctionTest is Test {
     vm.stopPrank();
 
     vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
+    vm.prank(pool);
     auction.endAuction();
 
     vm.expectRevert(Auction.NothingToClaim.selector);
@@ -178,7 +233,7 @@ contract AuctionTest is Test {
     vm.stopPrank();
 
     vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
+    vm.prank(pool);
     auction.endAuction();
 
     vm.startPrank(bidder);
@@ -197,29 +252,12 @@ contract AuctionTest is Test {
     vm.stopPrank();
 
     vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
-    auction.endAuction();
+    vm.prank(pool);
 
     uint256 initialBalance = usdc.balanceOf(house);
-
-    vm.prank(house);
-    auction.withdraw();
-
-    assertEq(usdc.balanceOf(house), initialBalance + 100000000000 ether);
-  }
-
-  function testWithdrawAuctionNotEnded() public {
-    vm.expectRevert(Auction.AuctionStillOngoing.selector);
-    auction.withdraw();
-  }
-
-  function testWithdrawAuctionFailed() public {
-    vm.warp(block.timestamp + 15 days);
-    vm.prank(house);
+    
     auction.endAuction();
-
-    vm.expectRevert(Auction.AuctionFailed.selector);
-    auction.withdraw();
+    assertEq(usdc.balanceOf(house), initialBalance + 100000000000 ether);
   }
 
   function testMultipleBidsWithNewHighBid() public {
