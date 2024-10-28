@@ -28,8 +28,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         bytes32 balancerPoolId,
         IAsset[] memory assets,
         uint256[] memory maxAmountsIn,
-        bytes memory userData,
-        uint256 amount
+        bytes memory userData
     ) external nonReentrant returns (uint256) {
         // Step 1: Join Balancer Pool
         uint256 bptReceived = joinBalancerPool(balancerPoolId, assets, maxAmountsIn, userData);
@@ -101,7 +100,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         bytes memory userData
     ) external nonReentrant {
         // Step 1: Withdraw from PreDeposit
-        predeposit.withdraw(bptIn, msg.sender);
+        predeposit.withdraw(bptIn);
 
         // Step 2: Exit Balancer Pool
         exitBalancerPool(balancerPoolId, assets, bptIn, minAmountsOut, userData, msg.sender);
