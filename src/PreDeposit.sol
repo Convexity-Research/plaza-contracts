@@ -65,6 +65,18 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     _disableInitializers();
   }
 
+  /**
+   * @dev Initializes the contract with pool parameters and configuration.
+   * @param _params Pool parameters struct
+   * @param _factory Address of the pool factory
+   * @param _depositStartTime Start time for deposits
+   * @param _depositEndTime End time for deposits
+   * @param _reserveCap Maximum reserve amount
+   * @param _bondName Name of the bond token
+   * @param _bondSymbol Symbol of the bond token
+   * @param _leverageName Name of the leverage token
+   * @param _leverageSymbol Symbol of the leverage token
+   */
   function initialize(
     PoolFactory.PoolParams memory _params,
     address _factory,
@@ -90,6 +102,10 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     leverageSymbol = _leverageSymbol;
   }
 
+  /**
+   * @dev Allows users to deposit reserve tokens up to the reserve cap.
+   * @param amount Amount of reserve tokens to deposit
+   */
   function deposit(uint256 amount) external nonReentrant whenNotPaused {
     if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
     if (block.timestamp > depositEndTime) revert DepositEnded();
@@ -108,6 +124,10 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     emit Deposited(msg.sender, amount);
   }
 
+  /**
+   * @dev Allows users to withdraw their deposited reserve tokens before deposit end time.
+   * @param amount Amount of reserve tokens to withdraw
+   */
   function withdraw(uint256 amount) external nonReentrant whenNotPaused {
     if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
     if (block.timestamp > depositEndTime) revert WithdrawEnded();
@@ -121,6 +141,9 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     emit Withdrawn(msg.sender, amount);
   }
 
+  /**
+   * @dev Creates a new pool using the accumulated deposits after deposit period ends.
+   */
   function createPool() external nonReentrant whenNotPaused {
     if (block.timestamp < depositEndTime) revert DepositNotEnded();
     if (reserveAmount == 0) revert NoReserveAmount();
@@ -132,6 +155,9 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     emit PoolCreated(pool);
   }
 
+  /**
+   * @dev Allows users to claim their share of bond and leverage tokens after pool creation.
+   */
   function claim() external nonReentrant whenNotPaused {
     if (block.timestamp < depositEndTime) revert DepositNotEnded();
     if (pool == address(0)) revert ClaimPeriodNotStarted();
@@ -157,7 +183,10 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     emit Claimed(msg.sender, userBondShare, userLeverageShare);
   }
 
-  // admin functions
+  /**
+   * @dev Updates pool parameters. Can only be called by owner before deposit end time.
+   * @param _params New pool parameters
+   */
   function setParams(PoolFactory.PoolParams memory _params) external onlyOwner {
     if (block.timestamp > depositEndTime) revert DepositEnded();
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
@@ -166,12 +195,21 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     params = _params;
   }
 
+  /**
+   * @dev Sets the bond and leverage token amounts. Can only be called by owner before deposit end time.
+   * @param _bondAmount Amount of bond tokens
+   * @param _leverageAmount Amount of leverage tokens
+   */
   function setBondAndLeverageAmount(uint256 _bondAmount, uint256 _leverageAmount) external onlyOwner {
     if (block.timestamp > depositEndTime) revert DepositEnded();
     bondAmount = _bondAmount;
     leverageAmount = _leverageAmount;
   }
 
+  /**
+   * @dev Increases the reserve cap. Can only be called by owner before deposit end time.
+   * @param newReserveCap New maximum reserve amount
+   */
   function increaseReserveCap(uint256 newReserveCap) external onlyOwner {
     if (newReserveCap <= reserveCap) revert CapMustIncrease();
     if (block.timestamp > depositEndTime) revert DepositEnded();
@@ -180,14 +218,22 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     emit DepositCapIncreased(newReserveCap);
   }
 
-  function setDepositStartTime (uint256 newDepositStartTime) external onlyOwner {
+  /**
+   * @dev Updates the deposit start time. Can only be called by owner before current start time.
+   * @param newDepositStartTime New deposit start timestamp
+   */
+  function setDepositStartTime(uint256 newDepositStartTime) external onlyOwner {
     if (block.timestamp > newDepositStartTime) revert DepositAlreadyStarted();
     if (newDepositStartTime <= depositStartTime) revert DepositStartMustOnlyBeExtended();
     if (newDepositStartTime >= depositEndTime) revert DepositEndMustBeAfterStart();
     depositStartTime = newDepositStartTime;
   }
 
-  function setDepositEndTime (uint256 newDepositEndTime) external onlyOwner {
+  /**
+   * @dev Updates the deposit end time. Can only be called by owner before current end time.
+   * @param newDepositEndTime New deposit end timestamp
+   */
+  function setDepositEndTime(uint256 newDepositEndTime) external onlyOwner {
     if (newDepositEndTime <= depositEndTime) revert DepositEndMustOnlyBeExtended();
     if (newDepositEndTime <= depositStartTime) revert DepositEndMustBeAfterStart();
     if (block.timestamp > depositEndTime) revert DepositEnded();
@@ -213,11 +259,9 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
    * Can only be called by the owner of the contract.
    * @param newImplementation The address of the new implementation.
    */
-  // @todo: owner will be PoolFactory, make sure we can upgrade
   function _authorizeUpgrade(address newImplementation)
     internal
     onlyOwner
     override
   {}
-
 }
