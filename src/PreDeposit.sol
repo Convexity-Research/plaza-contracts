@@ -24,6 +24,10 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
   uint256 private bondAmount;
   uint256 private leverageAmount;
+  string private bondName;
+  string private bondSymbol;
+  string private leverageName;
+  string private leverageSymbol;
 
   uint256 public depositStartTime;
   uint256 public depositEndTime;
@@ -114,7 +118,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (bondAmount == 0 || leverageAmount == 0) revert InvalidBondOrLeverageAmount();
 
     IERC20(params.reserveToken).approve(address(factory), reserveAmount);
-    pool = factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, bondName, bondSymbol, leverageName, leverageSymbol);
 
     emit PoolCreated(pool);
   }
