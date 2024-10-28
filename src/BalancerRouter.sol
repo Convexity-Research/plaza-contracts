@@ -97,14 +97,14 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         bytes32 balancerPoolId,
         IAsset[] memory assets,
         uint256 bptIn,
-        uint256 minAmountOut,
+        uint256[] memory minAmountsOut,
         bytes memory userData
     ) external nonReentrant {
         // Step 1: Withdraw from PreDeposit
         predeposit.withdraw(bptIn, msg.sender);
 
         // Step 2: Exit Balancer Pool
-        exitBalancerPool(balancerPoolId, assets, bptIn, minAmountOut, userData, msg.sender);
+        exitBalancerPool(balancerPoolId, assets, bptIn, minAmountsOut, userData, msg.sender);
     }
 
     function exitPlazaAndBalancer(
@@ -114,11 +114,10 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         uint256[] memory minAmountsOut,
         bytes memory userData,
         Pool.TokenType plazaTokenType,
-        uint256 minBptOut,
-        uint256 deadline
+        uint256 minBptOut
     ) external nonReentrant {
         // Step 1: Exit Plaza Pool
-        uint256 bptReceived = exitPlazaPool(plazaTokenType, plazaTokenAmount, minBptOut, deadline);
+        uint256 bptReceived = exitPlazaPool(plazaTokenType, plazaTokenAmount, minBptOut);
 
         // Step 2: Exit Balancer Pool
         exitBalancerPool(balancerPoolId, assets, bptReceived, minAmountsOut, userData, msg.sender);
@@ -127,8 +126,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
     function exitPlazaPool(
         Pool.TokenType tokenType,
         uint256 tokenAmount,
-        uint256 minBptOut,
-        uint256 deadline
+        uint256 minBptOut
     ) internal returns (uint256) {
         // Transfer Plaza tokens from user to this contract
         IERC20 plazaToken = tokenType == Pool.TokenType.BOND ? IERC20(address(plazaPool.bondToken())) : IERC20(address(plazaPool.lToken()));
@@ -136,7 +134,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         plazaToken.safeIncreaseAllowance(address(plazaPool), tokenAmount);
 
         // Exit Plaza pool
-        return plazaPool.redeem(tokenType, tokenAmount, minBptOut, deadline);
+        return plazaPool.redeem(tokenType, tokenAmount, minBptOut);
     }
 
     function exitBalancerPool(

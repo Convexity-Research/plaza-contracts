@@ -127,7 +127,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
     IERC20(params.reserveToken).transferFrom(recipient, address(this), amount);
 
-    emit Deposit(recipient, amount);
+    emit Deposited(recipient, amount);
   }
 
   function withdraw(uint256 amount, address onBehalfOf) external nonReentrant whenNotPaused {
@@ -150,7 +150,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
     IERC20(params.reserveToken).transfer(recipient, amount);
 
-    emit Withdraw(recipient, amount);
+    emit Withdrawn(recipient, amount);
   }
 
   /**
