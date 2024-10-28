@@ -19,15 +19,15 @@ contract TokenDeployer {
    * @return address of the deployed BondToken contract
    */
   function deployDebtToken(
-    string memory /*name*/,
-    string memory /*symbol*/,
+    string memory name,
+    string memory symbol,
     address minter,
     address governance,
     address distributor,
     uint256 sharesPerToken
   ) external returns(address) {
     return Utils.deploy(address(new BondToken()), abi.encodeCall(
-      BondToken.initialize, ("Bond ETH", "bondETH", minter, governance, distributor, sharesPerToken)
+      BondToken.initialize, (name, symbol, minter, governance, distributor, sharesPerToken)
     ));
   }
 
@@ -38,13 +38,13 @@ contract TokenDeployer {
    * @return address of the deployed LeverageToken contract
    */
   function deployLeverageToken(
-    string memory /*name*/,
-    string memory /*symbol*/,
+    string memory name,
+    string memory symbol,
     address minter,
     address governance
   ) external returns(address) {
     return Utils.deploy(address(new LeverageToken()), abi.encodeCall(
-      LeverageToken.initialize, ("Leverage ETH", "levETH", minter, governance)
+      LeverageToken.initialize, (name, symbol, minter, governance)
     ));
   }
 }

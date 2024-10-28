@@ -3,20 +3,22 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {Distributor} from "../src/Distributor.sol";
-
+import {Pool} from "../src/Pool.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {Token} from "../test/mocks/Token.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {Distributor} from "../src/Distributor.sol";
+import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract TestnetScript is Script {
 
   // Base Sepolia addresses
-  address public constant reserveToken = address(0x0a38120534DA7Df6A52138926f3ceC7C970B14a1);
-  address public constant couponToken = address(0xa31577f757f371436373415F6894Cc7E37FD9D1D);
+  address public constant reserveToken = address(0x13e5FB0B6534BB22cBC59Fae339dbBE0Dc906871);
+  address public constant couponToken = address(0xf7464321dE37BdE4C03AAeeF6b1e7b71379A9a64);
 
   address public constant ethPriceFeed = address(0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1);
 
@@ -33,9 +35,17 @@ contract TestnetScript is Script {
     
     address tokenDeployer = address(new TokenDeployer());
     address distributor = Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (deployerAddress)));
+
+    // Deploys OracleFeeds
+    address oracleFeeds = address(new OracleFeeds());
+    
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), deployerAddress));
+
     PoolFactory factory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, ethPriceFeed)
+      (deployerAddress, tokenDeployer, distributor, oracleFeeds, poolBeacon, bondBeacon, levBeacon)
     )));
 
     // Grant pool factory role to factory
@@ -53,10 +63,13 @@ contract TestnetScript is Script {
       couponToken: couponToken
     });
 
+    // Set price feed
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
+
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);
-
-    factory.CreatePool(params, reserveAmount, bondAmount, leverageAmount);
+    
+    address pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
     
     vm.stopBroadcast();
   }

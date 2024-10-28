@@ -96,6 +96,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     address distributor,
     uint256 sharesPerToken
     ) initializer public {
+
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();

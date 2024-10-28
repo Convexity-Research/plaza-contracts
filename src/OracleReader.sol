@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {OracleFeeds} from "./OracleFeeds.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 /**
@@ -9,8 +10,12 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
  */
 contract OracleReader {
 
-  // Address of the ETH price feed oracle
-  address private ethPriceFeed;
+  address public oracleFeeds;
+
+  // @note: address(0) is a special address that represents USD (IRL asset)
+  address public constant USD = address(0);
+  // @note: address(1) is a special address that represents ETH (Chainlink asset)
+  address public constant ETH = address(1);
 
   /**
    * @dev Error thrown when no valid price is found
@@ -18,12 +23,17 @@ contract OracleReader {
   error NoPriceFound();
 
   /**
-   * @dev Initializes the contract with the ETH price feed address
-   * @param _ethPriceFeed Address of the ETH price feed oracle
+   * @dev Error thrown when no valid feed is found
+   */ 
+  error NoFeedFound();
+
+  /**
+   * @dev Initializes the contract with the OracleFeeds address
+   * @param _oracleFeeds Address of the OracleFeeds contract
    */
-  function __OracleReader_init(address _ethPriceFeed) internal {
-    require(ethPriceFeed == address(0), "Already initialized");
-    ethPriceFeed = _ethPriceFeed;
+  function __OracleReader_init(address _oracleFeeds) internal {
+    require(oracleFeeds == address(0), "Already initialized");
+    oracleFeeds = _oracleFeeds;
   }
 
   /**
@@ -31,21 +41,42 @@ contract OracleReader {
    * @return price from the oracle
    * @dev Reverts if the price data is older than 1 day
    */
-  function getOraclePrice(address /*quote*/) public view returns(uint256) {
-    (,int256 answer,,uint256 updatedTimestamp,) = AggregatorV3Interface(ethPriceFeed).latestRoundData();
+  function getOraclePrice(address quote, address base) public view returns(uint256) {
+    bool isInverted = false;
+    address feed = OracleFeeds(oracleFeeds).priceFeeds(quote, base);
+
+    if (feed == address(0)) {
+      feed = OracleFeeds(oracleFeeds).priceFeeds(base, quote);
+      if (feed == address(0)) {
+        revert NoFeedFound();
+      }
+
+      // Invert the price
+      isInverted = true;
+    }
+    (,int256 answer,,uint256 updatedTimestamp,) = AggregatorV3Interface(feed).latestRoundData();
 
     if (updatedTimestamp + 1 days <= block.timestamp) {
       revert NoPriceFound();
     }
 
-    return uint256(answer);
+    return isInverted ? uint256(10 ** AggregatorV3Interface(feed).decimals()) / uint256(answer) : uint256(answer);
   }
 
   /**
    * @dev Retrieves the number of decimals used in the oracle's price data
    * @return decimals Number of decimals used in the price data
    */
-  function getOracleDecimals(address /*quote*/) public view returns(uint8 decimals) {
-    return AggregatorV3Interface(ethPriceFeed).decimals();
+  function getOracleDecimals(address quote, address base) public view returns(uint8 decimals) {
+    address feed = OracleFeeds(oracleFeeds).priceFeeds(quote, base);
+
+    if (feed == address(0)) {
+      feed = OracleFeeds(oracleFeeds).priceFeeds(base, quote);
+      if (feed == address(0)) {
+        revert NoFeedFound();
+      }
+    }
+
+    return AggregatorV3Interface(feed).decimals();
   }
 }
