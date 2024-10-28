@@ -40,6 +40,7 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();
+    __Pausable_init();
 
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
