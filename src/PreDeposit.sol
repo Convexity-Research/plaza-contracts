@@ -45,21 +45,21 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   error DepositEnded();
   error WithdrawEnded();
   error NothingToClaim();
-  error DepositAlreadyStarted();
-  error DepositStartMustOnlyBeExtended();
-  error DepositEndMustOnlyBeExtended();
-  error DepositEndMustBeAfterStart();
-  error DepositNotYetStarted();
   error DepositNotEnded();
   error NoReserveAmount();
+  error CapMustIncrease();
+  error DepositCapReached();
   error InsufficientBalance();
   error InvalidReserveToken();
+  error DepositNotYetStarted();
+  error DepositAlreadyStarted();
   error ClaimPeriodNotStarted();
+  error DepositEndMustBeAfterStart();
   error InvalidBondOrLeverageAmount();
-  error DepositCapReached();
-  error CapMustIncrease();
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
+  error DepositEndMustOnlyBeExtended();
+  error DepositStartMustOnlyBeExtended();
+  
+  /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
   }
