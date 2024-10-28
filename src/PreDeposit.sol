@@ -15,7 +15,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable, PausableUpgradeable {
 
   // Initializing pool params
-  address pool;
+  address public pool;
   PoolFactory private factory;
   PoolFactory.PoolParams private params;
 
