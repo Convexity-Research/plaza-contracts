@@ -37,8 +37,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
   // Events
   event PoolCreated(address indexed pool);
-  event Deposit(address indexed user, uint256 amount);
-  event Withdraw(address indexed user, uint256 amount);
+  event Deposited(address indexed user, uint256 amount);
+  event Withdrawn(address indexed user, uint256 amount);
   event Claimed(address indexed user, uint256 bondAmount, uint256 leverageAmount);
 
   // Errors
@@ -104,7 +104,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
     IERC20(params.reserveToken).transferFrom(msg.sender, address(this), amount);
 
-    emit Deposit(msg.sender, amount);
+    emit Deposited(msg.sender, amount);
   }
 
   function withdraw(uint256 amount) external nonReentrant whenNotPaused {
@@ -117,7 +117,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
     IERC20(params.reserveToken).transfer(msg.sender, amount);
 
-    emit Withdraw(msg.sender, amount);
+    emit Withdrawn(msg.sender, amount);
   }
 
   function createPool() external nonReentrant whenNotPaused {
