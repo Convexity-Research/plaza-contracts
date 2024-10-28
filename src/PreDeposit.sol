@@ -37,6 +37,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
   // Events
   event PoolCreated(address indexed pool);
+  event DepositCapIncreased(uint256 newReserveCap);
   event Deposited(address indexed user, uint256 amount);
   event Withdrawn(address indexed user, uint256 amount);
   event Claimed(address indexed user, uint256 bondAmount, uint256 leverageAmount);
@@ -58,7 +59,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   error InvalidBondOrLeverageAmount();
   error DepositEndMustOnlyBeExtended();
   error DepositStartMustOnlyBeExtended();
-  
+
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -175,6 +176,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (newReserveCap <= reserveCap) revert CapMustIncrease();
     if (block.timestamp > depositEndTime) revert DepositEnded();
     reserveCap = newReserveCap;
+
+    emit DepositCapIncreased(newReserveCap);
   }
 
   function setDepositStartTime (uint256 newDepositStartTime) external onlyOwner {
