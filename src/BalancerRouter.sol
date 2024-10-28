@@ -104,7 +104,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         predeposit.withdraw(bptIn, msg.sender);
 
         // Step 2: Exit Balancer Pool
-        exitBalancerPool(balancerPoolId, assets, bptIn, minAmountOut, userData);
+        exitBalancerPool(balancerPoolId, assets, bptIn, minAmountOut, userData, msg.sender);
     }
 
     function exitPlazaAndBalancer(
