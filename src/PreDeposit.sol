@@ -69,7 +69,11 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     address _factory,
     uint256 _depositStartTime,
     uint256 _depositEndTime,
-    uint256 _reserveCap) initializer public {
+    uint256 _reserveCap,
+    string memory _bondName,
+    string memory _bondSymbol,
+    string memory _leverageName,
+    string memory _leverageSymbol) initializer public {
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
     __UUPSUpgradeable_init();
     __ReentrancyGuard_init();
@@ -79,6 +83,10 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     depositEndTime = _depositEndTime;
     reserveCap = _reserveCap;
     factory = PoolFactory(_factory);
+    bondName = _bondName;
+    bondSymbol = _bondSymbol;
+    leverageName = _leverageName;
+    leverageSymbol = _leverageSymbol;
   }
 
   function deposit(uint256 amount) external nonReentrant whenNotPaused {
