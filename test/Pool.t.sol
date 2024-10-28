@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
+
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
 import {Utils} from "../src/lib/Utils.sol";
@@ -13,6 +14,7 @@ import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {Validator} from "../src/utils/Validator.sol";
+import {OracleReader} from "../src/OracleReader.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
@@ -64,9 +66,8 @@ contract PoolTest is Test, TestCases {
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
-
-    console.log("reserveToken", address(params.reserveToken));
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
+    
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();
@@ -876,7 +877,7 @@ contract PoolTest is Test, TestCases {
     _params.distributionPeriod = 0;
     _params.couponToken = address(new Token("USDC", "USDC", false));
 
-    OracleFeeds(poolFactory.oracleFeeds()).setPriceFeed(_params.reserveToken, address(0), ethPriceFeed);
+    OracleFeeds(poolFactory.oracleFeeds()).setPriceFeed(_params.reserveToken, address(0), ethPriceFeed, 1 days);
     
     vm.stopPrank();
     vm.startPrank(governance);
@@ -931,5 +932,32 @@ contract PoolTest is Test, TestCases {
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
     }
+  }
+
+  function testCreateStaleOraclePrice() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+
+    rToken.approve(address(_pool), 1000);
+
+    // Advance time for oracle price to be stale
+    vm.warp(block.timestamp + 1 days + 1);
+
+    // Expect revert due to stale oracle price
+    vm.expectRevert(OracleReader.StalePrice.selector);
+
+    // Call create and assert minted tokens
+    _pool.create(Pool.TokenType.BOND, 1000, 30000, block.timestamp, governance);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
   }
 }

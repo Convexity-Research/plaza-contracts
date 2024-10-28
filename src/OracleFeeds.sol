@@ -9,6 +9,7 @@ contract OracleFeeds is AccessControl {
 
   // Mapping of token pairs to their price feed addresses
   mapping(address => mapping(address => address)) public priceFeeds;
+  mapping(address => uint256) public feedHeartbeats;
 
   constructor() {
     _grantRole(GOV_ROLE, msg.sender);
@@ -22,8 +23,14 @@ contract OracleFeeds is AccessControl {
 
    * Note: address(0) is a special address that represents USD (IRL asset)
    */
-  function setPriceFeed(address tokenA, address tokenB, address priceFeed) external onlyRole(GOV_ROLE) {
+  function setPriceFeed(address tokenA, address tokenB, address priceFeed, uint256 heartbeat) external onlyRole(GOV_ROLE) {
     priceFeeds[tokenA][tokenB] = priceFeed;
+
+    if (heartbeat == 0) {
+      heartbeat = 1 days;
+    }
+
+    feedHeartbeats[priceFeed] = heartbeat;
   }
 
   /**
