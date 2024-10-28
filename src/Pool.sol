@@ -12,17 +12,15 @@ import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 /**
  * @title Pool
- * @dev This contract manages a pool of assets, allowing for the creation, redemption, and swapping of bond and leverage tokens.
+ * @dev This contract manages a pool of assets, allowing for the creatio and redemption of bond and leverage tokens.
  * It also handles distribution periods and interacts with an oracle for price information.
  */
-contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
+contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
   using Decimals for uint256;
   using SafeERC20 for IERC20;
   using ERC20Extensions for IERC20;
@@ -83,12 +81,12 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   error DistributionPeriod();
 
   // Events
+  event Distributed(uint256 amount);
+  event MerchantApproved(address merchant);
+  event SharesPerTokenChanged(uint256 sharesPerToken);
+  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
-  event SharesPerTokenChanged(uint256 sharesPerToken);
-  event Distributed(uint256 amount);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -105,7 +103,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
    * @param _couponToken Address of the coupon token.
    * @param _sharesPerToken Initial shares per bond per distribution period.
    * @param _distributionPeriod Initial distribution period in seconds.
-   * @param _ethPriceFeed Address of the ETH price feed.
+   * @param _oracleFeeds Address of the OracleFeeds contract.
    */
   function initialize(
     address _poolFactory,
@@ -116,11 +114,11 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     address _couponToken,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
-    address _ethPriceFeed
+    address _oracleFeeds
   ) initializer public {
-    __UUPSUpgradeable_init();
-    __OracleReader_init(_ethPriceFeed);
+    __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
+    __Pausable_init();
 
     poolFactory = PoolFactory(_poolFactory);
     fee = _fee;
@@ -233,8 +231,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
   }
 
@@ -384,8 +382,8 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
       bondSupply,
       levSupply,
       poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
+      getOraclePrice(reserveToken, USD),
+      getOracleDecimals(reserveToken, USD)
     ).normalizeAmount(COMMON_DECIMALS, IERC20(reserveToken).safeDecimals());
   }
 
@@ -444,127 +442,7 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     // Calculate and return the final redeem amount
     return ((depositAmount * redeemRate).fromBaseUnit(oracleDecimals) / ethPrice) / PRECISION;
   }
-
-  /**
-   * @dev Swaps one token type for another (BOND for LEVERAGE or vice versa).
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to swap.
-   * @param minAmount The minimum amount of derivative tokens to receive in return.
-   * @return amount of derivative tokens received in the swap.
-   */
-  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() nonReentrant() returns(uint256) {
-    return _swap(tokenType, depositAmount, minAmount, address(0));
-  }
-
-  /**
-   * @dev Swaps one token type for another with additional parameters.
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to swap.
-   * @param minAmount The minimum amount of derivative tokens to receive in return.
-   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
-   * @param onBehalfOf The address to receive the swapped derivative tokens.
-   * @return amount of derivative tokens received in the swap.
-   */
-  function swap(
-    TokenType tokenType,
-    uint256 depositAmount,
-    uint256 minAmount,
-    uint256 deadline,
-    address onBehalfOf
-  ) public whenNotPaused() nonReentrant() checkDeadline(deadline) returns(uint256) {
-    return _swap(tokenType, depositAmount, minAmount, onBehalfOf);
-  }
-
-  /**
-   * @dev Swaps one token type for another with additional parameters.
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to swap.
-   * @param minAmount The minimum amount of derivative tokens to receive in return.
-   * @param onBehalfOf The address to receive the swapped derivative tokens.
-   * @return amount of derivative tokens received in the swap.
-   */
-  function _swap(
-    TokenType tokenType,
-    uint256 depositAmount,
-    uint256 minAmount,
-    address onBehalfOf
-  ) private returns(uint256) {
-    uint256 mintAmount = simulateSwap(tokenType, depositAmount);
-
-    if (mintAmount < minAmount) {
-      revert MinAmount();
-    }
-
-    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
-
-    if (tokenType == TokenType.BOND) {
-      bondToken.burn(msg.sender, depositAmount);
-      lToken.mint(recipient, mintAmount);
-    } else {
-      lToken.burn(msg.sender, depositAmount);
-      bondToken.mint(recipient, mintAmount);
-    }
-
-    emit TokensSwapped(msg.sender, recipient, tokenType, depositAmount, mintAmount);
-    return mintAmount;
-  }
-
-  /**
-   * @dev Simulates a swap without actually executing it.
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to simulate swapping.
-   * @return amount of derivative tokens that would be received in the swap.
-   */
-  function simulateSwap(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
-    require(depositAmount > 0, ZeroAmount());
-
-    uint256 bondSupply = bondToken.totalSupply()
-                          .normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
-    uint256 levSupply = lToken.totalSupply()
-                          .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
-    uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
-                          .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
-
-    if (tokenType == TokenType.LEVERAGE) {
-      depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
-    } else {
-      depositAmount = depositAmount.normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
-    }
-
-    uint256 redeemAmount = getRedeemAmount(
-      tokenType,
-      depositAmount,
-      bondSupply,
-      levSupply,
-      poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
-    );
-    
-    uint8 assetDecimals = 0;
-    TokenType createType = TokenType.BOND;
-    poolReserves = poolReserves - redeemAmount;
-
-    if (tokenType == TokenType.BOND) {
-      createType = TokenType.LEVERAGE;
-      bondSupply = bondSupply - depositAmount; 
-      assetDecimals = lToken.decimals();
-    } else {
-      levSupply = levSupply - depositAmount; 
-      assetDecimals = bondToken.decimals();
-    }
-
-    return getCreateAmount(
-      createType,
-      redeemAmount,
-      bondSupply,
-      levSupply,
-      poolReserves,
-      getOraclePrice(address(0)),
-      getOracleDecimals(address(0))
-    ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
-  }
-
+  
   /**
    * @dev Distributes coupon tokens to bond token holders.
    * Can only be called after the distribution period has passed.
@@ -576,12 +454,20 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
 
     Distributor distributor = Distributor(poolFactory.distributor());
 
-    // Calculate last distribution time
-    lastDistribution = block.timestamp + distributionPeriod;
+    // Update last distribution time
+    lastDistribution = block.timestamp;
+
+    uint8 bondDecimals = bondToken.decimals();
+    uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
+    uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
+
+    uint256 normalizedTotalSupply = bondToken.totalSupply().normalizeAmount(bondDecimals, maxDecimals);
+    uint256 normalizedShares = sharesPerToken.normalizeAmount(sharesDecimals, maxDecimals);
 
     // Calculate the coupon amount to distribute
-    uint256 couponAmountToDistribute = (bondToken.totalSupply() * sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS());
-
+    uint256 couponAmountToDistribute = (normalizedTotalSupply * normalizedShares)
+        .toBaseUnit(maxDecimals * 2 - IERC20(couponToken).safeDecimals());
+    
     // Increase the bond token period
     bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
@@ -657,29 +543,6 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
   }
 
   /**
-   * @dev Recovers any ERC20 tokens or native tokens sent to this contract.
-   * @param token The address of the ERC20 token to recover.
-   * @notice This function should be removed before production deployment.
-   */
-  // @todo: remove before prod
-  function recovery(address token) external onlyRole(poolFactory.GOV_ROLE()) {
-    // Transfer ERC20 token balance
-    uint256 tokenBalance = IERC20(token).balanceOf(address(this));
-    if (tokenBalance > 0) {
-      IERC20(token).safeTransfer(msg.sender, tokenBalance);
-    }
-
-    // Transfer native token balance
-    uint256 nativeBalance = address(this).balance;
-    if (nativeBalance > 0) {
-      (bool success,) = payable(msg.sender).call{value: nativeBalance}("");
-      if (!success) {
-        return;
-      }
-    }
-  }
-
-  /**
    * @dev Modifier to check if the caller has the specified role.
    * @param role The role to check for.
    */
@@ -689,16 +552,4 @@ contract Pool is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpg
     }
     _;
   }
-
-  /**
-   * @dev Authorizes an upgrade to a new implementation.
-   * Can only be called by the owner of the contract.
-   * @param newImplementation The address of the new implementation.
-   */
-  // @todo: owner will be PoolFactory, make sure we can upgrade
-  function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyOwner
-    override
-  {}
 }

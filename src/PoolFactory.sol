@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {Distributor} from "./Distributor.sol";
 import {Pool} from "./Pool.sol";
-import {Utils} from "./lib/Utils.sol";
 import {BondToken} from "./BondToken.sol";
+import {Distributor} from "./Distributor.sol";
 import {LeverageToken} from "./LeverageToken.sol";
+import {Create3} from "@create3/contracts/Create3.sol";
 import {TokenDeployer} from "./utils/TokenDeployer.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -21,7 +21,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
  * @dev This contract is responsible for creating and managing pools.
  * It inherits from various OpenZeppelin upgradeable contracts for enhanced functionality and security.
  */
-contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
   using SafeERC20 for IERC20;
   using ERC20Extensions for IERC20;
 
@@ -38,16 +38,20 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
   /// @dev Array to store addresses of created pools
   address[] public pools;
-  /// @dev Number of pools created
-  uint256 public poolsLength;
   /// @dev Address of the governance contract
   address public governance;
   /// @dev Address of the distributor contract
   address public distributor;
-  /// @dev Address of the ETH price feed
-  address private ethPriceFeed;
+  /// @dev Address of the OracleFeeds contract
+  address public oracleFeeds;
   /// @dev Instance of the TokenDeployer contract
   TokenDeployer private tokenDeployer;
+  /// @dev Address of the UpgradeableBeacon for Pool
+  address public poolBeacon;
+  /// @dev Address of the UpgradeableBeacon for BondToken
+  address public bondBeacon;
+  /// @dev Address of the UpgradeableBeacon for LeverageToken
+  address public leverageBeacon;
 
   /// @dev Error thrown when bond amount is zero
   error ZeroDebtAmount();
@@ -76,16 +80,33 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @param _governance Address of the governance account that will have the GOV_ROLE.
    * @param _tokenDeployer Address of the TokenDeployer contract.
    * @param _distributor Address of the Distributor contract.
-   * @param _ethPriceFeed Address of the ETH price feed.
+   * @param _oracleFeeds Address of the OracleFeeds contract.
+   * @param _poolImplementation Address of the Pool implementation contract.
+   * @param _bondImplementation Address of the BondToken implementation contract.
+   * @param _leverageImplementation Address of the LeverageToken implementation contract.
    */
-  function initialize(address _governance, address _tokenDeployer, address _distributor, address _ethPriceFeed) initializer public {
+  function initialize(
+    address _governance,
+    address _tokenDeployer,
+    address _distributor,
+    address _oracleFeeds,
+    address _poolImplementation,
+    address _bondImplementation,
+    address _leverageImplementation
+  ) initializer public {
     __UUPSUpgradeable_init();
+    __Pausable_init();
 
     tokenDeployer = TokenDeployer(_tokenDeployer);
     governance = _governance;
     distributor = _distributor;
-    ethPriceFeed = _ethPriceFeed;
+    oracleFeeds = _oracleFeeds;
     _grantRole(GOV_ROLE, _governance);
+
+    // Stores beacon implementation addresses
+    poolBeacon = _poolImplementation;
+    bondBeacon = _bondImplementation;
+    leverageBeacon = _leverageImplementation;
   }
 
   /**
@@ -96,27 +117,34 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    * @param leverageAmount Amount of leverage tokens to mint
    * @return Address of the newly created pool
    */
-  // @todo: make it payable (to accept native ETH)
-  function CreatePool(PoolParams calldata params, uint256 reserveAmount, uint256 bondAmount, uint256 leverageAmount) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
-    // @todo: with this is safer but some cases are not testable (guess that's still good)
-    // if (reserveAmount == 0) {
-    //   revert ZeroReserveAmount();
-    // }
+  function createPool(
+    PoolParams calldata params,
+    uint256 reserveAmount,
+    uint256 bondAmount,
+    uint256 leverageAmount,
+    string memory bondName,
+    string memory bondSymbol,
+    string memory leverageName,
+    string memory leverageSymbol
+  ) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
 
-    // if (bondAmount == 0) {
-    //   revert ZeroDebtAmount();
-    // }
+    if (reserveAmount == 0) {
+      revert ZeroReserveAmount();
+    }
 
-    // if (leverageAmount == 0) {
-    //   revert ZeroLeverageAmount();
-    // }
+    if (bondAmount == 0) {
+      revert ZeroDebtAmount();
+    }
 
-    string memory reserveSymbol = IERC20(params.reserveToken).safeSymbol();
+    if (leverageAmount == 0) {
+      revert ZeroLeverageAmount();
+    }
     
     // Deploy Bond token
-    BondToken bondToken = BondToken(tokenDeployer.deployDebtToken(
-      string.concat("Bond", reserveSymbol),
-      string.concat("bond", reserveSymbol),
+    BondToken bondToken = BondToken(tokenDeployer.deployBondToken(
+      bondBeacon,
+      bondName,
+      bondSymbol,
       address(this),
       address(this),
       distributor,
@@ -125,14 +153,15 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
 
     // Deploy Leverage token
     LeverageToken lToken = LeverageToken(tokenDeployer.deployLeverageToken(
-      string.concat("Leverage", reserveSymbol),
-      string.concat("lev", reserveSymbol),
+      leverageBeacon,
+      leverageName,
+      leverageSymbol,
       address(this),
       address(this)
     ));
 
-    // Deploy pool contract
-    address pool = Utils.deploy(address(new Pool()), abi.encodeCall(
+    // Deploy pool contract as a BeaconProxy
+    bytes memory initData = abi.encodeCall(
       Pool.initialize, 
       (
         address(this),
@@ -143,28 +172,43 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
         params.couponToken,
         params.sharesPerToken,
         params.distributionPeriod,
-        ethPriceFeed
+        oracleFeeds
       )
-    ));
+    );
+
+    address pool = Create3.create3(
+      keccak256(
+        abi.encodePacked(
+          params.reserveToken,
+          params.couponToken,
+          bondToken.symbol(),
+          lToken.symbol()
+        )
+      ),
+      abi.encodePacked(
+        type(BeaconProxy).creationCode,
+        abi.encode(poolBeacon, initData)
+      )
+    );
 
     Distributor(distributor).registerPool(pool, params.couponToken);
 
     bondToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
+
+    // @todo: check why this is needed
+    bondToken.grantRole(GOV_ROLE, pool);
+    lToken.grantRole(GOV_ROLE, pool);
     
     // set token governance
     bondToken.grantRole(GOV_ROLE, governance);
     lToken.grantRole(GOV_ROLE, governance);
-
-    bondToken.grantRole(GOV_ROLE, pool);
-    lToken.grantRole(GOV_ROLE, pool);
 
     // remove governance from factory
     bondToken.revokeRole(GOV_ROLE, address(this));
     lToken.revokeRole(GOV_ROLE, address(this));
 
     pools.push(pool);
-    poolsLength = poolsLength + 1;
     emit PoolCreated(pool, reserveAmount, bondAmount, leverageAmount);
 
     // Send seed reserves to pool
@@ -175,6 +219,14 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
     lToken.mint(msg.sender, leverageAmount);
 
     return pool;
+  }
+
+  /**
+  * @dev Returns the number of pools created.
+  * @return The length of the pools array.
+  */
+  function poolsLength() external view returns (uint256) {
+    return pools.length;
   }
   
   /**
@@ -218,7 +270,7 @@ contract PoolFactory is Initializable, OwnableUpgradeable, AccessControlUpgradea
    */
   function _authorizeUpgrade(address newImplementation)
     internal
-    onlyOwner
+    onlyRole(GOV_ROLE)
     override
   {}
 }
