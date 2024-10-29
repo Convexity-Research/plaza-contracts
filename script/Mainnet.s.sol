@@ -64,7 +64,8 @@ contract MainnetScript is Script {
       reserveToken: reserveToken,
       couponToken: couponToken,
       sharesPerToken: sharesPerToken,
-      distributionPeriod: distributionPeriod
+      distributionPeriod: distributionPeriod,
+      feeBeneficiary: deployerAddress
     });
 
     // Set price feed
