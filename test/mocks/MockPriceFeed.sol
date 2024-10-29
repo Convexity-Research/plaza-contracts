@@ -6,14 +6,17 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 contract MockPriceFeed is AggregatorV3Interface {
   int256 private price;
   uint8 private priceDecimals;
+  uint256 private priceTimestamp;
 
   function setMockPrice(int256 _initialPrice, uint8 _decimals) external {
     price = _initialPrice;
     priceDecimals = _decimals;
+    priceTimestamp = block.timestamp;
   }
 
   function setPrice(int256 _newPrice) external {
     price = _newPrice;
+    priceTimestamp = block.timestamp;
   }
 
   function decimals() external view override returns (uint8) {
@@ -40,7 +43,7 @@ contract MockPriceFeed is AggregatorV3Interface {
       uint80 answeredInRound
     )
   {
-    return (_roundId, price, block.timestamp, block.timestamp, _roundId);
+    return (_roundId, price, priceTimestamp, priceTimestamp, _roundId);
   }
 
   function latestRoundData()
@@ -55,6 +58,6 @@ contract MockPriceFeed is AggregatorV3Interface {
       uint80 answeredInRound
     )
   {
-    return (0, price, block.timestamp, block.timestamp, 0);
+    return (0, price, priceTimestamp, priceTimestamp, 0);
   }
 }
