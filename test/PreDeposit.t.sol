@@ -42,7 +42,8 @@ contract PreDepositTest is Test {
       reserveToken: address(reserveToken),
       couponToken: address(couponToken),
       distributionPeriod: 90 days,
-      sharesPerToken: 2 * 10**6
+      sharesPerToken: 2 * 10**6,
+      feeBeneficiary: address(0)
     });
     
     factory = address(new MockPoolFactory());
@@ -74,7 +75,7 @@ contract PreDepositTest is Test {
     ))));
 
     Pool pool = Pool(Utils.deploy(address(new Pool()), abi.encodeCall(Pool.initialize, 
-      (factory, 0, address(reserveToken), address(bondToken), address(lToken), address(couponToken), 0, 0, address(0))
+      (factory, 0, address(reserveToken), address(bondToken), address(lToken), address(couponToken), 0, 0, address(0), address(0))
     )));
 
     // Adds fake pool to preDeposit contract
@@ -99,7 +100,8 @@ contract PreDepositTest is Test {
       reserveToken: address(0),
       couponToken: address(couponToken),
       distributionPeriod: 90 days,
-      sharesPerToken: 2 * 10**6
+      sharesPerToken: 2 * 10**6,
+      feeBeneficiary: address(0)
     });
 
     address preDepositAddress = address(new PreDeposit());
@@ -137,7 +139,8 @@ contract PreDepositTest is Test {
       reserveToken: address(reserveToken),
       couponToken: address(couponToken),
       distributionPeriod: 90 days,
-      sharesPerToken: 2 * 10**6
+      sharesPerToken: 2 * 10**6,
+      feeBeneficiary: address(0)
     });
 
     PreDeposit newPreDeposit = PreDeposit(Utils.deploy(address(new PreDeposit()), abi.encodeCall(PreDeposit.initialize, (
@@ -391,7 +394,8 @@ contract PreDepositTest is Test {
       reserveToken: address(reserveToken),
       couponToken: address(couponToken),
       distributionPeriod: 180 days,
-      sharesPerToken: 3 * 10**6
+      sharesPerToken: 3 * 10**6,
+      feeBeneficiary: address(0)
     });
     preDeposit.setParams(newParams);
     vm.stopPrank();
@@ -404,7 +408,8 @@ contract PreDepositTest is Test {
       reserveToken: address(reserveToken),
       couponToken: address(couponToken),
       distributionPeriod: 180 days,
-      sharesPerToken: 3 * 10**6
+      sharesPerToken: 3 * 10**6,
+      feeBeneficiary: address(0)
     });
 
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, nonOwner));
