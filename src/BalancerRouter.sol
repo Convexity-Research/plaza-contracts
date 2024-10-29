@@ -37,7 +37,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         bpt.safeIncreaseAllowance(address(predeposit), bptReceived);
 
         // Step 3: Deposit to PreDeposit
-        predeposit.deposit(bptReceived, msg.sender);
+        predeposit.deposit(bptReceived);
 
         return bptReceived;
     }

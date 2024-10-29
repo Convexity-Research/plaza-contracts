@@ -128,7 +128,6 @@ contract BalancerRouterTest is Test {
         params.distributionPeriod = 0;
         params.couponToken = address(new Token("USDC", "USDC", false));
 
-        console.log("reserveToken", address(params.reserveToken));
         OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
         // Deploy the mock price feed
@@ -157,7 +156,10 @@ contract BalancerRouterTest is Test {
 
         // Deploy mock contracts
         vault = new MockBalancerVault(bpt);
-        predeposit = new PreDeposit();
+        predeposit = PreDeposit(Utils.deploy(address(new PreDeposit()), abi.encodeCall(
+        PreDeposit.initialize, 
+        (params, address(poolFactory), block.timestamp, block.timestamp + 1 hours, 100000 ether, "Bond ETH", "bondETH", "Leveraged ETH", "levETH")
+        )));
         router = new BalancerRouter(address(vault), address(_pool), address(predeposit), address(bpt));
 
         // Setup initial token balances
@@ -219,9 +221,9 @@ contract BalancerRouterTest is Test {
             block.timestamp + 1 hours
         );
 
-        // assertEq(plazaTokens, 1 ether, "Incorrect Plaza tokens received");
-        // assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
-        // assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
+        assertEq(plazaTokens, 125000000000000000000, "Incorrect Plaza tokens received");
+        assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
+        assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
 
         vm.stopPrank();
     }
@@ -240,6 +242,7 @@ contract BalancerRouterTest is Test {
         minAmountsOut[0] = 0.9 ether;
         minAmountsOut[1] = 0.9 ether;
 
+        bpt.approve(address(router), 1 ether);
         router.exitBalancerAndPredeposit(
             BALANCER_POOL_ID,
             assets,
@@ -253,6 +256,77 @@ contract BalancerRouterTest is Test {
 
         vm.stopPrank();
     }
+
+    function testExitPlazaAndBalancer() public {
+    // First join Balancer and Plaza to get some Plaza tokens
+    vm.startPrank(user);
+
+    IAsset[] memory assets = new IAsset[](2);
+    assets[0] = IAsset(address(asset1));
+    assets[1] = IAsset(address(asset2));
+
+    uint256[] memory maxAmountsIn = new uint256[](2);
+    maxAmountsIn[0] = 1 ether;
+    maxAmountsIn[1] = 1 ether;
+
+    asset1.approve(address(router), 1 ether);
+    asset2.approve(address(router), 1 ether);
+
+    // Join first to get Plaza tokens
+    uint256 plazaTokens = router.joinBalancerAndPlaza(
+        BALANCER_POOL_ID,
+        assets,
+        maxAmountsIn,
+        "",
+        Pool.TokenType.BOND,
+        0.9 ether,
+        block.timestamp + 1 hours
+    );
+
+    // Record balances before exit
+    uint256 asset1BalanceBefore = asset1.balanceOf(user);
+    uint256 asset2BalanceBefore = asset2.balanceOf(user);
+    uint256 bondTokenBalanceBefore = _pool.bondToken().balanceOf(user);
+
+    // Approve Plaza tokens for router
+    _pool.bondToken().approve(address(router), plazaTokens);
+
+    // Prepare exit parameters
+    uint256[] memory minAmountsOut = new uint256[](2);
+    minAmountsOut[0] = 0.9 ether;
+    minAmountsOut[1] = 0.9 ether;
+
+    // Exit Plaza and Balancer
+    router.exitPlazaAndBalancer(
+        BALANCER_POOL_ID,
+        assets,
+        plazaTokens,
+        minAmountsOut,
+        "",
+        Pool.TokenType.BOND,
+        0.9 ether
+    );
+
+    // Verify balances after exit
+    assertEq(
+        asset1.balanceOf(user), 
+        asset1BalanceBefore + 1 ether, 
+        "Incorrect asset1 balance after exit"
+    );
+    assertEq(
+        asset2.balanceOf(user), 
+        asset2BalanceBefore + 1 ether, 
+        "Incorrect asset2 balance after exit"
+    );
+    assertEq(
+        _pool.bondToken().balanceOf(user), 
+        bondTokenBalanceBefore - plazaTokens, 
+        "Incorrect bond token balance after exit"
+    );
+
+    vm.stopPrank();
+}
+
 
     function testFailJoinWithInsufficientAllowance() public {
         vm.startPrank(user);
