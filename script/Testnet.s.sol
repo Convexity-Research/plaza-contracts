@@ -60,6 +60,7 @@ contract TestnetScript is Script {
       reserveToken: reserveToken,
       sharesPerToken: sharesPerToken,
       distributionPeriod: distributionPeriod,
+      feeBeneficiary: deployerAddress,
       couponToken: couponToken
     });
 

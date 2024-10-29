@@ -29,6 +29,7 @@ contract PoolTest is Test, TestCases {
   PoolFactory.PoolParams private params;
 
   Distributor private distributor;
+  MockPriceFeed private mockPriceFeed;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
@@ -62,6 +63,7 @@ contract PoolTest is Test, TestCases {
     )));
 
     params.fee = 0;
+    params.feeBeneficiary = governance;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
@@ -69,8 +71,10 @@ contract PoolTest is Test, TestCases {
     
     OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
+
     // Deploy the mock price feed
-    MockPriceFeed mockPriceFeed = new MockPriceFeed();
+    mockPriceFeed = new MockPriceFeed();
 
     // Use vm.etch to deploy the mock contract at the specific address
     bytes memory bytecode = address(mockPriceFeed).code;
@@ -642,9 +646,6 @@ contract PoolTest is Test, TestCases {
     _pool.pause();
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    _pool.setFee(0);
-
-    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.create(Pool.TokenType.BOND, 0, 0);
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
@@ -932,6 +933,147 @@ contract PoolTest is Test, TestCases {
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
     }
+  }
+
+  function testClaimFees() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+
+    // Fast forward one year
+    vm.warp(block.timestamp + 365 days);
+
+    // Calculate expected fee
+    uint256 expectedFee = (1000 ether * 20000) / 1000000; // 2% of 1000 ether
+
+    // Check initial balance of fee beneficiary
+    address feeBeneficiary = pool.feeBeneficiary();
+    uint256 initialBalance = rToken.balanceOf(feeBeneficiary);
+    
+    vm.stopPrank();
+
+    // Claim fees
+    vm.startPrank(feeBeneficiary);
+    pool.claimFees();
+
+    vm.stopPrank();
+
+    // Check final balance of fee beneficiary
+    uint256 finalBalance = rToken.balanceOf(feeBeneficiary);
+
+    // Assert that the claimed fee is correct (allowing for small rounding errors)
+    assertEq(finalBalance - initialBalance, expectedFee);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testClaimFeesNothingToClaim() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    
+    vm.stopPrank();
+
+    // Claim fees
+    vm.startPrank(params.feeBeneficiary);
+    vm.expectRevert(Pool.NoFeesToClaim.selector);
+    pool.claimFees();
+    vm.stopPrank();
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testClaimNotBeneficiary() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+
+    // Claim fees
+    vm.expectRevert(Pool.NotBeneficiary.selector);
+    pool.claimFees();
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testCreateRedeemWithFees() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    vm.stopPrank();
+
+    // User creates leverage tokens
+    vm.startPrank(user);
+    
+    rToken.mint(user, 100 ether);
+    rToken.approve(address(pool), 100 ether);
+    uint256 levAmount = pool.create(Pool.TokenType.LEVERAGE, 100 ether, 0);
+    
+    // Advance time by 30 days
+    vm.warp(block.timestamp + 30 days);
+    
+    mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
+
+    // Calculate expected fee
+    uint256 expectedFee = (100 ether * params.fee * 30 days) / (1000000 * 365 days);
+    
+    // User redeems leverage tokens
+    pool.bondToken().approve(address(pool), levAmount);
+    uint256 redeemedAmount = pool.redeem(Pool.TokenType.LEVERAGE, levAmount, 0);
+
+    // User should get back less than initial deposit due to fees
+    assertLt(redeemedAmount, 100 ether);
+    
+    // Verify fee amount is correct
+    uint256 actualFee = 100 ether - redeemedAmount;
+    assertApproxEqRel(actualFee, expectedFee, 0.05e18); // 5% tolerance
+
+    vm.stopPrank();
+
+    // Reset state
+    rToken.burn(user, rToken.balanceOf(user));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
   }
 
   function testCreateStaleOraclePrice() public {

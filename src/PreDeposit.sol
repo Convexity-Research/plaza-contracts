@@ -1,0 +1,278 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.26;
+
+import {Pool} from "./Pool.sol";
+import {BondToken} from "./BondToken.sol";
+import {PoolFactory} from "./PoolFactory.sol";
+import {LeverageToken} from "./LeverageToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
+contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+
+  // Initializing pool params
+  address public pool;
+  PoolFactory private factory;
+  PoolFactory.PoolParams private params;
+
+  uint256 public reserveAmount;
+  uint256 public reserveCap;
+
+  uint256 private bondAmount;
+  uint256 private leverageAmount;
+  string private bondName;
+  string private bondSymbol;
+  string private leverageName;
+  string private leverageSymbol;
+
+  uint256 public depositStartTime;
+  uint256 public depositEndTime;
+
+  bool public poolCreated;
+
+  // Deposit balances
+  mapping(address => uint256) public balances;
+
+  // Events
+  event PoolCreated(address indexed pool);
+  event DepositCapIncreased(uint256 newReserveCap);
+  event Deposited(address indexed user, uint256 amount);
+  event Withdrawn(address indexed user, uint256 amount);
+  event Claimed(address indexed user, uint256 bondAmount, uint256 leverageAmount);
+
+  // Errors
+  error DepositEnded();
+  error WithdrawEnded();
+  error NothingToClaim();
+  error DepositNotEnded();
+  error NoReserveAmount();
+  error CapMustIncrease();
+  error DepositCapReached();
+  error InsufficientBalance();
+  error InvalidReserveToken();
+  error DepositNotYetStarted();
+  error DepositAlreadyStarted();
+  error ClaimPeriodNotStarted();
+  error DepositEndMustBeAfterStart();
+  error InvalidBondOrLeverageAmount();
+  error DepositEndMustOnlyBeExtended();
+  error DepositStartMustOnlyBeExtended();
+  error PoolAlreadyCreated();
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  /**
+   * @dev Initializes the contract with pool parameters and configuration.
+   * @param _params Pool parameters struct
+   * @param _factory Address of the pool factory
+   * @param _depositStartTime Start time for deposits
+   * @param _depositEndTime End time for deposits
+   * @param _reserveCap Maximum reserve amount
+   * @param _bondName Name of the bond token
+   * @param _bondSymbol Symbol of the bond token
+   * @param _leverageName Name of the leverage token
+   * @param _leverageSymbol Symbol of the leverage token
+   */
+  function initialize(
+    PoolFactory.PoolParams memory _params,
+    address _factory,
+    uint256 _depositStartTime,
+    uint256 _depositEndTime,
+    uint256 _reserveCap,
+    string memory _bondName,
+    string memory _bondSymbol,
+    string memory _leverageName,
+    string memory _leverageSymbol) initializer public {
+    if (_params.reserveToken == address(0)) revert InvalidReserveToken();
+    __UUPSUpgradeable_init();
+    __ReentrancyGuard_init();
+    __Ownable_init(msg.sender);
+    params = _params;
+    depositStartTime = _depositStartTime;
+    depositEndTime = _depositEndTime;
+    reserveCap = _reserveCap;
+    factory = PoolFactory(_factory);
+    bondName = _bondName;
+    bondSymbol = _bondSymbol;
+    leverageName = _leverageName;
+    leverageSymbol = _leverageSymbol;
+    poolCreated = false;
+  }
+
+  /**
+   * @dev Allows users to deposit reserve tokens up to the reserve cap.
+   * @param amount Amount of reserve tokens to deposit
+   */
+  function deposit(uint256 amount) external nonReentrant whenNotPaused {
+    if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
+    if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (reserveAmount >= reserveCap) revert DepositCapReached();
+
+    // if user would like to put more than available in cap, fill the rest up to cap and add that to reserves
+    if (reserveAmount + amount >= reserveCap) {
+      amount = reserveCap - reserveAmount;
+    }
+
+    balances[msg.sender] += amount;
+    reserveAmount += amount;
+
+    IERC20(params.reserveToken).transferFrom(msg.sender, address(this), amount);
+
+    emit Deposited(msg.sender, amount);
+  }
+
+  /**
+   * @dev Allows users to withdraw their deposited reserve tokens before deposit end time.
+   * @param amount Amount of reserve tokens to withdraw
+   */
+  function withdraw(uint256 amount) external nonReentrant whenNotPaused {
+    if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
+    if (block.timestamp > depositEndTime) revert WithdrawEnded();
+
+    if (balances[msg.sender] < amount) revert InsufficientBalance();
+    balances[msg.sender] -= amount;
+    reserveAmount -= amount;
+
+    IERC20(params.reserveToken).transfer(msg.sender, amount);
+
+    emit Withdrawn(msg.sender, amount);
+  }
+
+  /**
+   * @dev Creates a new pool using the accumulated deposits after deposit period ends.
+   */
+  function createPool() external nonReentrant whenNotPaused {
+    if (block.timestamp < depositEndTime) revert DepositNotEnded();
+    if (reserveAmount == 0) revert NoReserveAmount();
+    if (bondAmount == 0 || leverageAmount == 0) revert InvalidBondOrLeverageAmount();
+    if (poolCreated) revert PoolAlreadyCreated();
+    IERC20(params.reserveToken).approve(address(factory), reserveAmount);
+    pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, bondName, bondSymbol, leverageName, leverageSymbol);
+
+    emit PoolCreated(pool);
+    poolCreated = true;
+  }
+
+  /**
+   * @dev Allows users to claim their share of bond and leverage tokens after pool creation.
+   */
+  function claim() external nonReentrant whenNotPaused {
+    if (block.timestamp < depositEndTime) revert DepositNotEnded();
+    if (pool == address(0)) revert ClaimPeriodNotStarted();
+    
+    uint256 userBalance = balances[msg.sender];
+    if (userBalance == 0) revert NothingToClaim();
+
+    BondToken bondToken = BondToken(Pool(pool).bondToken());
+    LeverageToken leverageToken = LeverageToken(Pool(pool).lToken());
+
+    uint256 userBondShare = (bondToken.balanceOf(address(this)) * userBalance) / reserveAmount;
+    uint256 userLeverageShare = (leverageToken.balanceOf(address(this)) * userBalance) / reserveAmount;
+
+    balances[msg.sender] = 0;
+
+    if (userBondShare > 0) {
+      bondToken.transfer(msg.sender, userBondShare);
+    }
+    if (userLeverageShare > 0) {
+      leverageToken.transfer(msg.sender, userLeverageShare);
+    }
+
+    emit Claimed(msg.sender, userBondShare, userLeverageShare);
+  }
+
+  /**
+   * @dev Updates pool parameters. Can only be called by owner before deposit end time.
+   * @param _params New pool parameters
+   */
+  function setParams(PoolFactory.PoolParams memory _params) external onlyOwner {
+    if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (_params.reserveToken == address(0)) revert InvalidReserveToken();
+    if (_params.reserveToken != params.reserveToken) revert InvalidReserveToken();
+    if (poolCreated) revert PoolAlreadyCreated();
+
+    params = _params;
+  }
+
+  /**
+   * @dev Sets the bond and leverage token amounts. Can only be called by owner before deposit end time.
+   * @param _bondAmount Amount of bond tokens
+   * @param _leverageAmount Amount of leverage tokens
+   */
+  function setBondAndLeverageAmount(uint256 _bondAmount, uint256 _leverageAmount) external onlyOwner {
+    if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
+
+    bondAmount = _bondAmount;
+    leverageAmount = _leverageAmount;
+  }
+
+  /**
+   * @dev Increases the reserve cap. Can only be called by owner before deposit end time.
+   * @param newReserveCap New maximum reserve amount
+   */
+  function increaseReserveCap(uint256 newReserveCap) external onlyOwner {
+    if (newReserveCap <= reserveCap) revert CapMustIncrease();
+    if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
+    reserveCap = newReserveCap;
+
+    emit DepositCapIncreased(newReserveCap);
+  }
+
+  /**
+   * @dev Updates the deposit start time. Can only be called by owner before current start time.
+   * @param newDepositStartTime New deposit start timestamp
+   */
+  function setDepositStartTime(uint256 newDepositStartTime) external onlyOwner {
+    if (block.timestamp > newDepositStartTime) revert DepositAlreadyStarted();
+    if (newDepositStartTime <= depositStartTime) revert DepositStartMustOnlyBeExtended();
+    if (newDepositStartTime >= depositEndTime) revert DepositEndMustBeAfterStart();
+
+    depositStartTime = newDepositStartTime;
+  }
+
+  /**
+   * @dev Updates the deposit end time. Can only be called by owner before current end time.
+   * @param newDepositEndTime New deposit end timestamp
+   */
+  function setDepositEndTime(uint256 newDepositEndTime) external onlyOwner {
+    if (newDepositEndTime <= depositEndTime) revert DepositEndMustOnlyBeExtended();
+    if (newDepositEndTime <= depositStartTime) revert DepositEndMustBeAfterStart();
+    if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
+    
+    depositEndTime = newDepositEndTime;
+  }
+
+  /**
+   * @dev Pauses the contract. Reverts any interaction except upgrade.
+   */
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  /**
+   * @dev Unpauses the contract.
+   */
+  function unpause() external onlyOwner {
+    _unpause();
+  }
+
+  /**
+   * @dev Authorizes an upgrade to a new implementation.
+   * Can only be called by the owner of the contract.
+   * @param newImplementation The address of the new implementation.
+   */
+  function _authorizeUpgrade(address newImplementation)
+    internal
+    onlyOwner
+    override
+  {}
+}
