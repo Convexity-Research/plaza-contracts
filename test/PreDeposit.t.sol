@@ -65,6 +65,25 @@ contract PreDepositTest is Test {
     vm.stopPrank();
   }
 
+  function deployFakePool() public returns(address, address, address) {
+    BondToken bondToken = BondToken(Utils.deploy(address(new BondToken()), abi.encodeCall(BondToken.initialize, (
+      "", "", owner, owner, owner, 0
+    ))));
+    
+    LeverageToken lToken = LeverageToken(Utils.deploy(address(new LeverageToken()), abi.encodeCall(LeverageToken.initialize, (
+      "", "", owner, owner
+    ))));
+
+    Pool pool = Pool(Utils.deploy(address(new Pool()), abi.encodeCall(Pool.initialize, 
+      (factory, 0, address(reserveToken), address(bondToken), address(lToken), address(couponToken), 0, 0, address(0))
+    )));
+
+    // Adds fake pool to preDeposit contract
+    uint256 poolSlot = 0;
+    vm.store(address(preDeposit), bytes32(poolSlot), bytes32(uint256(uint160(address(pool)))));
+    return (address(pool), address(bondToken), address(lToken));
+  }
+
   function resetReentrancy(address contractAddress) public {
     // Reset `_status` to allow the next call
     vm.store(
@@ -216,39 +235,40 @@ contract PreDepositTest is Test {
     preDeposit.createPool();
   }
 
-  // function testClaim() public {
-  //   // Setup initial deposit
-  //   vm.startPrank(user1);
-  //   reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
-  //   preDeposit.deposit(DEPOSIT_AMOUNT);
-  //   vm.stopPrank();
+  function testClaim() public {
+    (address pool, address bondToken, address lToken) = deployFakePool();
 
-  //   // Create pool
-  //   vm.startPrank(owner);
-  //   preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
-  //   vm.warp(block.timestamp + 8 days); // After deposit period
-  //   preDeposit.createPool();
-  //   vm.stopPrank();
+    // Setup initial deposit
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
-  //   // Claim tokens
-  //   vm.startPrank(user1);
-  //   uint256 balanceBefore = preDeposit.balances(user1);
-  //   preDeposit.claim();
-  //   uint256 balanceAfter = preDeposit.balances(user1);
+    // Create pool
+    vm.startPrank(owner);
+    preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
+    vm.warp(block.timestamp + 8 days); // After deposit period
+
+    // fake bond/lev to predeposit contract, simulating a pool created
+    BondToken(bondToken).mint(address(preDeposit), 10000 ether);
+    LeverageToken(lToken).mint(address(preDeposit), 10000 ether);
+
+    vm.stopPrank();
+
+    // Claim tokens
+    vm.startPrank(user1);
+    uint256 balanceBefore = preDeposit.balances(user1);
+    preDeposit.claim();
+    uint256 balanceAfter = preDeposit.balances(user1);
     
-  //   // Verify balances were updated
-  //   assertEq(balanceAfter, 0);
-  //   assertLt(balanceAfter, balanceBefore);
-
-  //   // Verify tokens were received
-  //   address pool = preDeposit.pool();
-  //   BondToken bondToken = BondToken(Pool(pool).bondToken());
-  //   LeverageToken leverageToken = LeverageToken(Pool(pool).lToken());
+    // Verify balances were updated
+    assertEq(balanceAfter, 0);
+    assertLt(balanceAfter, balanceBefore);
     
-  //   assertGt(bondToken.balanceOf(user1), 0);
-  //   assertGt(leverageToken.balanceOf(user1), 0);
-  //   vm.stopPrank();
-  // }
+    assertGt(BondToken(bondToken).balanceOf(user1), 0);
+    assertGt(LeverageToken(lToken).balanceOf(user1), 0);
+    vm.stopPrank();
+  }
 
   function testClaimBeforeDepositEnd() public {
     vm.startPrank(user1);
@@ -294,29 +314,35 @@ contract PreDepositTest is Test {
     vm.stopPrank();
   }
 
-  // function testClaimTwice() public {
-  //   // Setup initial deposit
-  //   vm.startPrank(user1);
-  //   reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
-  //   preDeposit.deposit(DEPOSIT_AMOUNT);
-  //   vm.stopPrank();
+  function testClaimTwice() public {
+    (address pool, address bondToken, address lToken) = deployFakePool();
 
-  //   // Create pool
-  //   vm.startPrank(owner);
-  //   preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
-  //   vm.warp(block.timestamp + 8 days);
-  //   preDeposit.createPool();
-  //   vm.stopPrank();
+    // Setup initial deposit
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
-  //   // First claim should succeed
-  //   vm.startPrank(user1);
-  //   preDeposit.claim();
+    // Create pool
+    vm.startPrank(owner);
+    preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
+    vm.warp(block.timestamp + 8 days);
+    
+    // fake bond/lev to predeposit contract, simulating a pool created
+    BondToken(bondToken).mint(address(preDeposit), 10000 ether);
+    LeverageToken(lToken).mint(address(preDeposit), 10000 ether);
 
-  //   // Second claim should fail
-  //   vm.expectRevert(PreDeposit.NothingToClaim.selector);
-  //   preDeposit.claim();
-  //   vm.stopPrank();
-  // }
+    vm.stopPrank();
+
+    // First claim should succeed
+    vm.startPrank(user1);
+    preDeposit.claim();
+
+    // Second claim should fail
+    vm.expectRevert(PreDeposit.NothingToClaim.selector);
+    preDeposit.claim();
+    vm.stopPrank();
+  }
 
   // Admin Function Tests
   function testSetParams() public {
