@@ -31,7 +31,7 @@ contract PreDepositTest is Test {
   uint256 constant BOND_AMOUNT = 50 ether;
   uint256 constant LEVERAGE_AMOUNT = 50 ether;
 
-  function setUp() public {
+  function setUp() public { 
     vm.startPrank(owner);
     
     reserveToken = new Token("Wrapped ETH", "WETH", false);
