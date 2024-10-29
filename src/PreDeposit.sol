@@ -195,6 +195,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (block.timestamp > depositEndTime) revert DepositEnded();
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
     if (_params.reserveToken != params.reserveToken) revert InvalidReserveToken();
+    if (poolCreated) revert PoolAlreadyCreated();
 
     params = _params;
   }
@@ -206,6 +207,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
    */
   function setBondAndLeverageAmount(uint256 _bondAmount, uint256 _leverageAmount) external onlyOwner {
     if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
+
     bondAmount = _bondAmount;
     leverageAmount = _leverageAmount;
   }
@@ -217,6 +220,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   function increaseReserveCap(uint256 newReserveCap) external onlyOwner {
     if (newReserveCap <= reserveCap) revert CapMustIncrease();
     if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
     reserveCap = newReserveCap;
 
     emit DepositCapIncreased(newReserveCap);
@@ -230,6 +234,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (block.timestamp > newDepositStartTime) revert DepositAlreadyStarted();
     if (newDepositStartTime <= depositStartTime) revert DepositStartMustOnlyBeExtended();
     if (newDepositStartTime >= depositEndTime) revert DepositEndMustBeAfterStart();
+
     depositStartTime = newDepositStartTime;
   }
 
@@ -241,6 +246,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (newDepositEndTime <= depositEndTime) revert DepositEndMustOnlyBeExtended();
     if (newDepositEndTime <= depositStartTime) revert DepositEndMustBeAfterStart();
     if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
+    
     depositEndTime = newDepositEndTime;
   }
 
