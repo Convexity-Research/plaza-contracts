@@ -66,7 +66,6 @@ contract PoolTest is Test, TestCases {
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
 
-    console.log("reserveToken", address(params.reserveToken));
     OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
 
     // Deploy the mock price feed
