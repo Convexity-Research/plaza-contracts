@@ -32,6 +32,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   uint256 public depositStartTime;
   uint256 public depositEndTime;
 
+  bool public poolCreated;
+
   // Deposit balances
   mapping(address => uint256) public balances;
 
@@ -59,7 +61,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   error InvalidBondOrLeverageAmount();
   error DepositEndMustOnlyBeExtended();
   error DepositStartMustOnlyBeExtended();
-
+  error PoolAlreadyCreated();
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -100,6 +102,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     bondSymbol = _bondSymbol;
     leverageName = _leverageName;
     leverageSymbol = _leverageSymbol;
+    poolCreated = false;
   }
 
   /**
@@ -148,11 +151,12 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (block.timestamp < depositEndTime) revert DepositNotEnded();
     if (reserveAmount == 0) revert NoReserveAmount();
     if (bondAmount == 0 || leverageAmount == 0) revert InvalidBondOrLeverageAmount();
-
+    if (poolCreated) revert PoolAlreadyCreated();
     IERC20(params.reserveToken).approve(address(factory), reserveAmount);
     pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, bondName, bondSymbol, leverageName, leverageSymbol);
 
     emit PoolCreated(pool);
+    poolCreated = true;
   }
 
   /**

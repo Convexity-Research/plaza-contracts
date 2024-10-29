@@ -161,6 +161,17 @@ contract PreDepositTest is Test {
     vm.stopPrank();
   }
 
+  function testDepositAfterEnd() public {
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    
+    vm.warp(block.timestamp + 8 days); // After deposit period
+    
+    vm.expectRevert(PreDeposit.DepositEnded.selector);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+  }
+
   // Withdraw Tests
   function testWithdraw() public {
     vm.startPrank(user1);
@@ -174,6 +185,18 @@ contract PreDepositTest is Test {
     assertEq(balanceAfter - balanceBefore, DEPOSIT_AMOUNT);
     assertEq(preDeposit.balances(user1), 0);
     assertEq(preDeposit.reserveAmount(), 0);
+    vm.stopPrank();
+  }
+
+  function testWithdrawAfterDepositEnd() public {
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    
+    vm.warp(block.timestamp + 8 days); // After deposit period
+    
+    vm.expectRevert(PreDeposit.WithdrawEnded.selector);
+    preDeposit.withdraw(DEPOSIT_AMOUNT);
     vm.stopPrank();
   }
 
@@ -232,6 +255,23 @@ contract PreDepositTest is Test {
 
     vm.expectRevert(PreDeposit.DepositNotEnded.selector);
     preDeposit.createPool();
+  }
+
+  function testCreatePoolAfterCreation() public {
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    vm.startPrank(owner);
+    preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
+    vm.warp(block.timestamp + 8 days); // After deposit period
+    preDeposit.createPool();
+
+    // Try to create pool again
+    vm.expectRevert(PreDeposit.PoolAlreadyCreated.selector);
+    preDeposit.createPool();
+    vm.stopPrank();
   }
 
   function testClaim() public {
