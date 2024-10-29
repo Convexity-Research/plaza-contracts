@@ -550,6 +550,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     // Fee cannot exceed 10%
     require(_fee <= 100000, FeeTooHigh());
 
+    // Force a fee claim to prevent governance from setting a higher fee
+    // and collecting increased fees on old deposits
+    claimFees();
+
     uint256 oldFee = fee;
     fee = _fee;
     emit FeeChanged(oldFee, _fee);
@@ -566,7 +570,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   /**
    * @dev Allows the fee beneficiary to claim the accumulated protocol fees.
    */
-  function claimFees() external nonReentrant {
+  function claimFees() public nonReentrant {
     require(msg.sender == feeBeneficiary, NotBeneficiary());
     uint256 feeAmount = (IERC20(reserveToken).balanceOf(address(this)) * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
     
