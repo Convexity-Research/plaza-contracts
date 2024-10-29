@@ -552,7 +552,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
 
     // Force a fee claim to prevent governance from setting a higher fee
     // and collecting increased fees on old deposits
-    claimFees();
+    if (getFeeAmount() > 0) {
+      claimFees();
+    }
 
     uint256 oldFee = fee;
     fee = _fee;
@@ -572,7 +574,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    */
   function claimFees() public nonReentrant {
     require(msg.sender == feeBeneficiary, NotBeneficiary());
-    uint256 feeAmount = (IERC20(reserveToken).balanceOf(address(this)) * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
+    uint256 feeAmount = getFeeAmount();
     
     if (feeAmount == 0) {
       revert NoFeesToClaim();
@@ -582,6 +584,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     IERC20(reserveToken).safeTransfer(feeBeneficiary, feeAmount);
     
     emit FeeClaimed(feeBeneficiary, feeAmount);
+  }
+
+  /**
+   * @dev Returns the amount of fees to be claimed.
+   * @return The amount of fees to be claimed.
+   */
+  function getFeeAmount() internal view returns (uint256) {
+    return (IERC20(reserveToken).balanceOf(address(this)) * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
   }
 
   /**
