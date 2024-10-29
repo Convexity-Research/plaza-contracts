@@ -1022,4 +1022,50 @@ contract PoolTest is Test, TestCases {
     rToken.burn(governance, rToken.balanceOf(governance));
     rToken.burn(address(pool), rToken.balanceOf(address(pool)));
   }
+
+  function testCreateRedeemWithFees() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    vm.stopPrank();
+
+    // User creates leverage tokens
+    vm.startPrank(user);
+    
+    rToken.mint(user, 100 ether);
+    rToken.approve(address(pool), 100 ether);
+    uint256 levAmount = pool.create(Pool.TokenType.LEVERAGE, 100 ether, 0);
+    
+    // Advance time by 30 days
+    vm.warp(block.timestamp + 30 days);
+
+    // Calculate expected fee
+    uint256 expectedFee = (100 ether * params.fee * 30 days) / (1000000 * 365 days);
+    
+    // User redeems leverage tokens
+    pool.bondToken().approve(address(pool), levAmount);
+    uint256 redeemedAmount = pool.redeem(Pool.TokenType.LEVERAGE, levAmount, 0);
+
+    // User should get back less than initial deposit due to fees
+    assertLt(redeemedAmount, 100 ether);
+    
+    // Verify fee amount is correct
+    uint256 actualFee = 100 ether - redeemedAmount;
+    assertApproxEqRel(actualFee, expectedFee, 0.05e18); // 5% tolerance
+
+    vm.stopPrank();
+
+    // Reset state
+    rToken.burn(user, rToken.balanceOf(user));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
 }
