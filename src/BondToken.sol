@@ -205,7 +205,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * @param sharesPerToken The new number of shares per token
    * @notice Can only be called by addresses with the GOV_ROLE and when the contract is not paused.
    */
-  function increaseIndexedAssetPeriod(uint256 sharesPerToken) public onlyRole(GOV_ROLE) whenNotPaused() {
+  function increaseIndexedAssetPeriod(uint256 sharesPerToken) public onlyRole(DISTRIBUTOR_ROLE) whenNotPaused() {
     globalPool.previousPoolAmounts.push(
       PoolAmount({
         period: globalPool.currentPeriod,
