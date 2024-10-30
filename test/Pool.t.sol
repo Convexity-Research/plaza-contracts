@@ -100,7 +100,7 @@ contract PoolTest is Test, TestCases {
   }
 
   function setEthPrice(uint256 price) public {
-    MockPriceFeed mockPriceFeed = MockPriceFeed(ethPriceFeed);
+    mockPriceFeed = MockPriceFeed(ethPriceFeed);
     mockPriceFeed.setMockPrice(int256(price), uint8(CHAINLINK_DECIMAL));
   }
 
