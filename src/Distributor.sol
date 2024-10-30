@@ -48,6 +48,10 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   error NotEnoughCouponBalance();
   /// @dev Error thrown when attempting to register an already registered pool
   error PoolAlreadyRegistered();
+  /// @dev Error thrown when the pool has an invalid address
+  error InvalidPoolAddress();
+  /// @dev error thrown when the caller is not the pool
+  error CallerIsNotPool();
 
   /// @dev Event emitted when a user claims their shares
   event ClaimedShares(address user, uint256 period, uint256 shares);
@@ -77,7 +81,7 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * @param _couponToken Address of the coupon token associated with the pool
    */
   function registerPool(address _pool, address _couponToken) external onlyRole(POOL_FACTORY_ROLE) {
-    require(_pool != address(0), "Invalid pool address");
+    require(_pool != address(0), InvalidPoolAddress());
     
     poolInfos[_pool] = PoolInfo(_couponToken, 0);
     emit PoolRegistered(_pool, _couponToken);
@@ -136,7 +140,7 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * @param _amountToDistribute Amount of shares to allocate.
    */
   function allocate(address _pool, uint256 _amountToDistribute) external whenNotPaused() {
-    require(_pool == msg.sender, "Caller must be a registered pool");
+    require(_pool == msg.sender, CallerIsNotPool());
 
     Pool pool = Pool(_pool);
 

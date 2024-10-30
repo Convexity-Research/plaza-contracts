@@ -31,11 +31,16 @@ contract OracleReader {
   error StalePrice();
 
   /**
+   * @dev Error thrown when oracle feeds are aready initialized
+   */
+  error AlreadyInitialized();
+
+  /**
    * @dev Initializes the contract with the OracleFeeds address
    * @param _oracleFeeds Address of the OracleFeeds contract
    */
   function __OracleReader_init(address _oracleFeeds) internal {
-    require(oracleFeeds == address(0), "Already initialized");
+    require(oracleFeeds == address(0), AlreadyInitialized());
     oracleFeeds = _oracleFeeds;
   }
 
