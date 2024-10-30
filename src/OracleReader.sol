@@ -28,6 +28,11 @@ contract OracleReader {
   error NoFeedFound();
 
   /**
+   * @dev Error thrown when the price is stale
+   */
+  error StalePrice();
+
+  /**
    * @dev Initializes the contract with the OracleFeeds address
    * @param _oracleFeeds Address of the OracleFeeds contract
    */
@@ -55,9 +60,9 @@ contract OracleReader {
       isInverted = true;
     }
     (,int256 answer,,uint256 updatedTimestamp,) = AggregatorV3Interface(feed).latestRoundData();
-
-    if (updatedTimestamp + 1 days <= block.timestamp) {
-      revert NoPriceFound();
+    
+    if (updatedTimestamp + OracleFeeds(oracleFeeds).feedHeartbeats(feed) < block.timestamp) {
+      revert StalePrice();
     }
 
     return isInverted ? uint256(10 ** AggregatorV3Interface(feed).decimals()) / uint256(answer) : uint256(answer);

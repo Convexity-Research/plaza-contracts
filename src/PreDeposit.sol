@@ -15,7 +15,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable, PausableUpgradeable {
 
   // Initializing pool params
-  address pool;
+  address public pool;
   PoolFactory private factory;
   PoolFactory.PoolParams private params;
 
@@ -31,6 +31,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
   uint256 public depositStartTime;
   uint256 public depositEndTime;
+
+  bool public poolCreated;
 
   // Deposit balances
   mapping(address => uint256) public balances;
@@ -59,7 +61,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   error InvalidBondOrLeverageAmount();
   error DepositEndMustOnlyBeExtended();
   error DepositStartMustOnlyBeExtended();
-
+  error PoolAlreadyCreated();
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -100,6 +102,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     bondSymbol = _bondSymbol;
     leverageName = _leverageName;
     leverageSymbol = _leverageSymbol;
+    poolCreated = false;
   }
 
   function deposit(uint256 amount, address onBehalfOf) external nonReentrant whenNotPaused {
@@ -160,11 +163,12 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (block.timestamp < depositEndTime) revert DepositNotEnded();
     if (reserveAmount == 0) revert NoReserveAmount();
     if (bondAmount == 0 || leverageAmount == 0) revert InvalidBondOrLeverageAmount();
-
+    if (poolCreated) revert PoolAlreadyCreated();
     IERC20(params.reserveToken).approve(address(factory), reserveAmount);
     pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, bondName, bondSymbol, leverageName, leverageSymbol);
 
     emit PoolCreated(pool);
+    poolCreated = true;
   }
 
   /**
@@ -203,6 +207,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (block.timestamp > depositEndTime) revert DepositEnded();
     if (_params.reserveToken == address(0)) revert InvalidReserveToken();
     if (_params.reserveToken != params.reserveToken) revert InvalidReserveToken();
+    if (poolCreated) revert PoolAlreadyCreated();
 
     params = _params;
   }
@@ -214,6 +219,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
    */
   function setBondAndLeverageAmount(uint256 _bondAmount, uint256 _leverageAmount) external onlyOwner {
     if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
+
     bondAmount = _bondAmount;
     leverageAmount = _leverageAmount;
   }
@@ -225,6 +232,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   function increaseReserveCap(uint256 newReserveCap) external onlyOwner {
     if (newReserveCap <= reserveCap) revert CapMustIncrease();
     if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
     reserveCap = newReserveCap;
 
     emit DepositCapIncreased(newReserveCap);
@@ -238,6 +246,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (block.timestamp > newDepositStartTime) revert DepositAlreadyStarted();
     if (newDepositStartTime <= depositStartTime) revert DepositStartMustOnlyBeExtended();
     if (newDepositStartTime >= depositEndTime) revert DepositEndMustBeAfterStart();
+
     depositStartTime = newDepositStartTime;
   }
 
@@ -249,6 +258,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (newDepositEndTime <= depositEndTime) revert DepositEndMustOnlyBeExtended();
     if (newDepositEndTime <= depositStartTime) revert DepositEndMustBeAfterStart();
     if (block.timestamp > depositEndTime) revert DepositEnded();
+    if (poolCreated) revert PoolAlreadyCreated();
+    
     depositEndTime = newDepositEndTime;
   }
 
