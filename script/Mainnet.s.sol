@@ -4,7 +4,6 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 
 import {Pool} from "../src/Pool.sol";
-import {Utils} from "../src/lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {LifiRouter} from "../src/LifiRouter.sol";
 import {Distributor} from "../src/Distributor.sol";
@@ -65,11 +64,12 @@ contract MainnetScript is Script {
       reserveToken: reserveToken,
       couponToken: couponToken,
       sharesPerToken: sharesPerToken,
-      distributionPeriod: distributionPeriod
+      distributionPeriod: distributionPeriod,
+      feeBeneficiary: deployerAddress
     });
 
     // Set price feed
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);

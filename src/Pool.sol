@@ -17,7 +17,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 
 /**
  * @title Pool
- * @dev This contract manages a pool of assets, allowing for the creation, redemption, and swapping of bond and leverage tokens.
+ * @dev This contract manages a pool of assets, allowing for the creatio and redemption of bond and leverage tokens.
  * It also handles distribution periods and interacts with an oracle for price information.
  */
 contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable, OracleReader, Validator {
@@ -32,10 +32,13 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   uint256 private constant PRECISION = 1000000;
   uint256 private constant BOND_TARGET_PRICE = 100;
   uint8 private constant COMMON_DECIMALS = 18;
+  uint256 private constant SECONDS_PER_YEAR = 365 days;
 
   // Protocol
   PoolFactory public poolFactory;
   uint256 private fee;
+  address public feeBeneficiary;
+  uint256 private lastFeeClaimTime;
 
   // Tokens
   address public reserveToken;
@@ -70,23 +73,29 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 currentPeriod;
     uint256 lastDistribution;
     uint256 distributionPeriod;
+    address feeBeneficiary;
   }
 
   // Custom errors
   error MinAmount();
   error ZeroAmount();
+  error FeeTooHigh();
   error AccessDenied();
+  error NoFeesToClaim();
+  error NotBeneficiary();
   error ZeroDebtSupply();
   error ZeroLeverageSupply();
   error DistributionPeriod();
 
   // Events
+  event Distributed(uint256 amount);
+  event MerchantApproved(address merchant);
+  event SharesPerTokenChanged(uint256 sharesPerToken);
+  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  event TokensSwapped(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
-  event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
-  event SharesPerTokenChanged(uint256 sharesPerToken);
-  event Distributed(uint256 amount);
+  event FeeClaimed(address beneficiary, uint256 amount);
+  event FeeChanged(uint256 oldFee, uint256 newFee);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -114,12 +123,16 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     address _couponToken,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
+    address _feeBeneficiary,
     address _oracleFeeds
   ) initializer public {
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
+    __Pausable_init();
 
     poolFactory = PoolFactory(_poolFactory);
+    // Fee cannot exceed 10%
+    require(_fee <= 100000, FeeTooHigh());
     fee = _fee;
     reserveToken = _reserveToken;
     bondToken = BondToken(_dToken);
@@ -128,6 +141,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistribution = block.timestamp;
+    feeBeneficiary = _feeBeneficiary;
+    lastFeeClaimTime = block.timestamp;
   }
 
   /**
@@ -215,6 +230,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
     uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    // Calculate and subtract fees from poolReserves
+    poolReserves = poolReserves - (poolReserves * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
+
     depositAmount = depositAmount.normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
     uint8 assetDecimals = 0;
@@ -369,6 +388,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
+    // Calculate and subtract fees from poolReserves
+    poolReserves = poolReserves - (poolReserves * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
+
     if (tokenType == TokenType.LEVERAGE) {
       depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
     } else {
@@ -441,127 +463,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     // Calculate and return the final redeem amount
     return ((depositAmount * redeemRate).fromBaseUnit(oracleDecimals) / ethPrice) / PRECISION;
   }
-
-  /**
-   * @dev Swaps one token type for another (BOND for LEVERAGE or vice versa).
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to swap.
-   * @param minAmount The minimum amount of derivative tokens to receive in return.
-   * @return amount of derivative tokens received in the swap.
-   */
-  function swap(TokenType tokenType, uint256 depositAmount, uint256 minAmount) public whenNotPaused() nonReentrant() returns(uint256) {
-    return _swap(tokenType, depositAmount, minAmount, address(0));
-  }
-
-  /**
-   * @dev Swaps one token type for another with additional parameters.
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to swap.
-   * @param minAmount The minimum amount of derivative tokens to receive in return.
-   * @param deadline The deadline timestamp in seconds for the transaction to be executed.
-   * @param onBehalfOf The address to receive the swapped derivative tokens.
-   * @return amount of derivative tokens received in the swap.
-   */
-  function swap(
-    TokenType tokenType,
-    uint256 depositAmount,
-    uint256 minAmount,
-    uint256 deadline,
-    address onBehalfOf
-  ) public whenNotPaused() nonReentrant() checkDeadline(deadline) returns(uint256) {
-    return _swap(tokenType, depositAmount, minAmount, onBehalfOf);
-  }
-
-  /**
-   * @dev Swaps one token type for another with additional parameters.
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to swap.
-   * @param minAmount The minimum amount of derivative tokens to receive in return.
-   * @param onBehalfOf The address to receive the swapped derivative tokens.
-   * @return amount of derivative tokens received in the swap.
-   */
-  function _swap(
-    TokenType tokenType,
-    uint256 depositAmount,
-    uint256 minAmount,
-    address onBehalfOf
-  ) private returns(uint256) {
-    uint256 mintAmount = simulateSwap(tokenType, depositAmount);
-
-    if (mintAmount < minAmount) {
-      revert MinAmount();
-    }
-
-    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
-
-    if (tokenType == TokenType.BOND) {
-      bondToken.burn(msg.sender, depositAmount);
-      lToken.mint(recipient, mintAmount);
-    } else {
-      lToken.burn(msg.sender, depositAmount);
-      bondToken.mint(recipient, mintAmount);
-    }
-
-    emit TokensSwapped(msg.sender, recipient, tokenType, depositAmount, mintAmount);
-    return mintAmount;
-  }
-
-  /**
-   * @dev Simulates a swap without actually executing it.
-   * @param tokenType The type of derivative token being swapped.
-   * @param depositAmount The amount of derivative tokens to simulate swapping.
-   * @return amount of derivative tokens that would be received in the swap.
-   */
-  function simulateSwap(TokenType tokenType, uint256 depositAmount) public view returns(uint256) {
-    require(depositAmount > 0, ZeroAmount());
-
-    uint256 bondSupply = bondToken.totalSupply()
-                          .normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
-    uint256 levSupply = lToken.totalSupply()
-                          .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
-    uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
-                          .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
-
-    if (tokenType == TokenType.LEVERAGE) {
-      depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
-    } else {
-      depositAmount = depositAmount.normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
-    }
-
-    uint256 redeemAmount = getRedeemAmount(
-      tokenType,
-      depositAmount,
-      bondSupply,
-      levSupply,
-      poolReserves,
-      getOraclePrice(reserveToken, USD),
-      getOracleDecimals(reserveToken, USD)
-    );
-    
-    uint8 assetDecimals = 0;
-    TokenType createType = TokenType.BOND;
-    poolReserves = poolReserves - redeemAmount;
-
-    if (tokenType == TokenType.BOND) {
-      createType = TokenType.LEVERAGE;
-      bondSupply = bondSupply - depositAmount; 
-      assetDecimals = lToken.decimals();
-    } else {
-      levSupply = levSupply - depositAmount; 
-      assetDecimals = bondToken.decimals();
-    }
-
-    return getCreateAmount(
-      createType,
-      redeemAmount,
-      bondSupply,
-      levSupply,
-      poolReserves,
-      getOraclePrice(reserveToken, USD),
-      getOracleDecimals(reserveToken, USD)
-    ).normalizeAmount(COMMON_DECIMALS, assetDecimals);
-  }
-
+  
   /**
    * @dev Distributes coupon tokens to bond token holders.
    * Can only be called after the distribution period has passed.
@@ -573,8 +475,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
 
     Distributor distributor = Distributor(poolFactory.distributor());
 
-    // Calculate last distribution time
-    lastDistribution = block.timestamp + distributionPeriod;
+    // Update last distribution time
+    lastDistribution = block.timestamp;
 
     uint8 bondDecimals = bondToken.decimals();
     uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
@@ -614,7 +516,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       levSupply: lToken.totalSupply(),
       sharesPerToken: _sharesPerToken,
       currentPeriod: currentPeriod,
-      lastDistribution: lastDistribution
+      lastDistribution: lastDistribution,
+      feeBeneficiary: feeBeneficiary
     });
   }
   
@@ -643,8 +546,52 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @dev Sets the fee for the pool.
    * @param _fee The new fee value.
    */
-  function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
+  function setFee(uint256 _fee) external onlyRole(poolFactory.GOV_ROLE()) {
+    // Fee cannot exceed 10%
+    require(_fee <= 100000, FeeTooHigh());
+
+    // Force a fee claim to prevent governance from setting a higher fee
+    // and collecting increased fees on old deposits
+    if (getFeeAmount() > 0) {
+      claimFees();
+    }
+
+    uint256 oldFee = fee;
     fee = _fee;
+    emit FeeChanged(oldFee, _fee);
+  }
+
+  /**
+   * @dev Sets the fee beneficiary for the pool.
+   * @param _feeBeneficiary The address of the new fee beneficiary.
+   */
+  function setFeeBeneficiary(address _feeBeneficiary) external onlyRole(poolFactory.GOV_ROLE()) {
+    feeBeneficiary = _feeBeneficiary;
+  }
+
+  /**
+   * @dev Allows the fee beneficiary to claim the accumulated protocol fees.
+   */
+  function claimFees() public nonReentrant {
+    require(msg.sender == feeBeneficiary, NotBeneficiary());
+    uint256 feeAmount = getFeeAmount();
+    
+    if (feeAmount == 0) {
+      revert NoFeesToClaim();
+    }
+    
+    lastFeeClaimTime = block.timestamp;
+    IERC20(reserveToken).safeTransfer(feeBeneficiary, feeAmount);
+    
+    emit FeeClaimed(feeBeneficiary, feeAmount);
+  }
+
+  /**
+   * @dev Returns the amount of fees to be claimed.
+   * @return The amount of fees to be claimed.
+   */
+  function getFeeAmount() internal view returns (uint256) {
+    return (IERC20(reserveToken).balanceOf(address(this)) * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
   }
 
   /**

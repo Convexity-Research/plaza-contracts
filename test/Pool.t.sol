@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
+
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
 import {Utils} from "../src/lib/Utils.sol";
@@ -13,6 +14,7 @@ import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {Validator} from "../src/utils/Validator.sol";
+import {OracleReader} from "../src/OracleReader.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
@@ -27,6 +29,7 @@ contract PoolTest is Test, TestCases {
   PoolFactory.PoolParams private params;
 
   Distributor private distributor;
+  MockPriceFeed private mockPriceFeed;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
@@ -60,16 +63,18 @@ contract PoolTest is Test, TestCases {
     )));
 
     params.fee = 0;
+    params.feeBeneficiary = governance;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
+    
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
-    console.log("reserveToken", address(params.reserveToken));
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
     // Deploy the mock price feed
-    MockPriceFeed mockPriceFeed = new MockPriceFeed();
+    mockPriceFeed = new MockPriceFeed();
 
     // Use vm.etch to deploy the mock contract at the specific address
     bytes memory bytecode = address(mockPriceFeed).code;
@@ -558,123 +563,6 @@ contract PoolTest is Test, TestCases {
     rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
   }
 
-  function testSwap() public {
-    initializeTestCasesFixedEth();
-
-    vm.startPrank(governance);
-    Token rToken = Token(params.reserveToken);
-
-    for (uint256 i = 0; i < calcTestCases.length; i++) {
-      if (calcTestCases[i].inAmount == 0) {
-        continue;
-      }
-
-      // Mint reserve tokens
-      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
-      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
-
-      // Create salt to create the pool at a different address
-      string memory salt = i.toString();
-
-      // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
-
-      uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-
-      vm.expectEmit(true, true, true, true);
-      emit Pool.TokensSwapped(governance, governance, calcTestCases[i].assetType, calcTestCases[i].inAmount, calcTestCases[i].expectedSwap);
-
-      // Call create and assert minted tokens
-      uint256 amount = _pool.swap(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
-      assertEq(amount, calcTestCases[i].expectedSwap);
-
-      uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-
-      assertEq(0, startBalance-endBalance);
-
-      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
-        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets - calcTestCases[i].inAmount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets + amount);
-        assertEq(calcTestCases[i].inAmount, startBondBalance-endBondBalance);
-        assertEq(amount, endLevBalance-startLevBalance);
-      } else {
-        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets + amount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets - calcTestCases[i].inAmount);
-        assertEq(calcTestCases[i].inAmount, startLevBalance-endLevBalance);
-        assertEq(amount, endBondBalance-startBondBalance);
-      }
-
-      // Reset reserve state
-      rToken.burn(governance, rToken.balanceOf(governance));
-      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
-
-      resetReentrancy(address(_pool));
-    }
-  }
-
-  function testSwapOnBehalfOf() public {
-    initializeTestCasesFixedEth();
-    vm.startPrank(governance);
-    Token rToken = Token(params.reserveToken);
-
-    for (uint256 i = 0; i < calcTestCases.length; i++) {
-      if (calcTestCases[i].inAmount == 0) {
-        continue;
-      }
-
-      // Mint reserve tokens
-      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
-      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
-
-      // Create salt to create the pool at a different address
-      string memory salt = i.toString();
-
-      // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
-
-      uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-
-      uint256 startBondBalanceUser = BondToken(_pool.bondToken()).balanceOf(user2);
-      uint256 startLevBalanceUser = LeverageToken(_pool.lToken()).balanceOf(user2);
-
-
-      // Call create and assert minted tokens
-      uint256 amount = _pool.swap(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0, block.timestamp, user2);
-      assertEq(amount, calcTestCases[i].expectedSwap);
-
-      uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-
-      uint256 endBondBalanceUser = BondToken(_pool.bondToken()).balanceOf(user2);
-      uint256 endLevBalanceUser = LeverageToken(_pool.lToken()).balanceOf(user2);
-
-      assertEq(0, startBalance-endBalance);
-
-      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
-        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets - calcTestCases[i].inAmount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets + amount);
-        assertEq(calcTestCases[i].inAmount, startBondBalance-endBondBalance);
-        assertEq(amount, endLevBalanceUser-startLevBalanceUser);
-      } else {
-        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets + amount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets - calcTestCases[i].inAmount);
-        assertEq(calcTestCases[i].inAmount, startLevBalance-endLevBalance);
-        assertEq(amount, endBondBalanceUser-startBondBalanceUser);
-      }
-
-      // Reset reserve state
-      rToken.burn(governance, rToken.balanceOf(governance));
-      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
-    }
-  }
-
   function testGetPoolInfo() public {
     vm.startPrank(governance);
     Token rToken = Token(params.reserveToken);
@@ -758,16 +646,10 @@ contract PoolTest is Test, TestCases {
     _pool.pause();
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    _pool.setFee(0);
-
-    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.create(Pool.TokenType.BOND, 0, 0);
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.redeem(Pool.TokenType.BOND, 0, 0);
-
-    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    _pool.swap(Pool.TokenType.BOND, 0, 0);
 
     _pool.unpause();
     _pool.setFee(100);
@@ -987,61 +869,6 @@ contract PoolTest is Test, TestCases {
     }
   }
 
-  function testSwapRealistic() public {
-    initializeRealisticTestCases();
-
-    vm.startPrank(governance);
-    Token rToken = Token(params.reserveToken);
-
-    for (uint256 i = 0; i < calcTestCases.length; i++) {
-      if (calcTestCases[i].inAmount == 0) {
-        continue;
-      }
-
-      // Mint reserve tokens
-      rToken.mint(governance, calcTestCases[i].TotalUnderlyingAssets);
-      rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
-
-      setEthPrice(calcTestCases[i].ethPrice);
-
-      // Create salt to create the pool at a different address
-      string memory salt = i.toString();
-
-      // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
-
-      uint256 startBalance = rToken.balanceOf(governance);
-      uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 startLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-
-      // Call create and assert minted tokens
-      uint256 amount = _pool.swap(calcTestCases[i].assetType, calcTestCases[i].inAmount, 0);
-      assertEq(amount, calcTestCases[i].expectedSwap);
-
-      uint256 endBalance = rToken.balanceOf(governance);
-      uint256 endBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
-      uint256 endLevBalance = LeverageToken(_pool.lToken()).balanceOf(governance);
-
-      assertEq(0, startBalance-endBalance);
-
-      if (calcTestCases[i].assetType == Pool.TokenType.BOND) {
-        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets - calcTestCases[i].inAmount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets + amount);
-        assertEq(calcTestCases[i].inAmount, startBondBalance-endBondBalance);
-        assertEq(amount, endLevBalance-startLevBalance);
-      } else {
-        assertEq(_pool.bondToken().totalSupply(), calcTestCases[i].DebtAssets + amount);
-        assertEq(_pool.lToken().totalSupply(), calcTestCases[i].LeverageAssets - calcTestCases[i].inAmount);
-        assertEq(calcTestCases[i].inAmount, startLevBalance-endLevBalance);
-        assertEq(amount, endBondBalance-startBondBalance);
-      }
-
-      // Reset reserve state
-      rToken.burn(governance, rToken.balanceOf(governance));
-      rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
-    }
-  }
-
   function testCreateTokensWithDifferentDecimals() public {
     vm.startPrank(deployer);
     PoolFactory.PoolParams memory _params;
@@ -1051,7 +878,7 @@ contract PoolTest is Test, TestCases {
     _params.distributionPeriod = 0;
     _params.couponToken = address(new Token("USDC", "USDC", false));
 
-    OracleFeeds(poolFactory.oracleFeeds()).setPriceFeed(_params.reserveToken, address(0), ethPriceFeed);
+    OracleFeeds(poolFactory.oracleFeeds()).setPriceFeed(_params.reserveToken, address(0), ethPriceFeed, 1 days);
     
     vm.stopPrank();
     vm.startPrank(governance);
@@ -1106,5 +933,173 @@ contract PoolTest is Test, TestCases {
       rToken.burn(governance, rToken.balanceOf(governance));
       rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
     }
+  }
+
+  function testClaimFees() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+
+    // Fast forward one year
+    vm.warp(block.timestamp + 365 days);
+
+    // Calculate expected fee
+    uint256 expectedFee = (1000 ether * 20000) / 1000000; // 2% of 1000 ether
+
+    // Check initial balance of fee beneficiary
+    address feeBeneficiary = pool.feeBeneficiary();
+    uint256 initialBalance = rToken.balanceOf(feeBeneficiary);
+    
+    vm.stopPrank();
+
+    // Claim fees
+    vm.startPrank(feeBeneficiary);
+    pool.claimFees();
+
+    vm.stopPrank();
+
+    // Check final balance of fee beneficiary
+    uint256 finalBalance = rToken.balanceOf(feeBeneficiary);
+
+    // Assert that the claimed fee is correct (allowing for small rounding errors)
+    assertEq(finalBalance - initialBalance, expectedFee);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testClaimFeesNothingToClaim() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    
+    vm.stopPrank();
+
+    // Claim fees
+    vm.startPrank(params.feeBeneficiary);
+    vm.expectRevert(Pool.NoFeesToClaim.selector);
+    pool.claimFees();
+    vm.stopPrank();
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testClaimNotBeneficiary() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+
+    // Claim fees
+    vm.expectRevert(Pool.NotBeneficiary.selector);
+    pool.claimFees();
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testCreateRedeemWithFees() public {
+    vm.startPrank(governance);
+
+    // Create a pool with 2% fee
+    params.fee = 20000; // 2% fee (1000000 precision)
+    params.feeBeneficiary = address(0x942);
+
+    // Mint and approve reserve tokens
+    Token rToken = Token(params.reserveToken);
+    rToken.mint(governance, 1000 ether);
+    rToken.approve(address(poolFactory), 1000 ether);
+
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    vm.stopPrank();
+
+    // User creates leverage tokens
+    vm.startPrank(user);
+    
+    rToken.mint(user, 100 ether);
+    rToken.approve(address(pool), 100 ether);
+    uint256 levAmount = pool.create(Pool.TokenType.LEVERAGE, 100 ether, 0);
+    
+    // Advance time by 30 days
+    vm.warp(block.timestamp + 30 days);
+    
+    mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
+
+    // Calculate expected fee
+    uint256 expectedFee = (100 ether * params.fee * 30 days) / (1000000 * 365 days);
+    
+    // User redeems leverage tokens
+    pool.bondToken().approve(address(pool), levAmount);
+    uint256 redeemedAmount = pool.redeem(Pool.TokenType.LEVERAGE, levAmount, 0);
+
+    // User should get back less than initial deposit due to fees
+    assertLt(redeemedAmount, 100 ether);
+    
+    // Verify fee amount is correct
+    uint256 actualFee = 100 ether - redeemedAmount;
+    assertApproxEqRel(actualFee, expectedFee, 0.05e18); // 5% tolerance
+
+    vm.stopPrank();
+
+    // Reset state
+    rToken.burn(user, rToken.balanceOf(user));
+    rToken.burn(address(pool), rToken.balanceOf(address(pool)));
+  }
+
+  function testCreateStaleOraclePrice() public {
+    vm.startPrank(governance);
+    Token rToken = Token(params.reserveToken);
+
+    // Mint reserve tokens
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+
+    rToken.approve(address(_pool), 1000);
+
+    // Advance time for oracle price to be stale
+    vm.warp(block.timestamp + 1 days + 1);
+
+    // Expect revert due to stale oracle price
+    vm.expectRevert(OracleReader.StalePrice.selector);
+
+    // Call create and assert minted tokens
+    _pool.create(Pool.TokenType.BOND, 1000, 30000, block.timestamp, governance);
+
+    // Reset reserve state
+    rToken.burn(governance, rToken.balanceOf(governance));
+    rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
   }
 }
