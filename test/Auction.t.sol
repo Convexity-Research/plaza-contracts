@@ -36,7 +36,7 @@ contract AuctionTest is Test {
     useMockPool(pool);
 
     vm.startPrank(pool);
-    auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house);
+    auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house, 100);
     vm.stopPrank();
   }
 

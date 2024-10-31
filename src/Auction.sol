@@ -21,6 +21,7 @@ contract Auction {
   // Auction end time and total buy amount
   uint256 public endTime;
   uint256 public totalBuyAmount;
+  uint256 public immutable liquidationThreshold;
 
   enum State {
     BIDDING,
@@ -72,14 +73,16 @@ contract Auction {
    * @param _endTime The end time of the auction.
    * @param _maxBids The maximum number of bids allowed in the auction.
    * @param _beneficiary The address of the auction beneficiary.
+   * @param _liquidationThreshold The percentage threshold for liquidation (e.g. 95000 = 95%).
    */
-  constructor(address _buyToken, address _sellToken, uint256 _totalBuyAmount, uint256 _endTime, uint256 _maxBids, address _beneficiary) {
+  constructor(address _buyToken, address _sellToken, uint256 _totalBuyAmount, uint256 _endTime, uint256 _maxBids, address _beneficiary, uint256 _liquidationThreshold) {
     buyToken = _buyToken; // coupon
     sellToken = _sellToken; // reserve
     totalBuyAmount = _totalBuyAmount; // coupon amount
     endTime = _endTime;
     maxBids = _maxBids;
     pool = msg.sender;
+    liquidationThreshold = _liquidationThreshold;
 
     if (_beneficiary == address(0)) {
       beneficiary = msg.sender;
@@ -297,7 +300,7 @@ contract Auction {
 
     if (totalBidsAmount < totalBuyAmount) {
       state = State.FAILED_UNDERSOLD;
-    } else if (totalSellAmount >= (IERC20(sellToken).balanceOf(pool) * 95) / 100) {
+    } else if (totalSellAmount >= (IERC20(sellToken).balanceOf(pool) * liquidationThreshold) / 100000) {
         state = State.FAILED_LIQUIDATION;
     } else {
       state = State.SUCCEEDED;

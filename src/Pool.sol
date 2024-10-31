@@ -34,12 +34,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   uint256 private constant BOND_TARGET_PRICE = 100;
   uint8 private constant COMMON_DECIMALS = 18;
   uint256 private constant SECONDS_PER_YEAR = 365 days;
+  uint256 private constant MIN_LIQUIDATION_THRESHOLD = 90; // 90%
 
   // Protocol
   PoolFactory public poolFactory;
   uint256 private fee;
   address public feeBeneficiary;
   uint256 private lastFeeClaimTime;
+  uint256 private liquidationThreshold;
 
   // Tokens
   address public reserveToken;
@@ -95,6 +97,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   error AuctionPeriodPassed();
   error AuctionNotSucceeded();
   error AuctionAlreadyStarted();
+  error LiquidationThresholdTooLow();
   error DistributionPeriodNotPassed();
 
   // Events
@@ -107,6 +110,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event FeeClaimed(address beneficiary, uint256 amount);
   event FeeChanged(uint256 oldFee, uint256 newFee);
+  event LiquidationThresholdChanged(uint256 oldThreshold, uint256 newThreshold);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -154,6 +158,20 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     lastDistribution = block.timestamp;
     feeBeneficiary = _feeBeneficiary;
     lastFeeClaimTime = block.timestamp;
+    liquidationThreshold = MIN_LIQUIDATION_THRESHOLD;
+  }
+
+  /**
+   * @dev Sets the liquidation threshold. Cannot be set below 90%.
+   * @param _liquidationThreshold The new liquidation threshold value.
+   */
+  function setLiquidationThreshold(uint256 _liquidationThreshold) external onlyRole(poolFactory.GOV_ROLE()) {
+    if (_liquidationThreshold < MIN_LIQUIDATION_THRESHOLD) {
+      revert LiquidationThresholdTooLow();
+    }
+    uint256 oldThreshold = liquidationThreshold;
+    liquidationThreshold = _liquidationThreshold;
+    emit LiquidationThresholdChanged(oldThreshold, _liquidationThreshold);
   }
 
   /**
@@ -495,7 +513,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       (bondToken.totalSupply() * _sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS()),
       block.timestamp + auctionPeriod,
       1000,
-      address(this)
+      address(this),
+      liquidationThreshold
     ));
   }
 

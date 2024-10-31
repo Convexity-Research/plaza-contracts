@@ -21,7 +21,7 @@ contract AuctionScript is Script {
         Token usdc = new Token("USDC", "USDC", false);
         Token weth = new Token("WETH", "WETH", false);
         usdc.mint(deployerAddress, 1000000000000 ether);
-        auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 1 days, 1000, deployerAddress);
+        auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 1 days, 1000, deployerAddress, 100);
 
         usdc.approve(address(auction), type(uint256).max);
 
