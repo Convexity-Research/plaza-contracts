@@ -103,7 +103,7 @@ contract Auction {
     if (buyAmount == 0) revert BidAmountTooLow();
 
     // Transfer buy tokens to contract
-    IERC20(buyToken).transferFrom(msg.sender, address(this), buyAmount);
+    IERC20(buyToken).transferFrom(msg.sender, address(this), sellAmount);
 
     Bid memory newBid = Bid({
       bidder: msg.sender,
@@ -122,7 +122,6 @@ contract Auction {
     // Insert the new bid into the sorted linked list
     insertSortedBid(newBidIndex);
     totalBidsAmount += sellAmount;
-
     totalSellAmount += buyAmount;
 
     if (bidCount > maxBids) {
@@ -249,15 +248,12 @@ contract Auction {
         // Calculate the proportion of sellAmount being removed
         uint256 proportion = (amountToRemove * 1e18) / sellAmount;
         
-        // Calculate sellAmount to refund based on the same proportion
-        uint256 sellAmountToRefund = (currentBid.sellAmount * proportion) / 1e18;
-        
         // Reduce the current bid's amounts
         currentBid.sellAmount = sellAmount - amountToRemove;
         currentBid.buyAmount = currentBid.buyAmount - ((currentBid.buyAmount * proportion) / 1e18);
         
         // Refund the proportional sellAmount
-        IERC20(buyToken).safeTransfer(currentBid.bidder, sellAmountToRefund);
+        IERC20(buyToken).safeTransfer(currentBid.bidder, amountToRemove);
         
         amountToRemove = 0;
       }

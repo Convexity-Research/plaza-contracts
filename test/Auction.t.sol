@@ -8,13 +8,15 @@ import {Token} from "./mocks/Token.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {Auction} from "../src/Auction.sol";
 import {MockPool} from "./mocks/MockPool.sol";
+import {BondToken} from "../src/BondToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
-import {BondToken} from "../src/BondToken.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+
 
 contract AuctionTest is Test {
   Auction auction;
@@ -208,6 +210,29 @@ contract AuctionTest is Test {
     assertEq(weth.balanceOf(bidder), initialBalance + 1000000000000);
   }
 
+  function testPartialRefund() public {
+    vm.startPrank(bidder);
+    weth.mint(address(auction), 1000000000000 ether);
+    usdc.mint(bidder, 1000000000000 ether);
+    usdc.approve(address(auction), 1000000000000 ether);
+    auction.bid(100000000000 ether, 1000000000000);
+    vm.stopPrank();
+
+    uint256 initialBidderBalance = usdc.balanceOf(bidder);
+
+    // New bidder
+    vm.startPrank(address(0x55));
+    uint256 newBidderBid = 1000000000;
+    usdc.mint(address(0x55), newBidderBid);
+    usdc.approve(address(auction), newBidderBid);
+    // Higher bid, kicks out the first bid partially (1 slot)
+    auction.bid(100 ether, newBidderBid);
+    vm.stopPrank();
+
+    // Check that the bidder received the partial refund
+    assertEq(usdc.balanceOf(bidder), initialBidderBalance + newBidderBid);
+  }
+
   function testClaimBidAuctionNotEnded() public {
     vm.startPrank(bidder);
     usdc.mint(bidder, 1000 ether);
@@ -278,7 +303,7 @@ contract AuctionTest is Test {
     uint256 initialBalance = usdc.balanceOf(house);
     
     auction.endAuction();
-    assertEq(usdc.balanceOf(house), initialBalance + 100000000000 ether);
+    assertEq(usdc.balanceOf(house), initialBalance + 1000000000000);
   }
 
   function testMultipleBidsWithNewHighBid() public {
