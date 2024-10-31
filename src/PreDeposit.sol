@@ -105,32 +105,34 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     poolCreated = false;
   }
 
-  /**
-   * @dev Allows users to deposit reserve tokens up to the reserve cap.
-   * @param amount Amount of reserve tokens to deposit
-   */
+  function deposit(uint256 amount, address onBehalfOf) external nonReentrant whenNotPaused {
+    _deposit(amount, onBehalfOf);
+  }
+
   function deposit(uint256 amount) external nonReentrant whenNotPaused {
+    _deposit(amount, address(0));
+  }
+
+  function _deposit(uint256 amount, address onBehalfOf) private {
     if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
     if (block.timestamp > depositEndTime) revert DepositEnded();
     if (reserveAmount >= reserveCap) revert DepositCapReached();
+
+    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
 
     // if user would like to put more than available in cap, fill the rest up to cap and add that to reserves
     if (reserveAmount + amount >= reserveCap) {
       amount = reserveCap - reserveAmount;
     }
 
-    balances[msg.sender] += amount;
+    balances[recipient] += amount;
     reserveAmount += amount;
 
     IERC20(params.reserveToken).transferFrom(msg.sender, address(this), amount);
 
-    emit Deposited(msg.sender, amount);
+    emit Deposited(recipient, amount);
   }
 
-  /**
-   * @dev Allows users to withdraw their deposited reserve tokens before deposit end time.
-   * @param amount Amount of reserve tokens to withdraw
-   */
   function withdraw(uint256 amount) external nonReentrant whenNotPaused {
     if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
     if (block.timestamp > depositEndTime) revert WithdrawEnded();
