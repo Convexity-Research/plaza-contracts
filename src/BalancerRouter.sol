@@ -34,8 +34,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         balancerPoolToken.safeIncreaseAllowance(_predeposit, balancerPoolTokenReceived);
 
         // Step 3: Deposit to PreDeposit
-        PreDeposit predeposit = PreDeposit(_predeposit);
-        predeposit.deposit(balancerPoolTokenReceived, msg.sender);
+        PreDeposit(_predeposit).deposit(balancerPoolTokenReceived, msg.sender);
 
         return balancerPoolTokenReceived;
     }
@@ -58,8 +57,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         balancerPoolToken.safeIncreaseAllowance(_plazaPool, balancerPoolTokenReceived);
 
         // Step 3: Join Plaza Pool
-        Pool plazaPool = Pool(_plazaPool);
-        uint256 plazaTokens = plazaPool.create(plazaTokenType, balancerPoolTokenReceived, minPlazaTokens, deadline, msg.sender);
+        uint256 plazaTokens = Pool(_plazaPool).create(plazaTokenType, balancerPoolTokenReceived, minPlazaTokens, deadline, msg.sender);
 
         return plazaTokens;
     }
@@ -102,8 +100,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         uint256 minbalancerPoolTokenOut
     ) external nonReentrant {
         // Step 1: Exit Plaza Pool
-        Pool plazaPool = Pool(_plazaPool);
-        uint256 balancerPoolTokenReceived = exitPlazaPool(plazaTokenType, address(_plazaPool), plazaTokenAmount, minbalancerPoolTokenOut);
+        uint256 balancerPoolTokenReceived = exitPlazaPool(plazaTokenType, _plazaPool, plazaTokenAmount, minbalancerPoolTokenOut);
 
         // Step 2: Exit Balancer Pool
         exitBalancerPool(balancerPoolId, assets, balancerPoolTokenReceived, minAmountsOut, userData, msg.sender);
@@ -119,7 +116,7 @@ contract BalancerRouter is ReentrancyGuardUpgradeable {
         Pool plazaPool = Pool(_plazaPool);
         IERC20 plazaToken = tokenType == Pool.TokenType.BOND ? IERC20(address(plazaPool.bondToken())) : IERC20(address(plazaPool.lToken()));
         plazaToken.safeTransferFrom(msg.sender, address(this), tokenAmount);
-        plazaToken.safeIncreaseAllowance(address(plazaPool), tokenAmount);
+        plazaToken.safeIncreaseAllowance(_plazaPool, tokenAmount);
 
         // Exit Plaza pool
         return plazaPool.redeem(tokenType, tokenAmount, minbalancerPoolTokenOut);
