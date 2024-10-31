@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Utils} from "./lib/Utils.sol";
 import {Auction} from "./Auction.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
@@ -507,15 +508,19 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     (uint256 currentPeriod, uint256 _sharesPerToken) = bondToken.globalPool();
     require(auctions[currentPeriod] == address(0), AuctionAlreadyStarted());
 
-    auctions[currentPeriod] = address(new Auction(
-      address(couponToken),
-      address(reserveToken),
-      (bondToken.totalSupply() * _sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS()),
-      block.timestamp + auctionPeriod,
-      1000,
-      address(this),
-      liquidationThreshold
-    ));
+    auctions[currentPeriod] = Utils.deploy(
+      address(new Auction()),
+      abi.encodeWithSelector(
+        Auction.initialize.selector,
+        address(couponToken),
+        address(reserveToken),
+        (bondToken.totalSupply() * _sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS()),
+        block.timestamp + auctionPeriod,
+        1000,
+        address(this),
+        liquidationThreshold
+      )
+    );
   }
 
   /**

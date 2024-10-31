@@ -77,7 +77,7 @@ contract DistributorTest is Test {
   }
 
   function fakeSucceededAuction(address poolAddress, uint256 period) public {
-    address auction = address(new Auction(params.couponToken, params.reserveToken, 1000000000000, block.timestamp + 10 days, 1000, address(0), 95));
+    address auction = Utils.deploy(address(new Auction()), abi.encodeWithSelector(Auction.initialize.selector, params.couponToken, params.reserveToken, 1000000000000, block.timestamp + 10 days, 1000, address(0), 95));
 
     uint256 auctionSlot = 11;
     bytes32 auctionPeriodSlot = keccak256(abi.encode(period, auctionSlot));

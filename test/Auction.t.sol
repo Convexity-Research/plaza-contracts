@@ -38,7 +38,19 @@ contract AuctionTest is Test {
     useMockPool(pool);
 
     vm.startPrank(pool);
-    auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house, 110);
+    auction = Auction(Utils.deploy(
+      address(new Auction()),
+      abi.encodeWithSelector(
+        Auction.initialize.selector,
+        address(usdc),
+        address(weth),
+        1000000000000,
+        block.timestamp + 10 days,
+        1000,
+        house,
+        110
+      )
+    ));
     vm.stopPrank();
   }
 
@@ -81,9 +93,9 @@ contract AuctionTest is Test {
   }
 
   function testConstructor() public view {
-    assertEq(auction.buyToken(), address(usdc));
-    assertEq(auction.sellToken(), address(weth));
-    assertEq(auction.totalBuyAmount(), 1000000000000);
+    assertEq(auction.buyCouponToken(), address(usdc));
+    assertEq(auction.sellReserveToken(), address(weth));
+    assertEq(auction.totalBuyCouponAmount(), 1000000000000);
     assertEq(auction.endTime(), block.timestamp + 10 days);
     assertEq(auction.beneficiary(), house);
   }

@@ -2,6 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
+
+import {Utils} from "../src/lib/Utils.sol";
 import {Auction} from "../src/Auction.sol";
 import {Token} from "../test/mocks/Token.sol";
 
@@ -21,7 +23,19 @@ contract AuctionScript is Script {
         Token usdc = new Token("USDC", "USDC", false);
         Token weth = new Token("WETH", "WETH", false);
         usdc.mint(deployerAddress, 1000000000000 ether);
-        auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 1 days, 1000, deployerAddress, 100);
+        auction = Auction(Utils.deploy(
+            address(new Auction()),
+            abi.encodeWithSelector(
+                Auction.initialize.selector,
+                address(usdc),
+                address(weth),
+                1000000000000,
+                block.timestamp + 1 days,
+                1000,
+                deployerAddress,
+                100
+            )
+        ));
 
         usdc.approve(address(auction), type(uint256).max);
 

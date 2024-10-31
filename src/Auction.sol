@@ -2,10 +2,13 @@
 pragma solidity ^0.8.26;
 
 import {Pool} from "./Pool.sol";
+import {PoolFactory} from "./PoolFactory.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract Auction {
+contract Auction is Initializable, UUPSUpgradeable {
   using SafeERC20 for IERC20;
 
   // Pool contract
@@ -15,12 +18,12 @@ contract Auction {
   address public beneficiary;
 
   // Auction buy and sell tokens
-  address public buyToken;
-  address public sellToken;
+  address public buyCouponToken;
+  address public sellReserveToken;
 
   // Auction end time and total buy amount
   uint256 public endTime;
-  uint256 public totalBuyAmount;
+  uint256 public totalBuyCouponAmount;
   uint256 public liquidationThreshold;
 
   enum State {
@@ -34,8 +37,8 @@ contract Auction {
 
   struct Bid {
     address bidder;
-    uint256 buyAmount;
-    uint256 sellAmount;
+    uint256 buyReserveAmount;
+    uint256 sellCouponAmount;
     uint256 nextBidIndex;
     uint256 prevBidIndex;
     bool claimed;
@@ -47,14 +50,15 @@ contract Auction {
   uint256 public highestBidIndex; // The index of the highest bid in the sorted list
   uint256 public maxBids;
   uint256 public lowestBidIndex; // New variable to track the lowest bid
-  uint256 public totalBidsAmount; // Aggregated buy amount (coupon) for the auction
-  uint256 public totalSellAmount; // Aggregated sell amount (reserve) for the auction
+  uint256 public currentCouponAmount; // Aggregated buy amount (coupon) for the auction
+  uint256 public totalSellReserveAmount; // Aggregated sell amount (reserve) for the auction
 
-  event AuctionEnded(State state, uint256 totalSellAmount, uint256 totalBuyAmount);
-  event BidClaimed(address indexed bidder, uint256 sellAmount);
-  event BidPlaced(address indexed bidder, uint256 buyAmount, uint256 sellAmount);
-  event BidRemoved(address indexed bidder, uint256 buyAmount, uint256 sellAmount);
+  event AuctionEnded(State state, uint256 totalSellReserveAmount, uint256 totalBuyCouponAmount);
+  event BidClaimed(address indexed bidder, uint256 sellCouponAmount);
+  event BidPlaced(address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
+  event BidRemoved(address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
 
+  error AccessDenied();
   error AuctionFailed();
   error NothingToClaim();
   error AlreadyClaimed();
@@ -65,20 +69,35 @@ contract Auction {
   error AuctionStillOngoing();
   error AuctionAlreadyEnded();
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
   /**
-   * @dev Constructor for the Auction contract.
-   * @param _buyToken The address of the buy token (coupon).
-   * @param _sellToken The address of the sell token (reserve).
-   * @param _totalBuyAmount The total amount of buy tokens (coupon) for the auction.
+   * @dev Initializes the Auction contract.
+   * @param _buyCouponToken The address of the buy token (coupon).
+   * @param _sellReserveToken The address of the sell token (reserve).
+   * @param _totalBuyCouponAmount The total amount of buy tokens (coupon) for the auction.
    * @param _endTime The end time of the auction.
    * @param _maxBids The maximum number of bids allowed in the auction.
    * @param _beneficiary The address of the auction beneficiary.
    * @param _liquidationThreshold The percentage threshold for liquidation (e.g. 95000 = 95%).
    */
-  constructor(address _buyToken, address _sellToken, uint256 _totalBuyAmount, uint256 _endTime, uint256 _maxBids, address _beneficiary, uint256 _liquidationThreshold) {
-    buyToken = _buyToken; // coupon
-    sellToken = _sellToken; // reserve
-    totalBuyAmount = _totalBuyAmount; // coupon amount
+  function initialize(
+    address _buyCouponToken, 
+    address _sellReserveToken, 
+    uint256 _totalBuyCouponAmount, 
+    uint256 _endTime, 
+    uint256 _maxBids, 
+    address _beneficiary, 
+    uint256 _liquidationThreshold
+  ) initializer public {
+    __UUPSUpgradeable_init();
+
+    buyCouponToken = _buyCouponToken; // coupon
+    sellReserveToken = _sellReserveToken; // reserve
+    totalBuyCouponAmount = _totalBuyCouponAmount; // coupon amount
     endTime = _endTime;
     maxBids = _maxBids;
     pool = msg.sender;
@@ -93,22 +112,22 @@ contract Auction {
 
   /**
    * @dev Places a bid on a portion of the pool.
-   * @param buyAmount The amount of buy tokens (reserve) to bid.
-   * @param sellAmount The amount of sell tokens (coupon) to bid.
+   * @param buyReserveAmount The amount of buy tokens (reserve) to bid.
+   * @param sellCouponAmount The amount of sell tokens (coupon) to bid.
    * @return The index of the bid.
    */
-  function bid(uint256 buyAmount, uint256 sellAmount) external auctionActive returns(uint256) {
-    if (sellAmount == 0 || sellAmount > totalBuyAmount) revert InvalidSellAmount();
-    if (sellAmount % slotSize() != 0) revert InvalidSellAmount();
-    if (buyAmount == 0) revert BidAmountTooLow();
+  function bid(uint256 buyReserveAmount, uint256 sellCouponAmount) external auctionActive returns(uint256) {
+    if (sellCouponAmount == 0 || sellCouponAmount > totalBuyCouponAmount) revert InvalidSellAmount();
+    if (sellCouponAmount % slotSize() != 0) revert InvalidSellAmount();
+    if (buyReserveAmount == 0) revert BidAmountTooLow();
 
     // Transfer buy tokens to contract
-    IERC20(buyToken).transferFrom(msg.sender, address(this), sellAmount);
+    IERC20(buyCouponToken).transferFrom(msg.sender, address(this), sellCouponAmount);
 
     Bid memory newBid = Bid({
       bidder: msg.sender,
-      buyAmount: buyAmount,
-      sellAmount: sellAmount,
+      buyReserveAmount: buyReserveAmount,
+      sellCouponAmount: sellCouponAmount,
       nextBidIndex: 0, // Default to 0, which indicates the end of the list
       prevBidIndex: 0, // Default to 0, which indicates the start of the list
       claimed: false
@@ -121,8 +140,8 @@ contract Auction {
 
     // Insert the new bid into the sorted linked list
     insertSortedBid(newBidIndex);
-    totalBidsAmount += sellAmount;
-    totalSellAmount += buyAmount;
+    currentCouponAmount += sellCouponAmount;
+    totalSellReserveAmount += buyReserveAmount;
 
     if (bidCount > maxBids) {
       if (lowestBidIndex == newBidIndex) {
@@ -139,7 +158,7 @@ contract Auction {
       revert BidAmountTooLow();
     }
 
-    emit BidPlaced(msg.sender, buyAmount, sellAmount);
+    emit BidPlaced(msg.sender, buyReserveAmount, sellCouponAmount);
 
     return newBidIndex;
   }
@@ -150,8 +169,8 @@ contract Auction {
    */
   function insertSortedBid(uint256 newBidIndex) internal {
     Bid storage newBid = bids[newBidIndex];
-    uint256 newSellAmount = newBid.sellAmount;
-    uint256 newBuyAmount = newBid.buyAmount;
+    uint256 newSellCouponAmount = newBid.sellCouponAmount;
+    uint256 newBuyReserveAmount = newBid.buyReserveAmount;
     uint256 leftSide;
     uint256 rightSide;
 
@@ -167,15 +186,15 @@ contract Auction {
       while (currentBidIndex != 0) {
         // Cache the current bid's data into local variables
         Bid storage currentBid = bids[currentBidIndex];
-        uint256 currentSellAmount = currentBid.sellAmount;
-        uint256 currentBuyAmount = currentBid.buyAmount;
+        uint256 currentSellCouponAmount = currentBid.sellCouponAmount;
+        uint256 currentBuyReserveAmount = currentBid.buyReserveAmount;
         uint256 currentNextBidIndex = currentBid.nextBidIndex;
 
         // Compare prices without division by cross-multiplying (it's more gas efficient)
-        leftSide = newSellAmount * currentBuyAmount;
-        rightSide = currentSellAmount * newBuyAmount;
+        leftSide = newSellCouponAmount * currentBuyReserveAmount;
+        rightSide = currentSellCouponAmount * newBuyReserveAmount;
 
-        if (leftSide > rightSide || (leftSide == rightSide && newSellAmount > currentSellAmount)) {
+        if (leftSide > rightSide || (leftSide == rightSide && newSellCouponAmount > currentSellCouponAmount)) {
           break;
         }
         
@@ -206,14 +225,14 @@ contract Auction {
 
     // Cache the lowest bid's data into local variables
     Bid storage lowestBid = bids[lowestBidIndex];
-    uint256 lowestSellAmount = lowestBid.sellAmount;
-    uint256 lowestBuyAmount = lowestBid.buyAmount;
+    uint256 lowestSellCouponAmount = lowestBid.sellCouponAmount;
+    uint256 lowestBuyReserveAmount = lowestBid.buyReserveAmount;
 
     // Compare prices without division by cross-multiplying (it's more gas efficient)
-    leftSide = newSellAmount * lowestBuyAmount;
-    rightSide = lowestSellAmount * newBuyAmount;
+    leftSide = newSellCouponAmount * lowestBuyReserveAmount;
+    rightSide = lowestSellCouponAmount * newBuyReserveAmount;
 
-    if (leftSide < rightSide || (leftSide == rightSide && newSellAmount < lowestSellAmount)) {
+    if (leftSide < rightSide || (leftSide == rightSide && newSellCouponAmount < lowestSellCouponAmount)) {
       lowestBidIndex = newBidIndex;
     }
   }
@@ -222,22 +241,22 @@ contract Auction {
    * @dev Removes excess bids from the auction.
    */
   function removeExcessBids() internal {
-    if (totalBidsAmount <= totalBuyAmount) {
+    if (currentCouponAmount <= totalBuyCouponAmount) {
       return;
     }
 
-    uint256 amountToRemove = totalBidsAmount - totalBuyAmount;
+    uint256 amountToRemove = currentCouponAmount - totalBuyCouponAmount;
     uint256 currentIndex = lowestBidIndex;
 
     while (currentIndex != 0 && amountToRemove != 0) {
       // Cache the current bid's data into local variables
       Bid storage currentBid = bids[currentIndex];
-      uint256 sellAmount = currentBid.sellAmount;
+      uint256 sellCouponAmount = currentBid.sellCouponAmount;
       uint256 prevIndex = currentBid.prevBidIndex;
 
-      if (amountToRemove >= sellAmount) {
+      if (amountToRemove >= sellCouponAmount) {
         // Subtract the sellAmount from amountToRemove
-        amountToRemove -= sellAmount;
+        amountToRemove -= sellCouponAmount;
 
         // Remove the bid
         _removeBid(currentIndex);
@@ -246,14 +265,14 @@ contract Auction {
         currentIndex = prevIndex;
       } else {
         // Calculate the proportion of sellAmount being removed
-        uint256 proportion = (amountToRemove * 1e18) / sellAmount;
+        uint256 proportion = (amountToRemove * 1e18) / sellCouponAmount;
         
         // Reduce the current bid's amounts
-        currentBid.sellAmount = sellAmount - amountToRemove;
-        currentBid.buyAmount = currentBid.buyAmount - ((currentBid.buyAmount * proportion) / 1e18);
+        currentBid.sellCouponAmount = sellCouponAmount - amountToRemove;
+        currentBid.buyReserveAmount = currentBid.buyReserveAmount - ((currentBid.buyReserveAmount * proportion) / 1e18);
         
         // Refund the proportional sellAmount
-        IERC20(buyToken).safeTransfer(currentBid.bidder, amountToRemove);
+        IERC20(buyCouponToken).safeTransfer(currentBid.bidder, amountToRemove);
         
         amountToRemove = 0;
       }
@@ -285,15 +304,15 @@ contract Auction {
     }
 
     address bidder = bidToRemove.bidder;
-    uint256 buyAmount = bidToRemove.buyAmount;
-    uint256 sellAmount = bidToRemove.sellAmount;
-    totalBidsAmount -= sellAmount;
-    totalSellAmount -= buyAmount;
+    uint256 buyReserveAmount = bidToRemove.buyReserveAmount;
+    uint256 sellCouponAmount = bidToRemove.sellCouponAmount;
+    currentCouponAmount -= sellCouponAmount;
+    totalSellReserveAmount -= buyReserveAmount;
 
     // Refund the buy tokens for the removed bid
-    IERC20(buyToken).transfer(bidder, buyAmount);
+    IERC20(buyCouponToken).transfer(bidder, buyReserveAmount);
 
-    emit BidRemoved(bidder, buyAmount, sellAmount);
+    emit BidRemoved(bidder, buyReserveAmount, sellCouponAmount);
 
     delete bids[bidIndex];
     bidCount--;
@@ -305,17 +324,17 @@ contract Auction {
   function endAuction() external auctionExpired {
     if (state != State.BIDDING) revert AuctionAlreadyEnded();
 
-    if (totalBidsAmount < totalBuyAmount) {
+    if (currentCouponAmount < totalBuyCouponAmount) {
       state = State.FAILED_UNDERSOLD;
-    } else if (totalSellAmount >= (IERC20(sellToken).balanceOf(pool) * liquidationThreshold) / 100) {
+    } else if (totalSellReserveAmount >= (IERC20(sellReserveToken).balanceOf(pool) * liquidationThreshold) / 100) {
         state = State.FAILED_LIQUIDATION;
     } else {
       state = State.SUCCEEDED;
-      Pool(pool).transferReserveToAuction(totalSellAmount);
-      IERC20(buyToken).safeTransfer(beneficiary, IERC20(buyToken).balanceOf(address(this)));
+      Pool(pool).transferReserveToAuction(totalSellReserveAmount);
+      IERC20(buyCouponToken).safeTransfer(beneficiary, IERC20(buyCouponToken).balanceOf(address(this)));
     }
 
-    emit AuctionEnded(state, totalSellAmount, totalBuyAmount);
+    emit AuctionEnded(state, totalSellReserveAmount, totalBuyCouponAmount);
   }
 
   /**
@@ -328,9 +347,9 @@ contract Auction {
     if (bidInfo.claimed) revert AlreadyClaimed();
 
     bidInfo.claimed = true;
-    IERC20(sellToken).transfer(bidInfo.bidder, bidInfo.sellAmount);
+    IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.sellCouponAmount);
 
-    emit BidClaimed(bidInfo.bidder, bidInfo.sellAmount);
+    emit BidClaimed(bidInfo.bidder, bidInfo.sellCouponAmount);
   }
 
   /**
@@ -338,7 +357,7 @@ contract Auction {
    * @return uint256 The size of a bid slot.
    */
   function slotSize() internal view returns (uint256) {
-    return totalBuyAmount / maxBids;
+    return totalBuyCouponAmount / maxBids;
   }
 
   /**
@@ -364,4 +383,26 @@ contract Auction {
     if (state != State.SUCCEEDED) revert AuctionFailed();
     _;
   }
+
+  /**
+   * @dev Modifier to check if the caller has the specified role.
+   * @param role The role to check for.
+   */
+  modifier onlyRole(bytes32 role) {
+    if (!PoolFactory(Pool(pool).poolFactory()).hasRole(role, msg.sender)) {
+      revert AccessDenied();
+    }
+    _;
+  }
+
+  /**
+   * @dev Authorizes an upgrade to a new implementation.
+   * Can only be called by the owner of the contract.
+   * @param newImplementation Address of the new implementation
+   */
+  function _authorizeUpgrade(address newImplementation)
+    internal
+    onlyRole(PoolFactory(Pool(pool).poolFactory()).GOV_ROLE())
+    override
+  {}
 }
