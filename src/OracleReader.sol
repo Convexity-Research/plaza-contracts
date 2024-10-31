@@ -14,6 +14,8 @@ contract OracleReader {
 
   // @note: address(0) is a special address that represents USD (IRL asset)
   address public constant USD = address(0);
+  // @note: special address that represents ETH (Chainlink asset)
+  address public constant ETH = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
 
   /**
    * @dev Error thrown when no valid price is found
@@ -47,7 +49,7 @@ contract OracleReader {
   function getOraclePrice(address quote, address base) public view returns(uint256) {
     bool isInverted = false;
     address feed = OracleFeeds(oracleFeeds).priceFeeds(quote, base);
-
+    
     if (feed == address(0)) {
       feed = OracleFeeds(oracleFeeds).priceFeeds(base, quote);
       if (feed == address(0)) {
