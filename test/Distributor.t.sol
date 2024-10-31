@@ -261,13 +261,13 @@ contract DistributorTest is Test {
   }
 
   function testAllocateInvalidPoolAddress() public {
-    vm.expectRevert("Caller must be a registered pool");
+    vm.expectRevert(Distributor.CallerIsNotPool.selector);
     distributor.allocate(address(0), 100);
   }
 
   function testAllocateCallerNotPool() public {
     vm.startPrank(user);
-    vm.expectRevert("Caller must be a registered pool");
+    vm.expectRevert(Distributor.CallerIsNotPool.selector);
     distributor.allocate(address(_pool), 100);
     vm.stopPrank();
   }

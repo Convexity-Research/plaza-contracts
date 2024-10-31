@@ -278,7 +278,7 @@ contract PreDepositTest is Test {
   }
 
   function testClaim() public {
-    (address pool, address bondToken, address lToken) = deployFakePool();
+    (, address bondToken, address lToken) = deployFakePool();
 
     // Setup initial deposit
     vm.startPrank(user1);
@@ -357,7 +357,7 @@ contract PreDepositTest is Test {
   }
 
   function testClaimTwice() public {
-    (address pool, address bondToken, address lToken) = deployFakePool();
+    (, address bondToken, address lToken) = deployFakePool();
 
     // Setup initial deposit
     vm.startPrank(user1);
