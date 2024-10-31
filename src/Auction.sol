@@ -246,8 +246,19 @@ contract Auction {
         // Move to the previous bid (higher price)
         currentIndex = prevIndex;
       } else {
-        // Reduce the current bid's sellAmount
+        // Calculate the proportion of sellAmount being removed
+        uint256 proportion = (amountToRemove * 1e18) / sellAmount;
+        
+        // Calculate sellAmount to refund based on the same proportion
+        uint256 sellAmountToRefund = (currentBid.sellAmount * proportion) / 1e18;
+        
+        // Reduce the current bid's amounts
         currentBid.sellAmount = sellAmount - amountToRemove;
+        currentBid.buyAmount = currentBid.buyAmount - ((currentBid.buyAmount * proportion) / 1e18);
+        
+        // Refund the proportional sellAmount
+        IERC20(buyToken).safeTransfer(currentBid.bidder, sellAmountToRefund);
+        
         amountToRemove = 0;
       }
     }
