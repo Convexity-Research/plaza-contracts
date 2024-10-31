@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
+import {Auction} from "../src/Auction.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {BondToken} from "../src/BondToken.sol";
 import {Distributor} from "../src/Distributor.sol";
@@ -75,6 +76,17 @@ contract DistributorTest is Test {
     _pool.lToken().grantRole(_pool.lToken().MINTER_ROLE(), minter);
   }
 
+  function fakeSucceededAuction(address poolAddress, uint256 period) public {
+    address auction = Utils.deploy(address(new Auction()), abi.encodeWithSelector(Auction.initialize.selector, params.couponToken, params.reserveToken, 1000000000000, block.timestamp + 10 days, 1000, address(0), 95));
+
+    uint256 auctionSlot = 11;
+    bytes32 auctionPeriodSlot = keccak256(abi.encode(period, auctionSlot));
+    vm.store(address(poolAddress), auctionPeriodSlot, bytes32(uint256(uint160(auction))));
+
+    uint256 stateSlot = 6;
+    vm.store(auction, bytes32(stateSlot), bytes32(uint256(1)));
+  }
+
   function testClaimShares() public {
     Token sharesToken = Token(_pool.couponToken());
 
@@ -84,6 +96,14 @@ contract DistributorTest is Test {
     vm.stopPrank();
 
     vm.startPrank(governance);
+    fakeSucceededAuction(address(_pool), 0);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
+
     _pool.distribute();
     vm.stopPrank();
 
@@ -135,6 +155,14 @@ contract DistributorTest is Test {
     vm.stopPrank();
 
     vm.startPrank(governance);
+    fakeSucceededAuction(address(pool), 0);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
+
     pool.distribute();
     vm.stopPrank();
 
@@ -165,6 +193,16 @@ contract DistributorTest is Test {
     vm.stopPrank();
 
     vm.startPrank(governance);
+    fakeSucceededAuction(address(_pool), 0);
+    fakeSucceededAuction(address(_pool), 1);
+    fakeSucceededAuction(address(_pool), 2);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
+
     _pool.distribute();
     _pool.distribute();
     _pool.distribute();

@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 
 import {Pool} from "../src/Pool.sol";
 import {Token} from "./mocks/Token.sol";
+import {Auction} from "../src/Auction.sol";
 import {Utils} from "../src/lib/Utils.sol";
 import {MockPool} from "./mocks/MockPool.sol";
 import {BondToken} from "../src/BondToken.sol";
@@ -71,8 +72,6 @@ contract PoolTest is Test, TestCases {
     
     OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
-
     // Deploy the mock price feed
     mockPriceFeed = new MockPriceFeed();
 
@@ -111,6 +110,17 @@ contract PoolTest is Test, TestCases {
       bytes32(0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00), // Storage slot for `_status`
       bytes32(uint256(1))  // Reset to `_NOT_ENTERED`
     );
+  }
+
+  function fakeSucceededAuction(address poolAddress, uint256 period) public {
+    address auction = Utils.deploy(address(new Auction()), abi.encodeWithSelector(Auction.initialize.selector, params.couponToken, params.reserveToken, 1000000000000, block.timestamp + 10 days, 1000, address(0), 95));
+
+    uint256 auctionSlot = 11;
+    bytes32 auctionPeriodSlot = keccak256(abi.encode(period, auctionSlot));
+    vm.store(address(poolAddress), auctionPeriodSlot, bytes32(uint256(uint160(auction))));
+
+    uint256 stateSlot = 6;
+    vm.store(auction, bytes32(stateSlot), bytes32(uint256(1)));
   }
 
   function testGetCreateAmount() public {
@@ -707,6 +717,15 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(governance);
     vm.expectEmit(true, true, true, true);
     emit Pool.Distributed(expectedDistribution);
+
+    fakeSucceededAuction(address(_pool), 0);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
+
     _pool.distribute();
     vm.stopPrank();
 
@@ -735,6 +754,16 @@ contract PoolTest is Test, TestCases {
     vm.stopPrank();
 
     vm.startPrank(governance);
+    fakeSucceededAuction(address(_pool), 0);
+    fakeSucceededAuction(address(_pool), 1);
+    fakeSucceededAuction(address(_pool), 2);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
+
     _pool.distribute();
     _pool.distribute();
     _pool.distribute();
