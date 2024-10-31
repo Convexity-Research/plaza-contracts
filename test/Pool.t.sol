@@ -720,6 +720,12 @@ contract PoolTest is Test, TestCases {
 
     fakeSucceededAuction(address(_pool), 0);
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
+
     _pool.distribute();
     vm.stopPrank();
 
@@ -751,6 +757,12 @@ contract PoolTest is Test, TestCases {
     fakeSucceededAuction(address(_pool), 0);
     fakeSucceededAuction(address(_pool), 1);
     fakeSucceededAuction(address(_pool), 2);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
 
     _pool.distribute();
     _pool.distribute();
