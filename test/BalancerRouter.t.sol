@@ -19,7 +19,7 @@ import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 
 contract MockBalancerVault {    
-    Token public bpt;
+    Token public balancerPoolToken;
     mapping(address => uint256) public joinAmounts;
 
     struct JoinPoolRequest {
@@ -36,8 +36,8 @@ contract MockBalancerVault {
         bool toInternalBalance;
     }
 
-    constructor(Token _bpt) {
-        bpt = _bpt;
+    constructor(Token _balancerPoolToken) {
+        balancerPoolToken = _balancerPoolToken;
     }
 
     function joinPool(
@@ -56,7 +56,7 @@ contract MockBalancerVault {
                 joinAmounts[address(request.assets[i])] = request.maxAmountsIn[i];
             }
         }
-        bpt.mint(recipient, 1 ether);
+        balancerPoolToken.mint(recipient, 1 ether);
     }
 
     function exitPool(
@@ -65,7 +65,7 @@ contract MockBalancerVault {
         address payable recipient,
         ExitPoolRequest memory request
     ) external {
-        bpt.burn(sender, request.minAmountsOut[0]);
+        balancerPoolToken.burn(sender, request.minAmountsOut[0]);
         for (uint256 i = 0; i < request.assets.length; i++) {
             if (address(request.assets[i]) != address(0)) {
                 Token(address(request.assets[i])).transfer(
@@ -81,7 +81,7 @@ contract BalancerRouterTest is Test {
     MockBalancerVault public vault;
     Pool public _pool;
     PreDeposit public predeposit;
-    Token public bpt;
+    Token public balancerPoolToken;
     Token public asset1;
     Token public asset2;
     address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
@@ -106,7 +106,7 @@ contract BalancerRouterTest is Test {
         vm.startPrank(deployer);
 
         // Deploy mock tokens
-        bpt = new Token("Balancer Pool Token", "BPT", false);
+        balancerPoolToken = new Token("Balancer Pool Token", "balancerPoolToken", false);
         asset1 = new Token("Test Token 1", "TT1", true);
         asset2 = new Token("Test Token 2", "TT2", true);
         address tokenDeployer = address(new TokenDeployer());
@@ -123,7 +123,7 @@ contract BalancerRouterTest is Test {
         )));
 
         params.fee = 0;
-        params.reserveToken = address(bpt);
+        params.reserveToken = address(balancerPoolToken);
         params.sharesPerToken = 50 * 10 ** 18;
         params.distributionPeriod = 0;
         params.couponToken = address(new Token("USDC", "USDC", false));
@@ -131,7 +131,7 @@ contract BalancerRouterTest is Test {
         OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
         // Deploy the mock price feed
-        MockPriceFeed mockPriceFeed = new MockPriceFeed();
+        mockPriceFeed = new MockPriceFeed();
 
         // Use vm.etch to deploy the mock contract at the specific address
         bytes memory bytecode = address(mockPriceFeed).code;
@@ -146,8 +146,8 @@ contract BalancerRouterTest is Test {
         vm.startPrank(governance);
         distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
-        bpt.mint(governance, 100 ether);
-        bpt.approve(address(poolFactory), 100 ether);
+        balancerPoolToken.mint(governance, 100 ether);
+        balancerPoolToken.approve(address(poolFactory), 100 ether);
         _pool = Pool(poolFactory.createPool(params, 100 ether, 10000*10**18, 10000*10**18, "", "", "", ""));
 
         vm.stopPrank();
@@ -155,12 +155,12 @@ contract BalancerRouterTest is Test {
         vm.startPrank(deployer);
 
         // Deploy mock contracts
-        vault = new MockBalancerVault(bpt);
+        vault = new MockBalancerVault(balancerPoolToken);
         predeposit = PreDeposit(Utils.deploy(address(new PreDeposit()), abi.encodeCall(
         PreDeposit.initialize, 
         (params, address(poolFactory), block.timestamp, block.timestamp + 1 hours, 100000 ether, "Bond ETH", "bondETH", "Leveraged ETH", "levETH")
         )));
-        router = new BalancerRouter(address(vault), address(_pool), address(predeposit), address(bpt));
+        router = new BalancerRouter(address(vault), address(balancerPoolToken));
 
         // Setup initial token balances
         asset1.mint(user, 1000 ether);
@@ -183,14 +183,15 @@ contract BalancerRouterTest is Test {
         asset1.approve(address(router), 1 ether);
         asset2.approve(address(router), 1 ether);
 
-        uint256 bptReceived = router.joinBalancerAndPredeposit(
+        uint256 balancerPoolTokenReceived = router.joinBalancerAndPredeposit(
             BALANCER_POOL_ID,
+            address(predeposit),
             assets,
             maxAmountsIn,
             ""
         );
 
-        assertEq(bptReceived, 1 ether, "Incorrect BPT amount received");
+        assertEq(balancerPoolTokenReceived, 1 ether, "Incorrect balancerPoolToken amount received");
         assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
         assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
 
@@ -213,6 +214,7 @@ contract BalancerRouterTest is Test {
 
         uint256 plazaTokens = router.joinBalancerAndPlaza(
             BALANCER_POOL_ID,
+            address(_pool),
             assets,
             maxAmountsIn,
             "",
@@ -224,35 +226,6 @@ contract BalancerRouterTest is Test {
         assertEq(plazaTokens, 125000000000000000000, "Incorrect Plaza tokens received");
         assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
         assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
-
-        vm.stopPrank();
-    }
-
-    function testExitBalancerAndPredeposit() public {
-        // First join the pools
-        testJoinBalancerAndPredeposit();
-
-        vm.startPrank(user);
-
-        IAsset[] memory assets = new IAsset[](2);
-        assets[0] = IAsset(address(asset1));
-        assets[1] = IAsset(address(asset2));
-
-        uint256[] memory minAmountsOut = new uint256[](2);
-        minAmountsOut[0] = 0.9 ether;
-        minAmountsOut[1] = 0.9 ether;
-
-        bpt.approve(address(router), 1 ether);
-        router.exitBalancerAndPredeposit(
-            BALANCER_POOL_ID,
-            assets,
-            1 ether,
-            minAmountsOut,
-            ""
-        );
-
-        assertEq(asset1.balanceOf(user), 1000 ether, "Incorrect asset1 balance after exit");
-        assertEq(asset2.balanceOf(user), 1000 ether, "Incorrect asset2 balance after exit");
 
         vm.stopPrank();
     }
@@ -275,6 +248,7 @@ contract BalancerRouterTest is Test {
     // Join first to get Plaza tokens
     uint256 plazaTokens = router.joinBalancerAndPlaza(
         BALANCER_POOL_ID,
+        address(_pool),
         assets,
         maxAmountsIn,
         "",
@@ -299,6 +273,7 @@ contract BalancerRouterTest is Test {
     // Exit Plaza and Balancer
     router.exitPlazaAndBalancer(
         BALANCER_POOL_ID,
+        address(_pool),
         assets,
         plazaTokens,
         minAmountsOut,
@@ -342,6 +317,7 @@ contract BalancerRouterTest is Test {
         // Don't approve tokens
         router.joinBalancerAndPredeposit(
             BALANCER_POOL_ID,
+            address(predeposit),
             assets,
             maxAmountsIn,
             ""
@@ -366,6 +342,7 @@ contract BalancerRouterTest is Test {
 
         router.joinBalancerAndPredeposit(
             BALANCER_POOL_ID,
+            address(predeposit),
             assets,
             maxAmountsIn,
             ""

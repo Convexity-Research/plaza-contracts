@@ -125,35 +125,25 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
       amount = reserveCap - reserveAmount;
     }
 
-    balances[msg.sender] += amount;
+    balances[recipient] += amount;
     reserveAmount += amount;
 
-    IERC20(params.reserveToken).transferFrom(recipient, address(this), amount);
+    IERC20(params.reserveToken).transferFrom(msg.sender, address(this), amount);
 
     emit Deposited(recipient, amount);
   }
 
-  function withdraw(uint256 amount, address onBehalfOf) external nonReentrant whenNotPaused {
-    _withdraw(amount, onBehalfOf);
-  }
-
   function withdraw(uint256 amount) external nonReentrant whenNotPaused {
-    _withdraw(amount, address(0));
-  }
-
-  function _withdraw(uint256 amount, address onBehalfOf) private {
     if (block.timestamp < depositStartTime) revert DepositNotYetStarted();
     if (block.timestamp > depositEndTime) revert WithdrawEnded();
-
-    address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
 
     if (balances[msg.sender] < amount) revert InsufficientBalance();
     balances[msg.sender] -= amount;
     reserveAmount -= amount;
 
-    IERC20(params.reserveToken).transfer(recipient, amount);
+    IERC20(params.reserveToken).transfer(msg.sender, amount);
 
-    emit Withdrawn(recipient, amount);
+    emit Withdrawn(msg.sender, amount);
   }
 
   /**
