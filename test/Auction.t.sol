@@ -36,7 +36,7 @@ contract AuctionTest is Test {
     useMockPool(pool);
 
     vm.startPrank(pool);
-    auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house, 100);
+    auction = new Auction(address(usdc), address(weth), 1000000000000, block.timestamp + 10 days, 1000, house, 110);
     vm.stopPrank();
   }
 
@@ -173,6 +173,10 @@ contract AuctionTest is Test {
     // End the auction
     vm.warp(block.timestamp + 15 days);
     vm.prank(pool);
+
+    uint256 liquidationThresholdSlot = 6;
+    vm.store(address(auction), bytes32(liquidationThresholdSlot), bytes32(uint256(95)));
+
     auction.endAuction();
 
     // Check that auction failed due to liquidation

@@ -21,7 +21,7 @@ contract Auction {
   // Auction end time and total buy amount
   uint256 public endTime;
   uint256 public totalBuyAmount;
-  uint256 public immutable liquidationThreshold;
+  uint256 public liquidationThreshold;
 
   enum State {
     BIDDING,
@@ -300,7 +300,7 @@ contract Auction {
 
     if (totalBidsAmount < totalBuyAmount) {
       state = State.FAILED_UNDERSOLD;
-    } else if (totalSellAmount >= (IERC20(sellToken).balanceOf(pool) * liquidationThreshold) / 100000) {
+    } else if (totalSellAmount >= (IERC20(sellToken).balanceOf(pool) * liquidationThreshold) / 100) {
         state = State.FAILED_LIQUIDATION;
     } else {
       state = State.SUCCEEDED;
