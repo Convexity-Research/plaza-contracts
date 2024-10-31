@@ -57,6 +57,7 @@ contract Auction is Initializable, UUPSUpgradeable {
   event BidClaimed(address indexed bidder, uint256 sellCouponAmount);
   event BidPlaced(address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
   event BidRemoved(address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
+  event BidReduced(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
 
   error AccessDenied();
   error AuctionFailed();
@@ -275,6 +276,7 @@ contract Auction is Initializable, UUPSUpgradeable {
         IERC20(buyCouponToken).safeTransfer(currentBid.bidder, amountToRemove);
         
         amountToRemove = 0;
+        emit BidReduced(currentIndex, currentBid.bidder, currentBid.buyReserveAmount, currentBid.sellCouponAmount);
       }
     }
   }
