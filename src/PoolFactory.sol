@@ -34,6 +34,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     address couponToken;
     uint256 distributionPeriod;
     uint256 sharesPerToken;
+    address feeBeneficiary;
   }
 
   /// @dev Array to store addresses of created pools
@@ -172,6 +173,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         params.couponToken,
         params.sharesPerToken,
         params.distributionPeriod,
+        params.feeBeneficiary,
         oracleFeeds
       )
     );
@@ -196,15 +198,13 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     bondToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
 
-    // @todo: check why this is needed
-    bondToken.grantRole(GOV_ROLE, pool);
-    lToken.grantRole(GOV_ROLE, pool);
+    bondToken.grantRole(bondToken.DISTRIBUTOR_ROLE(), pool);
     
     // set token governance
     bondToken.grantRole(GOV_ROLE, governance);
     lToken.grantRole(GOV_ROLE, governance);
 
-    // remove governance from factory
+    // renounce governance from factory
     bondToken.revokeRole(GOV_ROLE, address(this));
     lToken.revokeRole(GOV_ROLE, address(this));
 

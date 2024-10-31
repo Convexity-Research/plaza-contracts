@@ -60,7 +60,7 @@ contract MockRouterTest is Test {
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
 
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
     // Deploy the mock price feed
     MockPriceFeed mockPriceFeed = new MockPriceFeed();

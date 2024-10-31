@@ -60,11 +60,12 @@ contract TestnetScript is Script {
       reserveToken: reserveToken,
       sharesPerToken: sharesPerToken,
       distributionPeriod: distributionPeriod,
+      feeBeneficiary: deployerAddress,
       couponToken: couponToken
     });
 
     // Set price feed
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed);
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
     Token(params.reserveToken).mint(deployerAddress, reserveAmount);
     Token(params.reserveToken).approve(address(factory), reserveAmount);

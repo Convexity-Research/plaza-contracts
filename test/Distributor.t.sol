@@ -70,6 +70,7 @@ contract DistributorTest is Test {
     // Create pool and approve deposit amount
     _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
 
+    _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), governance);
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
     _pool.bondToken().grantRole(_pool.bondToken().MINTER_ROLE(), minter);
     _pool.lToken().grantRole(_pool.lToken().MINTER_ROLE(), minter);
@@ -114,6 +115,7 @@ contract DistributorTest is Test {
 
     PoolFactory.PoolParams memory poolParams = PoolFactory.PoolParams({
       fee: 0,
+      feeBeneficiary: address(0x1),
       sharesPerToken: 50*10**6,
       reserveToken: address(new Token("Wrapped ETH", "WETH", false)),
       distributionPeriod: 0,

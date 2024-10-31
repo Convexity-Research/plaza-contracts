@@ -33,10 +33,13 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   uint256 private constant PRECISION = 1000000;
   uint256 private constant BOND_TARGET_PRICE = 100;
   uint8 private constant COMMON_DECIMALS = 18;
+  uint256 private constant SECONDS_PER_YEAR = 365 days;
 
   // Protocol
   PoolFactory public poolFactory;
   uint256 private fee;
+  address public feeBeneficiary;
+  uint256 private lastFeeClaimTime;
 
   // Tokens
   address public reserveToken;
@@ -74,12 +77,16 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 lastDistribution;
     uint256 distributionPeriod;
     uint256 auctionPeriod;
+    address feeBeneficiary;
   }
 
   // Custom errors
   error MinAmount();
   error ZeroAmount();
+  error FeeTooHigh();
   error AccessDenied();
+  error NoFeesToClaim();
+  error NotBeneficiary();
   error ZeroDebtSupply();
   error AuctionIsOngoing();
   error ZeroLeverageSupply();
@@ -98,6 +105,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
+  event FeeClaimed(address beneficiary, uint256 amount);
+  event FeeChanged(uint256 oldFee, uint256 newFee);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -125,6 +134,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     address _couponToken,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
+    address _feeBeneficiary,
     address _oracleFeeds
   ) initializer public {
     __OracleReader_init(_oracleFeeds);
@@ -132,6 +142,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     __Pausable_init();
 
     poolFactory = PoolFactory(_poolFactory);
+    // Fee cannot exceed 10%
+    require(_fee <= 100000, FeeTooHigh());
     fee = _fee;
     reserveToken = _reserveToken;
     bondToken = BondToken(_dToken);
@@ -140,6 +152,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     sharesPerToken = _sharesPerToken;
     distributionPeriod = _distributionPeriod;
     lastDistribution = block.timestamp;
+    feeBeneficiary = _feeBeneficiary;
+    lastFeeClaimTime = block.timestamp;
   }
 
   /**
@@ -227,6 +241,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
     uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    // Calculate and subtract fees from poolReserves
+    poolReserves = poolReserves - (poolReserves * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
+
     depositAmount = depositAmount.normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
 
     uint8 assetDecimals = 0;
@@ -380,6 +398,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
                           .normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
     uint256 poolReserves = IERC20(reserveToken).balanceOf(address(this))
                           .normalizeTokenAmount(reserveToken, COMMON_DECIMALS);
+
+    // Calculate and subtract fees from poolReserves
+    poolReserves = poolReserves - (poolReserves * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
 
     if (tokenType == TokenType.LEVERAGE) {
       depositAmount = depositAmount.normalizeTokenAmount(address(lToken), COMMON_DECIMALS);
@@ -543,7 +564,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       sharesPerToken: _sharesPerToken,
       currentPeriod: currentPeriod,
       lastDistribution: lastDistribution,
-      auctionPeriod: auctionPeriod
+      auctionPeriod: auctionPeriod,
+      feeBeneficiary: feeBeneficiary
     });
   }
   
@@ -583,8 +605,52 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @dev Sets the fee for the pool.
    * @param _fee The new fee value.
    */
-  function setFee(uint256 _fee) external whenNotPaused() onlyRole(poolFactory.GOV_ROLE()) {
+  function setFee(uint256 _fee) external onlyRole(poolFactory.GOV_ROLE()) {
+    // Fee cannot exceed 10%
+    require(_fee <= 100000, FeeTooHigh());
+
+    // Force a fee claim to prevent governance from setting a higher fee
+    // and collecting increased fees on old deposits
+    if (getFeeAmount() > 0) {
+      claimFees();
+    }
+
+    uint256 oldFee = fee;
     fee = _fee;
+    emit FeeChanged(oldFee, _fee);
+  }
+
+  /**
+   * @dev Sets the fee beneficiary for the pool.
+   * @param _feeBeneficiary The address of the new fee beneficiary.
+   */
+  function setFeeBeneficiary(address _feeBeneficiary) external onlyRole(poolFactory.GOV_ROLE()) {
+    feeBeneficiary = _feeBeneficiary;
+  }
+
+  /**
+   * @dev Allows the fee beneficiary to claim the accumulated protocol fees.
+   */
+  function claimFees() public nonReentrant {
+    require(msg.sender == feeBeneficiary, NotBeneficiary());
+    uint256 feeAmount = getFeeAmount();
+    
+    if (feeAmount == 0) {
+      revert NoFeesToClaim();
+    }
+    
+    lastFeeClaimTime = block.timestamp;
+    IERC20(reserveToken).safeTransfer(feeBeneficiary, feeAmount);
+    
+    emit FeeClaimed(feeBeneficiary, feeAmount);
+  }
+
+  /**
+   * @dev Returns the amount of fees to be claimed.
+   * @return The amount of fees to be claimed.
+   */
+  function getFeeAmount() internal view returns (uint256) {
+    return (IERC20(reserveToken).balanceOf(address(this)) * fee * (block.timestamp - lastFeeClaimTime)) / (PRECISION * SECONDS_PER_YEAR);
   }
 
   /**
