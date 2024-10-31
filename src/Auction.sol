@@ -25,7 +25,8 @@ contract Auction {
   enum State {
     BIDDING,
     SUCCEEDED,
-    FAILED
+    FAILED_UNDERSOLD,
+    FAILED_LIQUIDATION
   }
 
   State public state;
@@ -118,6 +119,7 @@ contract Auction {
     // Insert the new bid into the sorted linked list
     insertSortedBid(newBidIndex);
     totalBidsAmount += sellAmount;
+
     totalSellAmount += buyAmount;
 
     if (bidCount > maxBids) {
@@ -292,9 +294,11 @@ contract Auction {
    */
   function endAuction() external auctionExpired {
     if (state != State.BIDDING) revert AuctionAlreadyEnded();
-    
+
     if (totalBidsAmount < totalBuyAmount) {
-      state = State.FAILED;
+      state = State.FAILED_UNDERSOLD;
+    } else if (totalSellAmount >= (IERC20(sellToken).balanceOf(pool) * 95) / 100) {
+        state = State.FAILED_LIQUIDATION;
     } else {
       state = State.SUCCEEDED;
       Pool(pool).transferReserveToAuction(totalSellAmount);
