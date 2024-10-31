@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {Utils} from "./lib/Utils.sol";
+import {Auction} from "./Auction.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
 import {Distributor} from "./Distributor.sol";
@@ -33,12 +35,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   uint256 private constant BOND_TARGET_PRICE = 100;
   uint8 private constant COMMON_DECIMALS = 18;
   uint256 private constant SECONDS_PER_YEAR = 365 days;
+  uint256 private constant MIN_LIQUIDATION_THRESHOLD = 90; // 90%
 
   // Protocol
   PoolFactory public poolFactory;
   uint256 private fee;
   address public feeBeneficiary;
   uint256 private lastFeeClaimTime;
+  uint256 private liquidationThreshold;
 
   // Tokens
   address public reserveToken;
@@ -51,7 +55,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   // Distribution
   uint256 private sharesPerToken;
   uint256 private distributionPeriod; // in seconds
+  uint256 private auctionPeriod; // in seconds
   uint256 private lastDistribution; // timestamp in seconds
+  mapping(uint256 => address) public auctions;
 
   /**
    * @dev Enum representing the types of tokens that can be created or redeemed.
@@ -73,6 +79,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 currentPeriod;
     uint256 lastDistribution;
     uint256 distributionPeriod;
+    uint256 auctionPeriod;
     address feeBeneficiary;
   }
 
@@ -84,18 +91,27 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   error NoFeesToClaim();
   error NotBeneficiary();
   error ZeroDebtSupply();
+  error AuctionIsOngoing();
   error ZeroLeverageSupply();
+  error CallerIsNotAuction();
   error DistributionPeriod();
+  error AuctionPeriodPassed();
+  error AuctionNotSucceeded();
+  error AuctionAlreadyStarted();
+  error LiquidationThresholdTooLow();
+  error DistributionPeriodNotPassed();
 
   // Events
   event Distributed(uint256 amount);
   event MerchantApproved(address merchant);
   event SharesPerTokenChanged(uint256 sharesPerToken);
+  event AuctionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event FeeClaimed(address beneficiary, uint256 amount);
   event FeeChanged(uint256 oldFee, uint256 newFee);
+  event LiquidationThresholdChanged(uint256 oldThreshold, uint256 newThreshold);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -143,6 +159,20 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     lastDistribution = block.timestamp;
     feeBeneficiary = _feeBeneficiary;
     lastFeeClaimTime = block.timestamp;
+    liquidationThreshold = MIN_LIQUIDATION_THRESHOLD;
+  }
+
+  /**
+   * @dev Sets the liquidation threshold. Cannot be set below 90%.
+   * @param _liquidationThreshold The new liquidation threshold value.
+   */
+  function setLiquidationThreshold(uint256 _liquidationThreshold) external onlyRole(poolFactory.GOV_ROLE()) {
+    if (_liquidationThreshold < MIN_LIQUIDATION_THRESHOLD) {
+      revert LiquidationThresholdTooLow();
+    }
+    uint256 oldThreshold = liquidationThreshold;
+    liquidationThreshold = _liquidationThreshold;
+    emit LiquidationThresholdChanged(oldThreshold, _liquidationThreshold);
   }
 
   /**
@@ -463,12 +493,53 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     // Calculate and return the final redeem amount
     return ((depositAmount * redeemRate).fromBaseUnit(oracleDecimals) / ethPrice) / PRECISION;
   }
+
+  /**
+   * @dev Starts an auction for the current period.
+   */
+  function startAuction() external {
+    // Check if distribution period has passed
+    require(lastDistribution + distributionPeriod < block.timestamp, DistributionPeriodNotPassed());
+
+    // Check if auction period hasn't passed
+    require(lastDistribution + distributionPeriod + auctionPeriod >= block.timestamp, AuctionPeriodPassed());
+
+    // Check if auction for current period has already started
+    (uint256 currentPeriod, uint256 _sharesPerToken) = bondToken.globalPool();
+    require(auctions[currentPeriod] == address(0), AuctionAlreadyStarted());
+
+    auctions[currentPeriod] = Utils.deploy(
+      address(new Auction()),
+      abi.encodeWithSelector(
+        Auction.initialize.selector,
+        address(couponToken),
+        address(reserveToken),
+        (bondToken.totalSupply() * _sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS()),
+        block.timestamp + auctionPeriod,
+        1000,
+        address(this),
+        liquidationThreshold
+      )
+    );
+  }
+
+  /**
+   * @dev Transfers reserve tokens to the current auction.
+   * @param amount The amount of reserve tokens to transfer.
+   */
+  function transferReserveToAuction(uint256 amount) external virtual {
+    (uint256 currentPeriod, ) = bondToken.globalPool();
+    address auctionAddress = auctions[currentPeriod];
+    require(msg.sender == auctionAddress, CallerIsNotAuction());
+    
+    IERC20(reserveToken).safeTransfer(msg.sender, amount);
+  }
   
   /**
    * @dev Distributes coupon tokens to bond token holders.
    * Can only be called after the distribution period has passed.
    */
-  function distribute() external whenNotPaused() {
+  function distribute() external whenNotPaused auctionSucceeded {
     if (block.timestamp - lastDistribution < distributionPeriod) {
       revert DistributionPeriod();
     }
@@ -517,6 +588,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       sharesPerToken: _sharesPerToken,
       currentPeriod: currentPeriod,
       lastDistribution: lastDistribution,
+      auctionPeriod: auctionPeriod,
       feeBeneficiary: feeBeneficiary
     });
   }
@@ -525,18 +597,29 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @dev Sets the distribution period.
    * @param _distributionPeriod The new distribution period.
    */
-  function setDistributionPeriod(uint256 _distributionPeriod) external onlyRole(poolFactory.GOV_ROLE()) {
+  function setDistributionPeriod(uint256 _distributionPeriod) external NotInAuction onlyRole(poolFactory.GOV_ROLE()) {
     uint256 oldPeriod = distributionPeriod;
     distributionPeriod = _distributionPeriod;
 
     emit DistributionPeriodChanged(oldPeriod, _distributionPeriod);
+  }
+
+  /**
+   * @dev Sets the auction period.
+   * @param _auctionPeriod The new auction period.
+   */
+  function setAuctionPeriod(uint256 _auctionPeriod) external NotInAuction onlyRole(poolFactory.GOV_ROLE()) {
+    uint256 oldPeriod = auctionPeriod;
+    auctionPeriod = _auctionPeriod;
+
+    emit AuctionPeriodChanged(oldPeriod, _auctionPeriod);
   }
   
   /**
    * @dev Sets the shares per token.
    * @param _sharesPerToken The new shares per token value.
    */
-  function setSharesPerToken(uint256 _sharesPerToken) external onlyRole(poolFactory.GOV_ROLE()) {
+  function setSharesPerToken(uint256 _sharesPerToken) external NotInAuction onlyRole(poolFactory.GOV_ROLE()) {
     sharesPerToken = _sharesPerToken;
 
     emit SharesPerTokenChanged(sharesPerToken);
@@ -616,6 +699,21 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     if (!poolFactory.hasRole(role, msg.sender)) {
       revert AccessDenied();
     }
+    _;
+  }
+
+  /**
+   * @dev Modifier to prevent a function from being called during an ongoing auction.
+   */
+  modifier NotInAuction() {
+    (uint256 currentPeriod,) = bondToken.globalPool();
+    require(auctions[currentPeriod] == address(0), AuctionIsOngoing());
+    _;
+  }
+
+  modifier auctionSucceeded() {
+    (uint256 currentPeriod,) = bondToken.globalPool();
+    require(Auction(auctions[currentPeriod]).state() == Auction.State.SUCCEEDED, AuctionNotSucceeded());
     _;
   }
 }
