@@ -159,7 +159,24 @@ contract AuctionTest is Test {
     vm.prank(pool);
     auction.endAuction();
 
-    assertEq(uint256(auction.state()), uint256(Auction.State.FAILED));
+    assertEq(uint256(auction.state()), uint256(Auction.State.FAILED_UNDERSOLD));
+  }
+
+  function testEndAuctionFailedLiquidation() public {
+    // Place a bid that would require too much of the reserve
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000000000000 ether);
+    usdc.approve(address(auction), 1000000000000 ether);
+    auction.bid(480000000000 ether, 1000000000000); // 96% of pool's reserve
+    vm.stopPrank();
+
+    // End the auction
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    // Check that auction failed due to liquidation
+    assertEq(uint256(auction.state()), uint256(Auction.State.FAILED_LIQUIDATION));
   }
 
   function testEndAuctionStillOngoing() public {
