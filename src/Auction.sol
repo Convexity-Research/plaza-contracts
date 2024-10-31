@@ -171,7 +171,7 @@ contract Auction {
         uint256 currentBuyAmount = currentBid.buyAmount;
         uint256 currentNextBidIndex = currentBid.nextBidIndex;
 
-        // Compare without division by cross-multiplying (it's more gas efficient)
+        // Compare prices without division by cross-multiplying (it's more gas efficient)
         leftSide = newSellAmount * currentBuyAmount;
         rightSide = currentSellAmount * newBuyAmount;
 
@@ -209,7 +209,7 @@ contract Auction {
     uint256 lowestSellAmount = lowestBid.sellAmount;
     uint256 lowestBuyAmount = lowestBid.buyAmount;
 
-    // Compare without division by cross-multiplying (it's more gas efficient)
+    // Compare prices without division by cross-multiplying (it's more gas efficient)
     leftSide = newSellAmount * lowestBuyAmount;
     rightSide = lowestSellAmount * newBuyAmount;
 
