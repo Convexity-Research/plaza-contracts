@@ -232,14 +232,15 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
 
     address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
 
+    // Take reserveToken from user
+    IERC20(reserveToken).safeTransferFrom(msg.sender, address(this), depositAmount);
+
     // Mint tokens
     if (tokenType == TokenType.BOND) {
       bondToken.mint(recipient, amount);
     } else {
       lToken.mint(recipient, amount);
     }
-
-    IERC20(reserveToken).safeTransferFrom(msg.sender, address(this), depositAmount);
 
     emit TokensCreated(msg.sender, recipient, tokenType, depositAmount, amount);
     return amount;
