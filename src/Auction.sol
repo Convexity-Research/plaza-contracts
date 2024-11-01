@@ -54,9 +54,10 @@ contract Auction is Initializable, UUPSUpgradeable {
   uint256 public totalSellReserveAmount; // Aggregated sell amount (reserve) for the auction
 
   event AuctionEnded(State state, uint256 totalSellReserveAmount, uint256 totalBuyCouponAmount);
-  event BidClaimed(address indexed bidder, uint256 sellCouponAmount);
-  event BidPlaced(address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
-  event BidRemoved(address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
+  event BidClaimed(uint256 indexed bidIndex, address indexed bidder, uint256 sellCouponAmount);
+  event BidPlaced(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
+  event BidRemoved(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
+  event BidReduced(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
 
   error AccessDenied();
   error AuctionFailed();
@@ -158,7 +159,7 @@ contract Auction is Initializable, UUPSUpgradeable {
       revert BidAmountTooLow();
     }
 
-    emit BidPlaced(msg.sender, buyReserveAmount, sellCouponAmount);
+    emit BidPlaced(newBidIndex,msg.sender, buyReserveAmount, sellCouponAmount);
 
     return newBidIndex;
   }
@@ -275,6 +276,7 @@ contract Auction is Initializable, UUPSUpgradeable {
         IERC20(buyCouponToken).safeTransfer(currentBid.bidder, amountToRemove);
         
         amountToRemove = 0;
+        emit BidReduced(currentIndex, currentBid.bidder, currentBid.buyReserveAmount, currentBid.sellCouponAmount);
       }
     }
   }
@@ -312,7 +314,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     // Refund the buy tokens for the removed bid
     IERC20(buyCouponToken).transfer(bidder, buyReserveAmount);
 
-    emit BidRemoved(bidder, buyReserveAmount, sellCouponAmount);
+    emit BidRemoved(bidIndex, bidder, buyReserveAmount, sellCouponAmount);
 
     delete bids[bidIndex];
     bidCount--;
@@ -349,7 +351,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     bidInfo.claimed = true;
     IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.sellCouponAmount);
 
-    emit BidClaimed(bidInfo.bidder, bidInfo.sellCouponAmount);
+    emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.sellCouponAmount);
   }
 
   /**
