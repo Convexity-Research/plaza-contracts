@@ -758,9 +758,15 @@ contract PoolTest is Test, TestCases {
     vm.expectEmit(true, true, true, true);
     emit Pool.DistributionRollOver(0, params.sharesPerToken);
 
+    // Fast forward 5 days
+    vm.warp(block.timestamp + 5 days);
+
     _pool.distribute();
     vm.stopPrank();
 
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.currentPeriod, 1);
+    assertEq(info.lastDistribution, block.timestamp);
     assertEq(sharesToken.balanceOf(address(distributor)), 0);
   }
 
@@ -790,9 +796,15 @@ contract PoolTest is Test, TestCases {
     vm.expectEmit(true, true, true, true);
     emit Pool.DistributionRollOver(0, params.sharesPerToken);
 
+    // Fast forward 5 days
+    vm.warp(block.timestamp + 5 days);
+
     _pool.distribute();
     vm.stopPrank();
 
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.currentPeriod, 1);
+    assertEq(info.lastDistribution, block.timestamp);
     assertEq(sharesToken.balanceOf(address(distributor)), 0);
   }
 
