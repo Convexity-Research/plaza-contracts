@@ -41,7 +41,7 @@ contract MockBalancerVault {
     }
 
     function joinPool(
-        bytes32 poolId,
+        bytes32 /*poolId*/,
         address sender,
         address recipient,
         JoinPoolRequest memory request
@@ -60,7 +60,7 @@ contract MockBalancerVault {
     }
 
     function exitPool(
-        bytes32 poolId,
+        bytes32 /*poolId*/,
         address sender,
         address payable recipient,
         ExitPoolRequest memory request
