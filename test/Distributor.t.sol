@@ -261,7 +261,7 @@ contract DistributorTest is Test {
   }
 
   function testAllocateInvalidPoolAddress() public {
-    vm.expectRevert(Distributor.CallerIsNotPool.selector);
+    vm.expectRevert(Distributor.UnsupportedPool.selector);
     distributor.allocate(address(0), 100);
   }
 
