@@ -87,6 +87,7 @@ contract PoolTest is Test, TestCases {
 
     vm.startPrank(governance);
     distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
     vm.stopPrank();
   }
 
