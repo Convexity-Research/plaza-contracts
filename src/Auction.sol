@@ -312,7 +312,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     totalSellReserveAmount -= buyReserveAmount;
 
     // Refund the buy tokens for the removed bid
-    IERC20(buyCouponToken).transfer(bidder, buyReserveAmount);
+    IERC20(buyCouponToken).transfer(bidder, sellCouponAmount);
 
     emit BidRemoved(bidIndex, bidder, buyReserveAmount, sellCouponAmount);
 
