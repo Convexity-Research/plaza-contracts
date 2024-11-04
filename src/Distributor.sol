@@ -93,9 +93,7 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * Transfers the calculated shares to the user's address.
    * @param _pool Address of the pool from which to claim shares.
    */
-  function claim(address _pool) external whenNotPaused() nonReentrant() {
-    require(_pool != address(0), UnsupportedPool());
-    
+  function claim(address _pool) external whenNotPaused nonReentrant IsRegisteredPool(_pool) {
     Pool pool = Pool(_pool);
     BondToken bondToken = pool.bondToken();
     address couponToken = pool.couponToken();
@@ -139,7 +137,7 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * @param _pool Address of the pool to allocate shares to.
    * @param _amountToDistribute Amount of shares to allocate.
    */
-  function allocate(address _pool, uint256 _amountToDistribute) external whenNotPaused() {
+  function allocate(address _pool, uint256 _amountToDistribute) external whenNotPaused IsRegisteredPool(_pool) {
     require(_pool == msg.sender, CallerIsNotPool());
 
     Pool pool = Pool(_pool);
@@ -206,4 +204,9 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     onlyRole(GOV_ROLE)
     override
   {}
+
+  modifier IsRegisteredPool(address _pool) {
+    if (poolInfos[_pool].couponToken == address(0)) revert UnsupportedPool();
+    _;
+  }
 }
