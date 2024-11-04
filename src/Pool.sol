@@ -106,6 +106,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event MerchantApproved(address merchant);
   event SharesPerTokenChanged(uint256 sharesPerToken);
   event AuctionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+  event DistributionRollOver(uint256 period, uint256 sharesPerToken);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
@@ -232,14 +233,15 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
 
     address recipient = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
 
+    // Take reserveToken from user
+    IERC20(reserveToken).safeTransferFrom(msg.sender, address(this), depositAmount);
+
     // Mint tokens
     if (tokenType == TokenType.BOND) {
       bondToken.mint(recipient, amount);
     } else {
       lToken.mint(recipient, amount);
     }
-
-    IERC20(reserveToken).safeTransferFrom(msg.sender, address(this), depositAmount);
 
     emit TokensCreated(msg.sender, recipient, tokenType, depositAmount, amount);
     return amount;
@@ -539,9 +541,23 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @dev Distributes coupon tokens to bond token holders.
    * Can only be called after the distribution period has passed.
    */
-  function distribute() external whenNotPaused auctionSucceeded {
+  function distribute() external whenNotPaused {
     if (block.timestamp - lastDistribution < distributionPeriod) {
       revert DistributionPeriod();
+    }
+
+    (uint256 currentPeriod, uint256 periodShares) = bondToken.globalPool();
+    if (Auction(auctions[currentPeriod]).state() == Auction.State.FAILED_LIQUIDATION || 
+        Auction(auctions[currentPeriod]).state() == Auction.State.FAILED_UNDERSOLD) {
+      
+      // Increase the bond token period
+      bondToken.increaseIndexedAssetPeriod(sharesPerToken);
+
+      // Update last distribution time
+      lastDistribution = block.timestamp;
+
+      emit DistributionRollOver(currentPeriod, periodShares);
+      return;
     }
 
     Distributor distributor = Distributor(poolFactory.distributor());
@@ -708,12 +724,6 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   modifier NotInAuction() {
     (uint256 currentPeriod,) = bondToken.globalPool();
     require(auctions[currentPeriod] == address(0), AuctionIsOngoing());
-    _;
-  }
-
-  modifier auctionSucceeded() {
-    (uint256 currentPeriod,) = bondToken.globalPool();
-    require(Auction(auctions[currentPeriod]).state() == Auction.State.SUCCEEDED, AuctionNotSucceeded());
     _;
   }
 }
