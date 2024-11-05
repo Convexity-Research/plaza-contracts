@@ -219,7 +219,7 @@ contract AuctionTest is Test {
     vm.prank(bidder);
     auction.claimBid(1);
 
-    assertEq(weth.balanceOf(bidder), initialBalance + 1000000000000);
+    assertEq(weth.balanceOf(bidder), initialBalance + 100000000000000000000000000000);
   }
 
   function testPartialRefund() public {
