@@ -11,7 +11,6 @@ import {PreDeposit} from "../src/PreDeposit.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
-import {MockPoolFactory} from "./mocks/MockPoolFactory.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
