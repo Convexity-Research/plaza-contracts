@@ -29,9 +29,11 @@ contract PreDepositTest is Test {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
   Distributor private distributor;
+
   address private deployer = address(0x5);
   address private minter = address(0x6);
   address private governance = address(0x7);
+  
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
   uint256 constant INITIAL_BALANCE = 1000 ether;
@@ -233,7 +235,7 @@ contract PreDepositTest is Test {
     
     vm.warp(block.timestamp + 8 days); // After deposit period
     
-    vm.expectRevert(PreDeposit.WithdrawEnded.selector);
+    vm.expectRevert(PreDeposit.DepositEnded.selector);
     preDeposit.withdraw(DEPOSIT_AMOUNT);
     vm.stopPrank();
   }
@@ -524,6 +526,7 @@ contract PreDepositTest is Test {
     // Create pool
     vm.startPrank(governance);
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
+
     vm.warp(block.timestamp + 8 days); // After deposit period
 
     // @todo: update once createPool permissions are fixed
@@ -545,5 +548,42 @@ contract PreDepositTest is Test {
     uint256 user2_bond_share = BondToken(bondToken).balanceOf(user2);
     assertEq(user1_bond_share, user2_bond_share);
     assertEq(user1_bond_share, 25 ether);
+  }
+
+  function testTimingAttack() public {
+    // Setup initial deposit
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+    vm.startPrank(user2);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    // Create pool
+    vm.startPrank(governance);
+    preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
+
+    // @todo: update role once POOL_ROLE is added
+    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+
+    vm.warp(block.timestamp + 7 days); // depositEndTime
+
+    // Start timing attack
+    vm.startPrank(user1);
+
+    // user1 trigger createPool, it's allowed because it's not onlyOwner
+    preDeposit.createPool();
+    
+    // user1 trigger claim
+    preDeposit.claim();
+    
+    reserveToken.approve(address(preDeposit), 10);
+
+    // deposit not possible at the same block as createPool
+    vm.expectRevert(PreDeposit.DepositEnded.selector);
+    preDeposit.deposit(10);
+    vm.stopPrank();
   }
 }
