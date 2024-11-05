@@ -29,9 +29,9 @@ contract PreDepositTest is Test {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
   Distributor private distributor;
-  address private deployer = address(0x1);
-  address private minter = address(0x2);
-  address private governance = address(0x3);
+  address private deployer = address(0x5);
+  address private minter = address(0x6);
+  address private governance = address(0x7);
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
   uint256 constant INITIAL_BALANCE = 1000 ether;
@@ -544,5 +544,6 @@ contract PreDepositTest is Test {
     uint256 user1_bond_share = BondToken(bondToken).balanceOf(user1);
     uint256 user2_bond_share = BondToken(bondToken).balanceOf(user2);
     assertEq(user1_bond_share, user2_bond_share);
+    assertEq(user1_bond_share, 25 ether);
   }
 }

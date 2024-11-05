@@ -62,6 +62,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   error DepositEndMustOnlyBeExtended();
   error DepositStartMustOnlyBeExtended();
   error PoolAlreadyCreated();
+  
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
