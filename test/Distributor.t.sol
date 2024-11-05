@@ -151,6 +151,42 @@ contract DistributorTest is Test {
     vm.stopPrank();
   }
 
+    function testAllBondHoldersCanClaim() public {
+      address user1 = address(0x61);
+      address user2 = address(0x62);
+      Token sharesToken = Token(_pool.couponToken());
+
+      vm.startPrank(minter);
+      _pool.bondToken().mint(user1, 1*10**18);
+      _pool.bondToken().mint(user2, 1*10**18);
+
+      sharesToken.mint(address(_pool), 500100000000000000000000);
+      vm.stopPrank();
+
+      vm.startPrank(governance);
+      fakeSucceededAuction(address(_pool), 0);
+
+      vm.mockCall(
+          address(0),
+          abi.encodeWithSignature("state()"),
+          abi.encode(uint256(1))
+      );
+
+      vm.warp(block.timestamp + params.distributionPeriod);
+      _pool.distribute();
+      vm.stopPrank();
+
+      vm.startPrank(user1);
+      distributor.claim(address(_pool));
+      assertEq(sharesToken.balanceOf(user1), 50 * 10**18);
+      vm.stopPrank();
+
+      vm.startPrank(user2);
+      distributor.claim(address(_pool));
+      assertEq(sharesToken.balanceOf(user2), 50 * 10**18);
+      vm.stopPrank();
+    }
+
   function testClaimSharesDifferentDecimals() public {
     vm.startPrank(governance);
 
