@@ -349,9 +349,9 @@ contract Auction is Initializable, UUPSUpgradeable {
     if (bidInfo.claimed) revert AlreadyClaimed();
 
     bidInfo.claimed = true;
-    IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.sellCouponAmount);
+    IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.buyReserveAmount);
 
-    emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.sellCouponAmount);
+    emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.buyReserveAmount);
   }
 
   /**

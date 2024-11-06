@@ -17,7 +17,6 @@ import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-
 contract AuctionTest is Test {
   Auction auction;
   Token usdc;
@@ -77,6 +76,7 @@ contract AuctionTest is Test {
     params.couponToken = coupon;
 
     Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(poolFactory));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
     
     Token(reserve).mint(governance, 500000000000000000000000000000);
     Token(reserve).approve(address(poolFactory), 500000000000000000000000000000);
@@ -219,7 +219,7 @@ contract AuctionTest is Test {
     vm.prank(bidder);
     auction.claimBid(1);
 
-    assertEq(weth.balanceOf(bidder), initialBalance + 1000000000000);
+    assertEq(weth.balanceOf(bidder), initialBalance + 100000000000000000000000000000);
   }
 
   function testPartialRefund() public {

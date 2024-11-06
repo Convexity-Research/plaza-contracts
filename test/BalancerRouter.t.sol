@@ -145,6 +145,7 @@ contract BalancerRouterTest is Test {
 
         vm.startPrank(governance);
         distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
+        poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
 
         balancerPoolToken.mint(governance, 100 ether);
         balancerPoolToken.approve(address(poolFactory), 100 ether);
