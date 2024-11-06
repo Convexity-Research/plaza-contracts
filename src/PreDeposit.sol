@@ -225,7 +225,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
    * @param newDepositStartTime New deposit start timestamp
    */
   function setDepositStartTime(uint256 newDepositStartTime) external onlyOwner {
-    if (block.timestamp > newDepositStartTime) revert DepositAlreadyStarted();
+    if (block.timestamp >= depositStartTime) revert DepositAlreadyStarted();
     if (newDepositStartTime <= depositStartTime) revert DepositStartMustOnlyBeExtended();
     if (newDepositStartTime >= depositEndTime) revert DepositEndMustBeAfterStart();
 

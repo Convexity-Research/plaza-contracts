@@ -42,6 +42,9 @@ contract PreDepositTest is Test {
   uint256 constant LEVERAGE_AMOUNT = 50 ether;
 
   function setUp() public { 
+    // Set block time to 10 days in the future to avoid block.timestamp to start from 0
+    vm.warp(block.timestamp + 10 days);
+
     vm.startPrank(governance);
     
     reserveToken = new Token("Wrapped ETH", "WETH", false);
@@ -476,7 +479,10 @@ contract PreDepositTest is Test {
 
   // Time-related Tests
   function testSetDepositStartTime() public {
-    uint256 newStartTime = block.timestamp + 1 days;
+    // Move time to before deposit start time
+    vm.warp(block.timestamp - 1 days);
+
+    uint256 newStartTime = preDeposit.depositStartTime() + 10 hours;
     vm.prank(governance);
     preDeposit.setDepositStartTime(newStartTime);
     assertEq(preDeposit.depositStartTime(), newStartTime);
@@ -579,5 +585,18 @@ contract PreDepositTest is Test {
     vm.expectRevert(PreDeposit.DepositEnded.selector);
     preDeposit.deposit(10);
     vm.stopPrank();
+  }
+
+  function testExtendStartTimeAfterStartReverts() public {
+    // user can deposit
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    // Extend start time
+    vm.prank(governance);
+    vm.expectRevert(PreDeposit.DepositAlreadyStarted.selector);
+    preDeposit.setDepositStartTime(block.timestamp + 1 days);
   }
 }
