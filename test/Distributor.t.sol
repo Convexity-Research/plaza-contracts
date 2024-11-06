@@ -61,6 +61,7 @@ contract DistributorTest is Test {
     
     vm.stopPrank(); 
     vm.startPrank(governance);
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
     Token rToken = Token(params.reserveToken);
 
     // Mint reserve tokens
@@ -116,6 +117,76 @@ contract DistributorTest is Test {
     assertEq(sharesToken.balanceOf(user), 50*10**18);
     vm.stopPrank();
   }
+
+  function testClaimSharesCheckPoolInfo() public {
+    Token sharesToken = Token(_pool.couponToken());
+
+    vm.startPrank(minter);
+    _pool.bondToken().mint(user, 1*10**18);
+    sharesToken.mint(address(_pool), 50*(1+10000)*10**18);
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    fakeSucceededAuction(address(_pool), 0);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(1))
+    );
+
+    _pool.distribute();
+    vm.stopPrank();
+
+    vm.startPrank(user);
+
+    vm.expectEmit(true, true, true, true);
+    emit Distributor.ClaimedShares(user, 1, 50*10**18);
+
+    (,uint256 amountToDistributePreClaim) = distributor.poolInfos(address(_pool));
+    distributor.claim(address(_pool));
+    (,uint256 amountToDistribute) = distributor.poolInfos(address(_pool));
+
+    assertEq(amountToDistribute + 50*10**18, amountToDistributePreClaim);
+    assertEq(sharesToken.balanceOf(user), 50*10**18);
+    vm.stopPrank();
+  }
+
+    function testAllBondHoldersCanClaim() public {
+      address user1 = address(0x61);
+      address user2 = address(0x62);
+      Token sharesToken = Token(_pool.couponToken());
+
+      vm.startPrank(minter);
+      _pool.bondToken().mint(user1, 1*10**18);
+      _pool.bondToken().mint(user2, 1*10**18);
+
+      sharesToken.mint(address(_pool), 500100000000000000000000);
+      vm.stopPrank();
+
+      vm.startPrank(governance);
+      fakeSucceededAuction(address(_pool), 0);
+
+      vm.mockCall(
+          address(0),
+          abi.encodeWithSignature("state()"),
+          abi.encode(uint256(1))
+      );
+
+      vm.warp(block.timestamp + params.distributionPeriod);
+      _pool.distribute();
+      vm.stopPrank();
+
+      vm.startPrank(user1);
+      distributor.claim(address(_pool));
+      assertEq(sharesToken.balanceOf(user1), 50 * 10**18);
+      vm.stopPrank();
+
+      vm.startPrank(user2);
+      distributor.claim(address(_pool));
+      assertEq(sharesToken.balanceOf(user2), 50 * 10**18);
+      vm.stopPrank();
+    }
 
   function testClaimSharesDifferentDecimals() public {
     vm.startPrank(governance);

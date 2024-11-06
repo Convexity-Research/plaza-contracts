@@ -123,7 +123,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     if (buyReserveAmount == 0) revert BidAmountTooLow();
 
     // Transfer buy tokens to contract
-    IERC20(buyCouponToken).transferFrom(msg.sender, address(this), sellCouponAmount);
+    IERC20(buyCouponToken).safeTransferFrom(msg.sender, address(this), sellCouponAmount);
 
     Bid memory newBid = Bid({
       bidder: msg.sender,
@@ -312,7 +312,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     totalSellReserveAmount -= buyReserveAmount;
 
     // Refund the buy tokens for the removed bid
-    IERC20(buyCouponToken).transfer(bidder, buyReserveAmount);
+    IERC20(buyCouponToken).safeTransfer(bidder, sellCouponAmount);
 
     emit BidRemoved(bidIndex, bidder, buyReserveAmount, sellCouponAmount);
 
@@ -349,9 +349,9 @@ contract Auction is Initializable, UUPSUpgradeable {
     if (bidInfo.claimed) revert AlreadyClaimed();
 
     bidInfo.claimed = true;
-    IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.sellCouponAmount);
+    IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.buyReserveAmount);
 
-    emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.sellCouponAmount);
+    emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.buyReserveAmount);
   }
 
   /**
