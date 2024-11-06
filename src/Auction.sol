@@ -54,6 +54,7 @@ contract Auction is Initializable, UUPSUpgradeable {
   uint256 public totalSellReserveAmount; // Aggregated sell amount (reserve) for the auction
 
   event AuctionEnded(State state, uint256 totalSellReserveAmount, uint256 totalBuyCouponAmount);
+  event BidRefundClaimed(uint256 bidIndex, address indexed bidder, uint256 sellCouponAmount);
   event BidClaimed(uint256 indexed bidIndex, address indexed bidder, uint256 sellCouponAmount);
   event BidPlaced(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
   event BidRemoved(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
@@ -354,6 +355,17 @@ contract Auction is Initializable, UUPSUpgradeable {
     emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.buyReserveAmount);
   }
 
+  function claimRefund(uint256 bidIndex) auctionExpired auctionFailed external {
+    Bid storage bidInfo = bids[bidIndex];
+    if (bidInfo.bidder != msg.sender) revert NothingToClaim();
+    if (bidInfo.claimed) revert AlreadyClaimed();
+
+    bidInfo.claimed = true;
+    IERC20(buyCouponToken).safeTransfer(bidInfo.bidder, bidInfo.sellCouponAmount);
+
+    emit BidRefundClaimed(bidIndex, bidInfo.bidder, bidInfo.sellCouponAmount);
+  }
+
   /**
    * @dev Returns the size of a bid slot.
    * @return uint256 The size of a bid slot.
@@ -383,6 +395,11 @@ contract Auction is Initializable, UUPSUpgradeable {
    */
   modifier auctionSucceeded() {
     if (state != State.SUCCEEDED) revert AuctionFailed();
+    _;
+  }
+
+  modifier auctionFailed() {
+    if (state == State.SUCCEEDED || state == State.BIDDING) revert AuctionFailed();
     _;
   }
 

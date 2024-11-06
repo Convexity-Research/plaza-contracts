@@ -302,6 +302,118 @@ contract AuctionTest is Test {
     vm.stopPrank();
   }
 
+  function testClaimRefundSuccess() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    uint256 initialBalance = usdc.balanceOf(bidder);
+
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
+
+    assertEq(usdc.balanceOf(bidder), initialBalance + 1000000000);
+  }
+
+  function testClaimRefundSuccessManyBidders() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    address bidder2 = address(0x55);
+    vm.startPrank(bidder2);
+    usdc.mint(bidder2, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex2 = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    uint256 initialBalance = usdc.balanceOf(bidder);
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
+    assertEq(usdc.balanceOf(bidder), initialBalance + 1000000000);
+
+    uint256 initialBalanceBidder2 = usdc.balanceOf(bidder2);
+    vm.prank(bidder2);
+    auction.claimRefund(bidIndex2);
+    assertEq(usdc.balanceOf(bidder2), initialBalanceBidder2 + 1000000000);
+  }
+
+  function testClaimRefundAuctionNotFailed() public {
+    vm.startPrank(bidder);
+    weth.mint(address(auction), 1000000000000 ether);
+    usdc.mint(bidder, 1000000000000 ether);
+    usdc.approve(address(auction), 1000000000000 ether);
+    uint256 bidIndex = auction.bid(100000000000 ether, 1000000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    vm.expectRevert(Auction.AuctionFailed.selector);
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
+  }
+
+  function testClaimRefundNothingToClaim() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    vm.expectRevert(Auction.NothingToClaim.selector);
+    vm.prank(address(0xdead));
+    auction.claimRefund(bidIndex);
+  }
+
+  function testClaimRefundAlreadyClaimed() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    vm.startPrank(bidder);
+    auction.claimRefund(bidIndex);
+
+    vm.expectRevert(Auction.AlreadyClaimed.selector);
+    auction.claimRefund(bidIndex);
+    vm.stopPrank();
+  }
+
+  function testClaimRefundAuctionNotEnded() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.expectRevert(Auction.AuctionStillOngoing.selector);
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
+  }
+
   function testWithdrawSuccess() public {
     vm.startPrank(bidder);
     usdc.mint(bidder, 1000000000000 ether);
