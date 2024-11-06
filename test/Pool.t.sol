@@ -733,6 +733,82 @@ contract PoolTest is Test, TestCases {
     assertEq(sharesToken.balanceOf(address(distributor)), expectedDistribution);
   }
 
+  function testDistributeFailedLiquidation() public {
+    Token rToken = Token(params.reserveToken);
+
+    vm.startPrank(governance);
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Token sharesToken = Token(_pool.couponToken());
+    uint256 initialBalance = 1000 * 10**18;
+    vm.stopPrank();
+
+    vm.startPrank(address(_pool));
+    _pool.bondToken().mint(user, initialBalance);
+
+    fakeSucceededAuction(address(_pool), 0);
+
+    // Force auction to fail for liquidation
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(3))
+    );
+
+    vm.expectEmit(true, true, true, true);
+    emit Pool.DistributionRollOver(0, params.sharesPerToken);
+
+    // Fast forward 5 days
+    vm.warp(block.timestamp + 5 days);
+
+    _pool.distribute();
+    vm.stopPrank();
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.currentPeriod, 1);
+    assertEq(info.lastDistribution, block.timestamp);
+    assertEq(sharesToken.balanceOf(address(distributor)), 0);
+  }
+
+  function testDistributeFailedUndersold() public {
+    Token rToken = Token(params.reserveToken);
+
+    vm.startPrank(governance);
+    rToken.mint(governance, 10000001000);
+    rToken.approve(address(poolFactory), 10000000000);
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Token sharesToken = Token(_pool.couponToken());
+    uint256 initialBalance = 1000 * 10**18;
+    vm.stopPrank();
+
+    vm.startPrank(address(_pool));
+    _pool.bondToken().mint(user, initialBalance);
+
+    fakeSucceededAuction(address(_pool), 0);
+
+    // Force auction to fail for liquidation
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("state()"),
+      abi.encode(uint256(2))
+    );
+
+    vm.expectEmit(true, true, true, true);
+    emit Pool.DistributionRollOver(0, params.sharesPerToken);
+
+    // Fast forward 5 days
+    vm.warp(block.timestamp + 5 days);
+
+    _pool.distribute();
+    vm.stopPrank();
+
+    Pool.PoolInfo memory info = _pool.getPoolInfo();
+    assertEq(info.currentPeriod, 1);
+    assertEq(info.lastDistribution, block.timestamp);
+    assertEq(sharesToken.balanceOf(address(distributor)), 0);
+  }
+
   function testDistributeMultiplePeriods() public {
     Token rToken = Token(params.reserveToken);
 

@@ -11,6 +11,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 contract OracleReader {
 
   address public oracleFeeds;
+  uint256[49] private __gap;
 
   // @note: address(0) is a special address that represents USD (IRL asset)
   address public constant USD = address(0);
