@@ -250,8 +250,7 @@ contract PreDepositTest is Test {
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
     vm.warp(block.timestamp + 8 days); // After deposit period
 
-    // @todo: update once createPool permissions are fixed
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     preDeposit.createPool();
     assertNotEq(preDeposit.pool(), address(0));
@@ -310,8 +309,7 @@ contract PreDepositTest is Test {
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
     vm.warp(block.timestamp + 8 days); // After deposit period
 
-    // @todo: update once createPool permissions are fixed
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     preDeposit.createPool();
 
@@ -391,8 +389,7 @@ contract PreDepositTest is Test {
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
     vm.warp(block.timestamp + 8 days);
 
-    // @todo: update once createPool permissions are fixed
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     preDeposit.createPool();
     vm.stopPrank();
@@ -528,8 +525,7 @@ contract PreDepositTest is Test {
 
     vm.warp(block.timestamp + 8 days); // After deposit period
 
-    // @todo: update once createPool permissions are fixed
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     preDeposit.createPool();
     vm.stopPrank();
@@ -564,8 +560,7 @@ contract PreDepositTest is Test {
     vm.startPrank(governance);
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
 
-    // @todo: update role once POOL_ROLE is added
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     vm.warp(block.timestamp + 7 days); // depositEndTime
 

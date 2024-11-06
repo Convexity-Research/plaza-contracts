@@ -61,6 +61,7 @@ contract DistributorTest is Test {
     
     vm.stopPrank(); 
     vm.startPrank(governance);
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
     Token rToken = Token(params.reserveToken);
 
     // Mint reserve tokens
