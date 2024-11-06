@@ -407,4 +407,40 @@ contract AuctionTest is Test {
     assertEq(highestBuyAmount, highBidAmount, "highest buy amount");
     assertEq(highestSellAmount, highSellAmount, "highest sell amount");
   }
+
+  function testRefundBidSuccessful() public {
+    uint256 initialBidAmount = 1000;
+    uint256 initialSellAmount = 1000000000;
+
+    // Create 1000 bids
+    for (uint256 i = 0; i < 1000; i++) {
+      address newBidder = address(uint160(i + 1));
+      vm.startPrank(newBidder);
+      usdc.mint(newBidder, initialSellAmount);
+      usdc.approve(address(auction), initialSellAmount);
+      auction.bid(initialBidAmount, initialSellAmount);
+      vm.stopPrank();
+    }
+
+    // Check initial state
+    assertEq(auction.bidCount(), 1000, "bid count 1");
+    assertEq(auction.highestBidIndex(), 1, "highest bid index 1");
+    assertEq(auction.lowestBidIndex(), 1000, "lowest bid index 1");
+
+    (address lowestBidder,,uint256 lowestSellCouponAmount,,,) = auction.bids(auction.lowestBidIndex());
+    uint256 lowestBidderCouponBalance = usdc.balanceOf(lowestBidder);
+
+    // Place a new high bid
+    address highBidder = address(1001);
+    uint256 highSellAmount = 1000000000 * 10; // this should take 10 slots
+
+    vm.startPrank(highBidder);
+    usdc.mint(highBidder, highSellAmount);
+    usdc.approve(address(auction), highSellAmount);
+    auction.bid(500, highSellAmount);
+    vm.stopPrank();
+
+    // Check that the lowest bidder received the refund
+    assertEq(usdc.balanceOf(lowestBidder), lowestBidderCouponBalance + lowestSellCouponAmount);
+  }
 }
