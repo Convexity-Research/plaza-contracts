@@ -26,6 +26,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   using ERC20Extensions for IERC20;
 
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant POOL_ROLE = keccak256("POOL_ROLE");
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
   struct PoolParams {
@@ -127,7 +128,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     string memory bondSymbol,
     string memory leverageName,
     string memory leverageSymbol
-  ) external whenNotPaused() onlyRole(GOV_ROLE) returns (address) {
+  ) external whenNotPaused() onlyRole(POOL_ROLE) returns (address) {
 
     if (reserveAmount == 0) {
       revert ZeroReserveAmount();

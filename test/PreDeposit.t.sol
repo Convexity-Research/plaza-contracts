@@ -11,7 +11,6 @@ import {PreDeposit} from "../src/PreDeposit.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
-import {MockPoolFactory} from "./mocks/MockPoolFactory.sol";
 import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -29,9 +28,11 @@ contract PreDepositTest is Test {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
   Distributor private distributor;
-  address private deployer = address(0x1);
-  address private minter = address(0x2);
-  address private governance = address(0x3);
+
+  address private deployer = address(0x5);
+  address private minter = address(0x6);
+  address private governance = address(0x7);
+  
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
   uint256 constant INITIAL_BALANCE = 1000 ether;
@@ -252,8 +253,7 @@ contract PreDepositTest is Test {
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
     vm.warp(block.timestamp + 8 days); // After deposit period
 
-    // @todo: update once createPool permissions are fixed
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     preDeposit.createPool();
     assertNotEq(preDeposit.pool(), address(0));
@@ -312,8 +312,7 @@ contract PreDepositTest is Test {
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
     vm.warp(block.timestamp + 8 days); // After deposit period
 
-    // @todo: update once createPool permissions are fixed
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     preDeposit.createPool();
 
@@ -393,8 +392,7 @@ contract PreDepositTest is Test {
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
     vm.warp(block.timestamp + 8 days);
 
-    // @todo: update once createPool permissions are fixed
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     preDeposit.createPool();
     vm.stopPrank();
@@ -516,6 +514,43 @@ contract PreDepositTest is Test {
     assertEq(preDeposit.balances(user1), DEPOSIT_AMOUNT);
   }
 
+  function testClaimTwoUsersSameBondShare() public {
+    // Setup initial deposit
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+    vm.startPrank(user2);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    // Create pool
+    vm.startPrank(governance);
+    preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
+
+    vm.warp(block.timestamp + 8 days); // After deposit period
+
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
+
+    preDeposit.createPool();
+    vm.stopPrank();
+
+    // Claim tokens
+    address bondToken = address(Pool(preDeposit.pool()).bondToken());
+    
+    vm.prank(user1);
+    preDeposit.claim();
+    
+    vm.prank(user2);
+    preDeposit.claim();
+    
+    uint256 user1_bond_share = BondToken(bondToken).balanceOf(user1);
+    uint256 user2_bond_share = BondToken(bondToken).balanceOf(user2);
+    assertEq(user1_bond_share, user2_bond_share);
+    assertEq(user1_bond_share, 25 ether);
+  }
+
   function testTimingAttack() public {
     // Setup initial deposit
     vm.startPrank(user1);
@@ -531,8 +566,7 @@ contract PreDepositTest is Test {
     vm.startPrank(governance);
     preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
 
-    // @todo: update role once POOL_ROLE is added
-    poolFactory.grantRole(poolFactory.GOV_ROLE(), address(preDeposit));
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
 
     vm.warp(block.timestamp + 7 days); // depositEndTime
 

@@ -113,7 +113,7 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
       revert NotEnoughSharesBalance();
     }
 
-    PoolInfo memory poolInfo = poolInfos[_pool];
+    PoolInfo storage poolInfo = poolInfos[_pool];
 
     // check if pool has enough *allocated* shares to distribute
     if (poolInfo.amountToDistribute < shares) {

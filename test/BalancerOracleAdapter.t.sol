@@ -35,13 +35,17 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
     // Deploy and initialize BondToken
     adapter = BalancerOracleAdapter(Utils.deploy(
       address(new BalancerOracleAdapter()),
-      abi.encodeCall(BalancerOracleAdapter.initialize, (poolAddr, 18, oracleFeed))
+      abi.encodeCall(BalancerOracleAdapter.initialize, (poolAddr, 18, oracleFeed, deployer))
     ));
 
     OracleFeeds(oracleFeed).setPriceFeed(adapter.ETH(), adapter.USD(), priceFeed, 1 days);
     OracleFeeds(oracleFeed).setPriceFeed(address(0x5), adapter.ETH(), priceFeed, 1 days);
     OracleFeeds(oracleFeed).setPriceFeed(address(0x6), adapter.ETH(), priceFeed, 1 days);
     vm.stopPrank();
+  }
+
+  function testOwner() public {
+    assertEq(adapter.owner(), deployer);
   }
 
   function testLatestRoundData() public {

@@ -61,6 +61,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
   error DepositEndMustOnlyBeExtended();
   error DepositStartMustOnlyBeExtended();
   error PoolAlreadyCreated();
+  
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -166,8 +167,8 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     BondToken bondToken = BondToken(Pool(pool).bondToken());
     LeverageToken leverageToken = LeverageToken(Pool(pool).lToken());
 
-    uint256 userBondShare = (bondToken.balanceOf(address(this)) * userBalance) / reserveAmount;
-    uint256 userLeverageShare = (leverageToken.balanceOf(address(this)) * userBalance) / reserveAmount;
+    uint256 userBondShare = (bondAmount * userBalance) / reserveAmount;
+    uint256 userLeverageShare = (leverageAmount * userBalance) / reserveAmount;
 
     balances[msg.sender] = 0;
 
