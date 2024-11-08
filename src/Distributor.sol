@@ -88,7 +88,7 @@ contract Distributor is Initializable, AccessControlUpgradeable, PausableUpgrade
     if (IERC20(couponToken).balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
     }
-
+    
     // check if pool has enough *allocated* shares to distribute
     if (couponAmountToDistribute < shares) {
       revert NotEnoughSharesToDistribute();

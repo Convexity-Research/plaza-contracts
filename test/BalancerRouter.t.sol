@@ -118,7 +118,7 @@ contract BalancerRouterTest is Test {
     address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
-    PoolFactory.initialize, 
+      PoolFactory.initialize, 
       (governance, contractDeployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
@@ -140,14 +140,15 @@ contract BalancerRouterTest is Test {
     // Set oracle price
     mockPriceFeed = MockPriceFeed(ethPriceFeed);
     mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
-    
+
+    balancerPoolToken.mint(governance, 100 ether);
     vm.stopPrank();
 
     vm.startPrank(governance);
-    balancerPoolToken.mint(governance, 100 ether);
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
+
     balancerPoolToken.approve(address(poolFactory), 100 ether);
     _pool = Pool(poolFactory.createPool(params, 100 ether, 10000*10**18, 10000*10**18, "", "", "", ""));
-
     vm.stopPrank();
 
     vm.startPrank(deployer);
@@ -155,8 +156,8 @@ contract BalancerRouterTest is Test {
     // Deploy mock contracts
     vault = new MockBalancerVault(balancerPoolToken);
     predeposit = PreDeposit(Utils.deploy(address(new PreDeposit()), abi.encodeCall(
-    PreDeposit.initialize, 
-    (params, address(poolFactory), block.timestamp, block.timestamp + 1 hours, 100000 ether, "Bond ETH", "bondETH", "Leveraged ETH", "levETH")
+      PreDeposit.initialize, 
+      (params, address(poolFactory), block.timestamp, block.timestamp + 1 hours, 100000 ether, "Bond ETH", "bondETH", "Leveraged ETH", "levETH")
     )));
     router = new BalancerRouter(address(vault), address(balancerPoolToken));
 

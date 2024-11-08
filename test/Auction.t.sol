@@ -17,7 +17,6 @@ import {Deployer} from "../src/utils/Deployer.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-
 contract AuctionTest is Test {
   Auction auction;
   Token usdc;
@@ -75,7 +74,9 @@ contract AuctionTest is Test {
     params.sharesPerToken = 50 * 10 ** 18;
     params.distributionPeriod = 10;
     params.couponToken = coupon;
-
+    
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
+    
     Token(reserve).mint(governance, 500000000000000000000000000000);
     Token(reserve).approve(address(poolFactory), 500000000000000000000000000000);
     
@@ -217,7 +218,7 @@ contract AuctionTest is Test {
     vm.prank(bidder);
     auction.claimBid(1);
 
-    assertEq(weth.balanceOf(bidder), initialBalance + 1000000000000);
+    assertEq(weth.balanceOf(bidder), initialBalance + 100000000000000000000000000000);
   }
 
   function testPartialRefund() public {
@@ -298,6 +299,118 @@ contract AuctionTest is Test {
     vm.expectRevert(Auction.AlreadyClaimed.selector);
     auction.claimBid(1);
     vm.stopPrank();
+  }
+
+  function testClaimRefundSuccess() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    uint256 initialBalance = usdc.balanceOf(bidder);
+
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
+
+    assertEq(usdc.balanceOf(bidder), initialBalance + 1000000000);
+  }
+
+  function testClaimRefundSuccessManyBidders() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    address bidder2 = address(0x55);
+    vm.startPrank(bidder2);
+    usdc.mint(bidder2, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex2 = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    uint256 initialBalance = usdc.balanceOf(bidder);
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
+    assertEq(usdc.balanceOf(bidder), initialBalance + 1000000000);
+
+    uint256 initialBalanceBidder2 = usdc.balanceOf(bidder2);
+    vm.prank(bidder2);
+    auction.claimRefund(bidIndex2);
+    assertEq(usdc.balanceOf(bidder2), initialBalanceBidder2 + 1000000000);
+  }
+
+  function testClaimRefundAuctionNotFailed() public {
+    vm.startPrank(bidder);
+    weth.mint(address(auction), 1000000000000 ether);
+    usdc.mint(bidder, 1000000000000 ether);
+    usdc.approve(address(auction), 1000000000000 ether);
+    uint256 bidIndex = auction.bid(100000000000 ether, 1000000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    vm.expectRevert(Auction.AuctionFailed.selector);
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
+  }
+
+  function testClaimRefundNothingToClaim() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    vm.expectRevert(Auction.NothingToClaim.selector);
+    vm.prank(address(0xdead));
+    auction.claimRefund(bidIndex);
+  }
+
+  function testClaimRefundAlreadyClaimed() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 15 days);
+    vm.prank(pool);
+    auction.endAuction();
+
+    vm.startPrank(bidder);
+    auction.claimRefund(bidIndex);
+
+    vm.expectRevert(Auction.AlreadyClaimed.selector);
+    auction.claimRefund(bidIndex);
+    vm.stopPrank();
+  }
+
+  function testClaimRefundAuctionNotEnded() public {
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    uint256 bidIndex = auction.bid(100 ether, 1000000000);
+    vm.stopPrank();
+
+    vm.expectRevert(Auction.AuctionStillOngoing.selector);
+    vm.prank(bidder);
+    auction.claimRefund(bidIndex);
   }
 
   function testWithdrawSuccess() public {
@@ -404,5 +517,41 @@ contract AuctionTest is Test {
     assertEq(highestBidder, highBidder, "highest bidder");
     assertEq(highestBuyAmount, highBidAmount, "highest buy amount");
     assertEq(highestSellAmount, highSellAmount, "highest sell amount");
+  }
+
+  function testRefundBidSuccessful() public {
+    uint256 initialBidAmount = 1000;
+    uint256 initialSellAmount = 1000000000;
+
+    // Create 1000 bids
+    for (uint256 i = 0; i < 1000; i++) {
+      address newBidder = address(uint160(i + 1));
+      vm.startPrank(newBidder);
+      usdc.mint(newBidder, initialSellAmount);
+      usdc.approve(address(auction), initialSellAmount);
+      auction.bid(initialBidAmount, initialSellAmount);
+      vm.stopPrank();
+    }
+
+    // Check initial state
+    assertEq(auction.bidCount(), 1000, "bid count 1");
+    assertEq(auction.highestBidIndex(), 1, "highest bid index 1");
+    assertEq(auction.lowestBidIndex(), 1000, "lowest bid index 1");
+
+    (address lowestBidder,,uint256 lowestSellCouponAmount,,,) = auction.bids(auction.lowestBidIndex());
+    uint256 lowestBidderCouponBalance = usdc.balanceOf(lowestBidder);
+
+    // Place a new high bid
+    address highBidder = address(1001);
+    uint256 highSellAmount = 1000000000 * 10; // this should take 10 slots
+
+    vm.startPrank(highBidder);
+    usdc.mint(highBidder, highSellAmount);
+    usdc.approve(address(auction), highSellAmount);
+    auction.bid(500, highSellAmount);
+    vm.stopPrank();
+
+    // Check that the lowest bidder received the refund
+    assertEq(usdc.balanceOf(lowestBidder), lowestBidderCouponBalance + lowestSellCouponAmount);
   }
 }

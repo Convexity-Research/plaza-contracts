@@ -54,6 +54,7 @@ contract Auction is Initializable, UUPSUpgradeable {
   uint256 public totalSellReserveAmount; // Aggregated sell amount (reserve) for the auction
 
   event AuctionEnded(State state, uint256 totalSellReserveAmount, uint256 totalBuyCouponAmount);
+  event BidRefundClaimed(uint256 bidIndex, address indexed bidder, uint256 sellCouponAmount);
   event BidClaimed(uint256 indexed bidIndex, address indexed bidder, uint256 sellCouponAmount);
   event BidPlaced(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
   event BidRemoved(uint256 indexed bidIndex, address indexed bidder, uint256 buyReserveAmount, uint256 sellCouponAmount);
@@ -123,7 +124,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     if (buyReserveAmount == 0) revert BidAmountTooLow();
 
     // Transfer buy tokens to contract
-    IERC20(buyCouponToken).transferFrom(msg.sender, address(this), sellCouponAmount);
+    IERC20(buyCouponToken).safeTransferFrom(msg.sender, address(this), sellCouponAmount);
 
     Bid memory newBid = Bid({
       bidder: msg.sender,
@@ -312,7 +313,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     totalSellReserveAmount -= buyReserveAmount;
 
     // Refund the buy tokens for the removed bid
-    IERC20(buyCouponToken).transfer(bidder, buyReserveAmount);
+    IERC20(buyCouponToken).safeTransfer(bidder, sellCouponAmount);
 
     emit BidRemoved(bidIndex, bidder, buyReserveAmount, sellCouponAmount);
 
@@ -349,9 +350,20 @@ contract Auction is Initializable, UUPSUpgradeable {
     if (bidInfo.claimed) revert AlreadyClaimed();
 
     bidInfo.claimed = true;
-    IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.sellCouponAmount);
+    IERC20(sellReserveToken).transfer(bidInfo.bidder, bidInfo.buyReserveAmount);
 
-    emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.sellCouponAmount);
+    emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.buyReserveAmount);
+  }
+
+  function claimRefund(uint256 bidIndex) auctionExpired auctionFailed external {
+    Bid storage bidInfo = bids[bidIndex];
+    if (bidInfo.bidder != msg.sender) revert NothingToClaim();
+    if (bidInfo.claimed) revert AlreadyClaimed();
+
+    bidInfo.claimed = true;
+    IERC20(buyCouponToken).safeTransfer(bidInfo.bidder, bidInfo.sellCouponAmount);
+
+    emit BidRefundClaimed(bidIndex, bidInfo.bidder, bidInfo.sellCouponAmount);
   }
 
   /**
@@ -383,6 +395,11 @@ contract Auction is Initializable, UUPSUpgradeable {
    */
   modifier auctionSucceeded() {
     if (state != State.SUCCEEDED) revert AuctionFailed();
+    _;
+  }
+
+  modifier auctionFailed() {
+    if (state == State.SUCCEEDED || state == State.BIDDING) revert AuctionFailed();
     _;
   }
 
