@@ -26,7 +26,7 @@ contract BondTokenTest is Test {
     BondToken implementation = new BondToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor, 50*10**18)));
+    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, 50*10**18)));
 
     // Attach the BondToken interface to the deployed proxy
     token = BondToken(address(proxy));
@@ -40,6 +40,7 @@ contract BondTokenTest is Test {
     // Increase the indexed asset period for testing
     vm.startPrank(governance);
     token.grantRole(token.DISTRIBUTOR_ROLE(), governance);
+    token.grantRole(token.DISTRIBUTOR_ROLE(), distributor);
     token.increaseIndexedAssetPeriod(20000);
     vm.stopPrank();
   }

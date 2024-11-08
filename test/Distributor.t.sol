@@ -11,7 +11,7 @@ import {BondToken} from "../src/BondToken.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract DistributorTest is Test {
@@ -31,27 +31,24 @@ contract DistributorTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
-    // TokenDeployer deploy
-    address tokenDeployer = address(new TokenDeployer());
-
-    // Distributor deploy
-    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+    // Deployer deploy
+    address contractDeployer = address(new Deployer());
 
     // Pool, Bond & Leverage Beacon deploy
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
 
     // PoolFactory deploy
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance,tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      (governance, contractDeployer, ethPriceFeed, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
     vm.stopPrank();
 
     vm.startPrank(governance);
-    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
 
     params.fee = 0;
     params.sharesPerToken = 50*10**6;
@@ -69,6 +66,7 @@ contract DistributorTest is Test {
 
     // Create pool and approve deposit amount
     _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    distributor = Distributor(poolFactory.distributors(address(_pool)));
 
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), governance);
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
@@ -112,7 +110,7 @@ contract DistributorTest is Test {
     vm.expectEmit(true, true, true, true);
     emit Distributor.ClaimedShares(user, 1, 50*10**18);
 
-    distributor.claim(address(_pool));
+    distributor.claim();
     assertEq(sharesToken.balanceOf(user), 50*10**18);
     vm.stopPrank();
   }
@@ -141,8 +139,8 @@ contract DistributorTest is Test {
 
     // Create pool and approve deposit amount
     Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    distributor = Distributor(poolFactory.distributors(address(pool)));
 
-    pool.bondToken().grantRole(pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
     pool.bondToken().grantRole(pool.bondToken().MINTER_ROLE(), minter);
     pool.lToken().grantRole(pool.lToken().MINTER_ROLE(), minter);
 
@@ -171,16 +169,26 @@ contract DistributorTest is Test {
     vm.expectEmit(true, true, true, true);
     emit Distributor.ClaimedShares(user, 1, 50*10**6);
 
-    distributor.claim(address(pool));
+    distributor.claim();
     assertEq(sharesToken.balanceOf(user), 50*10**6);
     
     vm.stopPrank();
   }
 
   function testClaimNonExistentPool() public {
+    vm.startPrank(governance);
+    // Mint reserve tokens
+    Token(params.reserveToken).mint(governance, 10000000000);
+    Token(params.reserveToken).approve(address(poolFactory), 10000000000);
+
+    params.couponToken = address(0);
+    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    distributor = Distributor(poolFactory.distributors(address(_pool)));
+    vm.stopPrank();
+
     vm.startPrank(user);
     vm.expectRevert(Distributor.UnsupportedPool.selector);
-    distributor.claim(address(0));
+    distributor.claim();
     vm.stopPrank();
   }
 
@@ -210,7 +218,7 @@ contract DistributorTest is Test {
 
     vm.startPrank(user);
 
-    distributor.claim(address(_pool));
+    distributor.claim();
     vm.stopPrank();
 
     assertEq(sharesToken.balanceOf(user), 3 * (50 * 1000) * 10**sharesToken.decimals());
@@ -232,7 +240,7 @@ contract DistributorTest is Test {
 
     vm.startPrank(user);
     vm.expectRevert(Distributor.NotEnoughSharesToDistribute.selector);
-    distributor.claim(address(_pool));
+    distributor.claim();
     vm.stopPrank();
   }
 
@@ -256,19 +264,14 @@ contract DistributorTest is Test {
 
     vm.startPrank(user);
     vm.expectRevert(Distributor.NotEnoughSharesBalance.selector);
-    distributor.claim(address(_pool));
+    distributor.claim();
     vm.stopPrank();
-  }
-
-  function testAllocateInvalidPoolAddress() public {
-    vm.expectRevert(Distributor.UnsupportedPool.selector);
-    distributor.allocate(address(0), 100);
   }
 
   function testAllocateCallerNotPool() public {
     vm.startPrank(user);
     vm.expectRevert(Distributor.CallerIsNotPool.selector);
-    distributor.allocate(address(_pool), 100);
+    distributor.allocate(100);
     vm.stopPrank();
   }
 
@@ -277,7 +280,7 @@ contract DistributorTest is Test {
 
     vm.startPrank(address(_pool));
     vm.expectRevert(Distributor.NotEnoughCouponBalance.selector);
-    distributor.allocate(address(_pool), allocateAmount);
+    distributor.allocate(allocateAmount);
     vm.stopPrank();
   }
 }

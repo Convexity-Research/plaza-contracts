@@ -13,224 +13,222 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {BondToken} from "../src/BondToken.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
 
 contract MockBalancerVault {    
-    Token public balancerPoolToken;
-    mapping(address => uint256) public joinAmounts;
+  Token public balancerPoolToken;
+  mapping(address => uint256) public joinAmounts;
 
-    struct JoinPoolRequest {
-        IAsset[] assets;
-        uint256[] maxAmountsIn;
-        bytes userData;
-        bool fromInternalBalance;
-    }
+  struct JoinPoolRequest {
+    IAsset[] assets;
+    uint256[] maxAmountsIn;
+    bytes userData;
+    bool fromInternalBalance;
+  }
 
-    struct ExitPoolRequest {
-        IAsset[] assets;
-        uint256[] minAmountsOut;
-        bytes userData;
-        bool toInternalBalance;
-    }
+  struct ExitPoolRequest {
+    IAsset[] assets;
+    uint256[] minAmountsOut;
+    bytes userData;
+    bool toInternalBalance;
+  }
 
-    constructor(Token _balancerPoolToken) {
-        balancerPoolToken = _balancerPoolToken;
-    }
+  constructor(Token _balancerPoolToken) {
+    balancerPoolToken = _balancerPoolToken;
+  }
 
-    function joinPool(
-        bytes32 poolId,
-        address sender,
-        address recipient,
-        JoinPoolRequest memory request
-    ) external {
-        for (uint256 i = 0; i < request.assets.length; i++) {
-            if (address(request.assets[i]) != address(0)) {
-                Token(address(request.assets[i])).transferFrom(
-                    sender,
-                    address(this),
-                    request.maxAmountsIn[i]
-                );
-                joinAmounts[address(request.assets[i])] = request.maxAmountsIn[i];
-            }
-        }
-        balancerPoolToken.mint(recipient, 1 ether);
+  function joinPool(
+    bytes32 poolId,
+    address sender,
+    address recipient,
+    JoinPoolRequest memory request
+  ) external {
+    for (uint256 i = 0; i < request.assets.length; i++) {
+      if (address(request.assets[i]) != address(0)) {
+        Token(address(request.assets[i])).transferFrom(
+          sender,
+          address(this),
+          request.maxAmountsIn[i]
+        );
+        joinAmounts[address(request.assets[i])] = request.maxAmountsIn[i];
+      }
     }
+    balancerPoolToken.mint(recipient, 1 ether);
+  }
 
-    function exitPool(
-        bytes32 poolId,
-        address sender,
-        address payable recipient,
-        ExitPoolRequest memory request
-    ) external {
-        balancerPoolToken.burn(sender, request.minAmountsOut[0]);
-        for (uint256 i = 0; i < request.assets.length; i++) {
-            if (address(request.assets[i]) != address(0)) {
-                Token(address(request.assets[i])).transfer(
-                    recipient,
-                    joinAmounts[address(request.assets[i])]
-                );
-            }
-        }
+  function exitPool(
+    bytes32 poolId,
+    address sender,
+    address payable recipient,
+    ExitPoolRequest memory request
+  ) external {
+    balancerPoolToken.burn(sender, request.minAmountsOut[0]);
+    for (uint256 i = 0; i < request.assets.length; i++) {
+      if (address(request.assets[i]) != address(0)) {
+        Token(address(request.assets[i])).transfer(
+          recipient,
+          joinAmounts[address(request.assets[i])]
+        );
+      }
     }
+  }
 }
 contract BalancerRouterTest is Test {
-    BalancerRouter public router;
-    MockBalancerVault public vault;
-    Pool public _pool;
-    PreDeposit public predeposit;
-    Token public balancerPoolToken;
-    Token public asset1;
-    Token public asset2;
-    address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
-    PoolFactory.PoolParams private params;
-    PoolFactory public poolFactory;
-    Distributor public distributor;
-    MockPriceFeed public mockPriceFeed;
+  BalancerRouter public router;
+  MockBalancerVault public vault;
+  Pool public _pool;
+  PreDeposit public predeposit;
+  Token public balancerPoolToken;
+  Token public asset1;
+  Token public asset2;
+  address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
+  PoolFactory.PoolParams private params;
+  PoolFactory public poolFactory;
+  Distributor public distributor;
+  MockPriceFeed public mockPriceFeed;
 
-    address public user = address(0x1);
-    address public governance = address(0x2);
-    address private deployer = address(0x3);
-    address private minter = address(0x4);
+  address public user = address(0x1);
+  address public governance = address(0x2);
+  address private deployer = address(0x3);
+  address private minter = address(0x4);
 
-    uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
-    uint8 private constant CHAINLINK_DECIMAL = 8;
+  uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
+  uint8 private constant CHAINLINK_DECIMAL = 8;
 
 
-    bytes32 public constant BALANCER_POOL_ID = bytes32(uint256(1));
+  bytes32 public constant BALANCER_POOL_ID = bytes32(uint256(1));
 
-    function setUp() public {
+  function setUp() public {
 
-        vm.startPrank(deployer);
+    vm.startPrank(deployer);
 
-        // Deploy mock tokens
-        balancerPoolToken = new Token("Balancer Pool Token", "balancerPoolToken", false);
-        asset1 = new Token("Test Token 1", "TT1", true);
-        asset2 = new Token("Test Token 2", "TT2", true);
-        address tokenDeployer = address(new TokenDeployer());
-        address oracleFeeds = address(new OracleFeeds());
-        distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+    // Deploy mock tokens
+    balancerPoolToken = new Token("Balancer Pool Token", "balancerPoolToken", false);
+    asset1 = new Token("Test Token 1", "TT1", true);
+    asset2 = new Token("Test Token 2", "TT2", true);
+    address contractDeployer = address(new Deployer());
+    address oracleFeeds = address(new OracleFeeds());
 
-        address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
-        address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
-        address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+    address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
+    address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
+    address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
 
-        poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
-        PoolFactory.initialize, 
-        (governance,tokenDeployer, address(distributor), oracleFeeds, poolBeacon, bondBeacon, levBeacon)
-        )));
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+    PoolFactory.initialize, 
+      (governance, contractDeployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
+    )));
 
-        params.fee = 0;
-        params.reserveToken = address(balancerPoolToken);
-        params.sharesPerToken = 50 * 10 ** 18;
-        params.distributionPeriod = 0;
-        params.couponToken = address(new Token("USDC", "USDC", false));
+    params.fee = 0;
+    params.reserveToken = address(balancerPoolToken);
+    params.sharesPerToken = 50 * 10 ** 18;
+    params.distributionPeriod = 0;
+    params.couponToken = address(new Token("USDC", "USDC", false));
 
-        OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
-        // Deploy the mock price feed
-        mockPriceFeed = new MockPriceFeed();
+    // Deploy the mock price feed
+    mockPriceFeed = new MockPriceFeed();
 
-        // Use vm.etch to deploy the mock contract at the specific address
-        bytes memory bytecode = address(mockPriceFeed).code;
-        vm.etch(ethPriceFeed, bytecode);
+    // Use vm.etch to deploy the mock contract at the specific address
+    bytes memory bytecode = address(mockPriceFeed).code;
+    vm.etch(ethPriceFeed, bytecode);
 
-        // Set oracle price
-        mockPriceFeed = MockPriceFeed(ethPriceFeed);
-        mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
-        
-        vm.stopPrank();
+    // Set oracle price
+    mockPriceFeed = MockPriceFeed(ethPriceFeed);
+    mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
+    
+    vm.stopPrank();
 
-        vm.startPrank(governance);
-        distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
+    vm.startPrank(governance);
+    balancerPoolToken.mint(governance, 100 ether);
+    balancerPoolToken.approve(address(poolFactory), 100 ether);
+    _pool = Pool(poolFactory.createPool(params, 100 ether, 10000*10**18, 10000*10**18, "", "", "", ""));
 
-        balancerPoolToken.mint(governance, 100 ether);
-        balancerPoolToken.approve(address(poolFactory), 100 ether);
-        _pool = Pool(poolFactory.createPool(params, 100 ether, 10000*10**18, 10000*10**18, "", "", "", ""));
+    vm.stopPrank();
 
-        vm.stopPrank();
+    vm.startPrank(deployer);
 
-        vm.startPrank(deployer);
+    // Deploy mock contracts
+    vault = new MockBalancerVault(balancerPoolToken);
+    predeposit = PreDeposit(Utils.deploy(address(new PreDeposit()), abi.encodeCall(
+    PreDeposit.initialize, 
+    (params, address(poolFactory), block.timestamp, block.timestamp + 1 hours, 100000 ether, "Bond ETH", "bondETH", "Leveraged ETH", "levETH")
+    )));
+    router = new BalancerRouter(address(vault), address(balancerPoolToken));
 
-        // Deploy mock contracts
-        vault = new MockBalancerVault(balancerPoolToken);
-        predeposit = PreDeposit(Utils.deploy(address(new PreDeposit()), abi.encodeCall(
-        PreDeposit.initialize, 
-        (params, address(poolFactory), block.timestamp, block.timestamp + 1 hours, 100000 ether, "Bond ETH", "bondETH", "Leveraged ETH", "levETH")
-        )));
-        router = new BalancerRouter(address(vault), address(balancerPoolToken));
+    // Setup initial token balances
+    asset1.mint(user, 1000 ether);
+    asset2.mint(user, 1000 ether);
 
-        // Setup initial token balances
-        asset1.mint(user, 1000 ether);
-        asset2.mint(user, 1000 ether);
+    vm.stopPrank();
+  }
 
-        vm.stopPrank();
-    }
+  function testJoinBalancerAndPredeposit() public {
+    vm.startPrank(user);
 
-    function testJoinBalancerAndPredeposit() public {
-        vm.startPrank(user);
+    IAsset[] memory assets = new IAsset[](2);
+    assets[0] = IAsset(address(asset1));
+    assets[1] = IAsset(address(asset2));
 
-        IAsset[] memory assets = new IAsset[](2);
-        assets[0] = IAsset(address(asset1));
-        assets[1] = IAsset(address(asset2));
+    uint256[] memory maxAmountsIn = new uint256[](2);
+    maxAmountsIn[0] = 1 ether;
+    maxAmountsIn[1] = 1 ether;
 
-        uint256[] memory maxAmountsIn = new uint256[](2);
-        maxAmountsIn[0] = 1 ether;
-        maxAmountsIn[1] = 1 ether;
+    asset1.approve(address(router), 1 ether);
+    asset2.approve(address(router), 1 ether);
 
-        asset1.approve(address(router), 1 ether);
-        asset2.approve(address(router), 1 ether);
+    uint256 balancerPoolTokenReceived = router.joinBalancerAndPredeposit(
+      BALANCER_POOL_ID,
+      address(predeposit),
+      assets,
+      maxAmountsIn,
+      ""
+    );
 
-        uint256 balancerPoolTokenReceived = router.joinBalancerAndPredeposit(
-            BALANCER_POOL_ID,
-            address(predeposit),
-            assets,
-            maxAmountsIn,
-            ""
-        );
+    assertEq(balancerPoolTokenReceived, 1 ether, "Incorrect balancerPoolToken amount received");
+    assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
+    assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
 
-        assertEq(balancerPoolTokenReceived, 1 ether, "Incorrect balancerPoolToken amount received");
-        assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
-        assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
+    vm.stopPrank();
+  }
 
-        vm.stopPrank();
-    }
+  function testJoinBalancerAndPlaza() public {
+    vm.startPrank(user);
 
-    function testJoinBalancerAndPlaza() public {
-        vm.startPrank(user);
+    IAsset[] memory assets = new IAsset[](2);
+    assets[0] = IAsset(address(asset1));
+    assets[1] = IAsset(address(asset2));
 
-        IAsset[] memory assets = new IAsset[](2);
-        assets[0] = IAsset(address(asset1));
-        assets[1] = IAsset(address(asset2));
+    uint256[] memory maxAmountsIn = new uint256[](2);
+    maxAmountsIn[0] = 1 ether;
+    maxAmountsIn[1] = 1 ether;
 
-        uint256[] memory maxAmountsIn = new uint256[](2);
-        maxAmountsIn[0] = 1 ether;
-        maxAmountsIn[1] = 1 ether;
+    asset1.approve(address(router), 1 ether);
+    asset2.approve(address(router), 1 ether);
 
-        asset1.approve(address(router), 1 ether);
-        asset2.approve(address(router), 1 ether);
+    uint256 plazaTokens = router.joinBalancerAndPlaza(
+      BALANCER_POOL_ID,
+      address(_pool),
+      assets,
+      maxAmountsIn,
+      "",
+      Pool.TokenType.BOND,
+      0.9 ether,
+      block.timestamp + 1 hours
+    );
 
-        uint256 plazaTokens = router.joinBalancerAndPlaza(
-            BALANCER_POOL_ID,
-            address(_pool),
-            assets,
-            maxAmountsIn,
-            "",
-            Pool.TokenType.BOND,
-            0.9 ether,
-            block.timestamp + 1 hours
-        );
+    assertEq(plazaTokens, 125000000000000000000, "Incorrect Plaza tokens received");
+    assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
+    assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
 
-        assertEq(plazaTokens, 125000000000000000000, "Incorrect Plaza tokens received");
-        assertEq(asset1.balanceOf(user), 999 ether, "Incorrect asset1 balance");
-        assertEq(asset2.balanceOf(user), 999 ether, "Incorrect asset2 balance");
+    vm.stopPrank();
+  }
 
-        vm.stopPrank();
-    }
-
-    function testExitPlazaAndBalancer() public {
+  function testExitPlazaAndBalancer() public {
     // First join Balancer and Plaza to get some Plaza tokens
     vm.startPrank(user);
 
@@ -247,14 +245,14 @@ contract BalancerRouterTest is Test {
 
     // Join first to get Plaza tokens
     uint256 plazaTokens = router.joinBalancerAndPlaza(
-        BALANCER_POOL_ID,
-        address(_pool),
-        assets,
-        maxAmountsIn,
-        "",
-        Pool.TokenType.BOND,
-        0.9 ether,
-        block.timestamp + 1 hours
+      BALANCER_POOL_ID,
+      address(_pool),
+      assets,
+      maxAmountsIn,
+      "",
+      Pool.TokenType.BOND,
+      0.9 ether,
+      block.timestamp + 1 hours
     );
 
     // Record balances before exit
@@ -272,82 +270,82 @@ contract BalancerRouterTest is Test {
 
     // Exit Plaza and Balancer
     router.exitPlazaAndBalancer(
-        BALANCER_POOL_ID,
-        address(_pool),
-        assets,
-        plazaTokens,
-        minAmountsOut,
-        "",
-        Pool.TokenType.BOND,
-        0.9 ether
+      BALANCER_POOL_ID,
+      address(_pool),
+      assets,
+      plazaTokens,
+      minAmountsOut,
+      "",
+      Pool.TokenType.BOND,
+      0.9 ether
     );
 
     // Verify balances after exit
     assertEq(
-        asset1.balanceOf(user), 
-        asset1BalanceBefore + 1 ether, 
-        "Incorrect asset1 balance after exit"
+      asset1.balanceOf(user), 
+      asset1BalanceBefore + 1 ether, 
+      "Incorrect asset1 balance after exit"
     );
     assertEq(
-        asset2.balanceOf(user), 
-        asset2BalanceBefore + 1 ether, 
-        "Incorrect asset2 balance after exit"
+      asset2.balanceOf(user), 
+      asset2BalanceBefore + 1 ether, 
+      "Incorrect asset2 balance after exit"
     );
     assertEq(
-        _pool.bondToken().balanceOf(user), 
-        bondTokenBalanceBefore - plazaTokens, 
-        "Incorrect bond token balance after exit"
+      _pool.bondToken().balanceOf(user), 
+      bondTokenBalanceBefore - plazaTokens, 
+      "Incorrect bond token balance after exit"
     );
 
     vm.stopPrank();
-}
+  }
 
 
-    function testFailJoinWithInsufficientAllowance() public {
-        vm.startPrank(user);
+  function testFailJoinWithInsufficientAllowance() public {
+    vm.startPrank(user);
 
-        IAsset[] memory assets = new IAsset[](2);
-        assets[0] = IAsset(address(asset1));
-        assets[1] = IAsset(address(asset2));
+    IAsset[] memory assets = new IAsset[](2);
+    assets[0] = IAsset(address(asset1));
+    assets[1] = IAsset(address(asset2));
 
-        uint256[] memory maxAmountsIn = new uint256[](2);
-        maxAmountsIn[0] = 1 ether;
-        maxAmountsIn[1] = 1 ether;
+    uint256[] memory maxAmountsIn = new uint256[](2);
+    maxAmountsIn[0] = 1 ether;
+    maxAmountsIn[1] = 1 ether;
 
-        // Don't approve tokens
-        router.joinBalancerAndPredeposit(
-            BALANCER_POOL_ID,
-            address(predeposit),
-            assets,
-            maxAmountsIn,
-            ""
-        );
+    // Don't approve tokens
+    router.joinBalancerAndPredeposit(
+      BALANCER_POOL_ID,
+      address(predeposit),
+      assets,
+      maxAmountsIn,
+      ""
+    );
 
-        vm.stopPrank();
-    }
+    vm.stopPrank();
+  }
 
-    function testFailJoinWithInsufficientBalance() public {
-        vm.startPrank(user);
+  function testFailJoinWithInsufficientBalance() public {
+    vm.startPrank(user);
 
-        IAsset[] memory assets = new IAsset[](2);
-        assets[0] = IAsset(address(asset1));
-        assets[1] = IAsset(address(asset2));
+    IAsset[] memory assets = new IAsset[](2);
+    assets[0] = IAsset(address(asset1));
+    assets[1] = IAsset(address(asset2));
 
-        uint256[] memory maxAmountsIn = new uint256[](2);
-        maxAmountsIn[0] = 1001 ether; // More than user's balance
-        maxAmountsIn[1] = 1 ether;
+    uint256[] memory maxAmountsIn = new uint256[](2);
+    maxAmountsIn[0] = 1001 ether; // More than user's balance
+    maxAmountsIn[1] = 1 ether;
 
-        asset1.approve(address(router), 1001 ether);
-        asset2.approve(address(router), 1 ether);
+    asset1.approve(address(router), 1001 ether);
+    asset2.approve(address(router), 1 ether);
 
-        router.joinBalancerAndPredeposit(
-            BALANCER_POOL_ID,
-            address(predeposit),
-            assets,
-            maxAmountsIn,
-            ""
-        );
+    router.joinBalancerAndPredeposit(
+      BALANCER_POOL_ID,
+      address(predeposit),
+      assets,
+      maxAmountsIn,
+      ""
+    );
 
-        vm.stopPrank();
-    }
+    vm.stopPrank();
+  }
 }

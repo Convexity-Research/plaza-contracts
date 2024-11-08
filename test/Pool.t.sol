@@ -18,7 +18,7 @@ import {Validator} from "../src/utils/Validator.sol";
 import {OracleReader} from "../src/OracleReader.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -29,7 +29,6 @@ contract PoolTest is Test, TestCases {
   PoolFactory private poolFactory;
   PoolFactory.PoolParams private params;
 
-  Distributor private distributor;
   MockPriceFeed private mockPriceFeed;
 
   address private deployer = address(0x1);
@@ -50,17 +49,17 @@ contract PoolTest is Test, TestCases {
   function setUp() public {
     vm.startPrank(deployer);
 
-    address tokenDeployer = address(new TokenDeployer());
+    address contractDeployer = address(new Deployer());
     address oracleFeeds = address(new OracleFeeds());
-    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
 
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance,tokenDeployer, address(distributor), oracleFeeds, poolBeacon, bondBeacon, levBeacon)
+      (governance, contractDeployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
     params.fee = 0;
@@ -83,10 +82,6 @@ contract PoolTest is Test, TestCases {
     mockPriceFeed = MockPriceFeed(ethPriceFeed);
     mockPriceFeed.setMockPrice(3000 * int256(CHAINLINK_DECIMAL_PRECISION), uint8(CHAINLINK_DECIMAL));
     
-    vm.stopPrank();
-
-    vm.startPrank(governance);
-    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
     vm.stopPrank();
   }
 
@@ -701,6 +696,8 @@ contract PoolTest is Test, TestCases {
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
     Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    address distributor = poolFactory.distributors(address(_pool));
+
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
     uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
@@ -716,7 +713,7 @@ contract PoolTest is Test, TestCases {
 
     vm.startPrank(governance);
     vm.expectEmit(true, true, true, true);
-    emit Pool.Distributed(expectedDistribution);
+    emit Pool.Distributed(expectedDistribution, distributor);
 
     fakeSucceededAuction(address(_pool), 0);
 
@@ -729,7 +726,7 @@ contract PoolTest is Test, TestCases {
     _pool.distribute();
     vm.stopPrank();
 
-    assertEq(sharesToken.balanceOf(address(distributor)), expectedDistribution);
+    assertEq(sharesToken.balanceOf(distributor), expectedDistribution);
   }
 
   function testDistributeMultiplePeriods() public {
@@ -739,6 +736,7 @@ contract PoolTest is Test, TestCases {
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
     Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    address distributor = poolFactory.distributors(address(_pool));
 
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
@@ -769,7 +767,7 @@ contract PoolTest is Test, TestCases {
     _pool.distribute();
     vm.stopPrank();
 
-    assertEq(sharesToken.balanceOf(address(distributor)), expectedDistribution * 3);
+    assertEq(sharesToken.balanceOf(distributor), expectedDistribution * 3);
   }
 
   function testDistributeNoShares() public {

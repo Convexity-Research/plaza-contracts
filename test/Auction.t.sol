@@ -13,7 +13,7 @@ import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -56,17 +56,17 @@ contract AuctionTest is Test {
 
   function createPool(address reserve, address coupon) public returns (address) {
     vm.startPrank(governance);
-    address tokenDeployer = address(new TokenDeployer());
+    address deployer = address(new Deployer());
     address oracleFeeds = address(new OracleFeeds());
-    address distributor = address(Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance)))));
 
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
 
     PoolFactory poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance, tokenDeployer, distributor, oracleFeeds, poolBeacon, bondBeacon, levBeacon)
+      (governance, deployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
     PoolFactory.PoolParams memory params;
@@ -76,8 +76,6 @@ contract AuctionTest is Test {
     params.distributionPeriod = 10;
     params.couponToken = coupon;
 
-    Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(poolFactory));
-    
     Token(reserve).mint(governance, 500000000000000000000000000000);
     Token(reserve).approve(address(poolFactory), 500000000000000000000000000000);
     
