@@ -717,7 +717,7 @@ contract PoolTest is Test, TestCases {
 
     vm.startPrank(governance);
     vm.expectEmit(true, true, true, true);
-    emit Pool.Distributed(expectedDistribution);
+    emit Pool.Distributed(1, expectedDistribution);
 
     fakeSucceededAuction(address(_pool), 0);
 

@@ -102,8 +102,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   error DistributionPeriodNotPassed();
 
   // Events
-  event Distributed(uint256 amount);
-  event MerchantApproved(address merchant);
+  event Distributed(uint256 period, uint256 amount);
   event SharesPerTokenChanged(uint256 sharesPerToken);
   event AuctionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event DistributionRollOver(uint256 period, uint256 sharesPerToken);
@@ -510,19 +509,36 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     (uint256 currentPeriod, uint256 _sharesPerToken) = bondToken.globalPool();
     require(auctions[currentPeriod] == address(0), AuctionAlreadyStarted());
 
+      uint8 bondDecimals = bondToken.decimals();
+    uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
+    uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
+
+    uint256 normalizedTotalSupply = bondToken.totalSupply().normalizeAmount(bondDecimals, maxDecimals);
+    uint256 normalizedShares = sharesPerToken.normalizeAmount(sharesDecimals, maxDecimals);
+
+    // Calculate the coupon amount to distribute
+    uint256 couponAmountToDistribute = (normalizedTotalSupply * normalizedShares)
+        .toBaseUnit(maxDecimals * 2 - IERC20(couponToken).safeDecimals());
+
     auctions[currentPeriod] = Utils.deploy(
       address(new Auction()),
       abi.encodeWithSelector(
         Auction.initialize.selector,
         address(couponToken),
         address(reserveToken),
-        (bondToken.totalSupply() * _sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS()),
+        couponAmountToDistribute,
         block.timestamp + auctionPeriod,
         1000,
         address(this),
         liquidationThreshold
       )
     );
+
+    // Increase the bond token period
+    bondToken.increaseIndexedAssetPeriod(sharesPerToken);
+
+    // Update last distribution time
+    lastDistribution = block.timestamp;
   }
 
   /**
@@ -542,42 +558,22 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * Can only be called after the distribution period has passed.
    */
   function distribute() external whenNotPaused {
-    if (block.timestamp - lastDistribution < distributionPeriod) {
-      revert DistributionPeriod();
-    }
+    (uint256 currentPeriod,) = bondToken.globalPool();
+    require(currentPeriod > 0, AccessDenied());
 
-    (uint256 currentPeriod, uint256 periodShares) = bondToken.globalPool();
-    if (Auction(auctions[currentPeriod]).state() == Auction.State.FAILED_LIQUIDATION || 
-        Auction(auctions[currentPeriod]).state() == Auction.State.FAILED_UNDERSOLD) {
-      
-      // Increase the bond token period
-      bondToken.increaseIndexedAssetPeriod(sharesPerToken);
+    // Period is increased when auction starts, we want to distribute for the previous period
+    uint256 previousPeriod = currentPeriod - 1;
+    uint256 couponAmountToDistribute = Auction(auctions[previousPeriod]).totalBuyCouponAmount();
 
-      // Update last distribution time
-      lastDistribution = block.timestamp;
+    if (Auction(auctions[previousPeriod]).state() == Auction.State.FAILED_LIQUIDATION || 
+        Auction(auctions[previousPeriod]).state() == Auction.State.FAILED_UNDERSOLD) {
 
-      emit DistributionRollOver(currentPeriod, periodShares);
+      emit DistributionRollOver(previousPeriod, couponAmountToDistribute);
       return;
     }
 
+    // Get Distributor
     Distributor distributor = Distributor(poolFactory.distributor());
-
-    // Update last distribution time
-    lastDistribution = block.timestamp;
-
-    uint8 bondDecimals = bondToken.decimals();
-    uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
-    uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
-
-    uint256 normalizedTotalSupply = bondToken.totalSupply().normalizeAmount(bondDecimals, maxDecimals);
-    uint256 normalizedShares = sharesPerToken.normalizeAmount(sharesDecimals, maxDecimals);
-
-    // Calculate the coupon amount to distribute
-    uint256 couponAmountToDistribute = (normalizedTotalSupply * normalizedShares)
-        .toBaseUnit(maxDecimals * 2 - IERC20(couponToken).safeDecimals());
-    
-    // Increase the bond token period
-    bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
     // Transfer coupon tokens to the distributor
     IERC20(couponToken).safeTransfer(address(distributor), couponAmountToDistribute);
@@ -585,7 +581,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     // Update distributor with the amount to distribute
     distributor.allocate(address(this), couponAmountToDistribute);
 
-    emit Distributed(couponAmountToDistribute);
+    emit Distributed(previousPeriod, couponAmountToDistribute);
   }
 
   /**
