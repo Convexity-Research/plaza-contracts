@@ -1224,5 +1224,8 @@ contract PoolTest is Test, TestCases {
     Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
     uint256 price = _pool.getOraclePrice(_pool.USD(), params.reserveToken);
     assertEq(price, 35858486155012863);
+
+    uint256 price2 = _pool.getOraclePrice(params.reserveToken, _pool.USD());
+    assertEq(price2, 27887401483629120000);
   }
 }
