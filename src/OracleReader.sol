@@ -71,7 +71,8 @@ contract OracleReader {
       revert StalePrice();
     }
 
-    return isInverted ? uint256(10 ** AggregatorV3Interface(feed).decimals()) / uint256(answer) : uint256(answer);
+    uint256 decimals = uint256(AggregatorV3Interface(feed).decimals());
+    return isInverted ? (10 ** decimals * 10 ** decimals) / uint256(answer) : uint256(answer);
   }
 
   /**

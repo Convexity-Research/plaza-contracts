@@ -31,6 +31,7 @@ contract PoolTest is Test, TestCases {
 
   Distributor private distributor;
   MockPriceFeed private mockPriceFeed;
+  address private oracleFeeds;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
@@ -51,7 +52,7 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(deployer);
 
     address tokenDeployer = address(new TokenDeployer());
-    address oracleFeeds = address(new OracleFeeds());
+    oracleFeeds = address(new OracleFeeds());
     distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
 
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
@@ -1207,5 +1208,24 @@ contract PoolTest is Test, TestCases {
     // Reset reserve state
     rToken.burn(governance, rToken.balanceOf(governance));
     rToken.burn(address(_pool), rToken.balanceOf(address(_pool)));
+  }
+
+  function testOracleInvertedPrice() public {
+    vm.startPrank(deployer);
+    mockPriceFeed.setMockPrice(27887401483629120000, 18);
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    // Mint reserve tokens
+    Token(params.reserveToken).mint(governance, 10000000000);
+    Token(params.reserveToken).approve(address(poolFactory), 10000000000);
+
+    // Create pool and approve deposit amount
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    uint256 price = _pool.getOraclePrice(_pool.USD(), params.reserveToken);
+    assertEq(price, 35858486155012863);
+
+    uint256 price2 = _pool.getOraclePrice(params.reserveToken, _pool.USD());
+    assertEq(price2, 27887401483629120000);
   }
 }
