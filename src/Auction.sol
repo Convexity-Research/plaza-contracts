@@ -271,7 +271,10 @@ contract Auction is Initializable, UUPSUpgradeable {
         
         // Reduce the current bid's amounts
         currentBid.sellCouponAmount = sellCouponAmount - amountToRemove;
-        currentBid.buyReserveAmount = currentBid.buyReserveAmount - ((currentBid.buyReserveAmount * proportion) / 1e18);
+
+        uint256 reserveReduction = ((currentBid.buyReserveAmount * proportion) / 1e18);
+        currentBid.buyReserveAmount = currentBid.buyReserveAmount - reserveReduction;
+        totalSellReserveAmount -= reserveReduction;
         
         // Refund the proportional sellAmount
         IERC20(buyCouponToken).safeTransfer(currentBid.bidder, amountToRemove);

@@ -554,4 +554,28 @@ contract AuctionTest is Test {
     // Check that the lowest bidder received the refund
     assertEq(usdc.balanceOf(lowestBidder), lowestBidderCouponBalance + lowestSellCouponAmount);
   }
+
+  function testPartialRefundUpdatesTotalReserves() public { 
+    vm.startPrank(bidder);
+    uint256 initialBidAmount = 1000000000000;
+    usdc.mint(bidder, initialBidAmount);
+    usdc.approve(address(auction), initialBidAmount);
+    auction.bid(100 ether, initialBidAmount);
+    vm.stopPrank();
+
+    address user = address(1001);
+
+    vm.startPrank(user);
+    // initialBidAmount + newBidderBid - totalBuyCouponAmount = 5000 ether
+    uint256 newBidderBid = 500000000000;
+    usdc.mint(user, newBidderBid);
+    usdc.approve(address(auction), newBidderBid);
+    auction.bid(40 ether, newBidderBid);
+    vm.stopPrank();
+    
+    (, uint256 amount1, , , ,) = auction.bids(1);
+    (, uint256 amount2, , , ,) = auction.bids(2);
+
+    assertEq(amount1 + amount2, auction.totalSellReserveAmount());
+  }
 }
