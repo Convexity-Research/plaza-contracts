@@ -50,7 +50,7 @@ contract OracleReader {
   /**
    * @dev Retrieves the latest price from the oracle
    * @return price from the oracle
-   * @dev Reverts if the price data is older than 1 day
+   * @dev Reverts if the price data is older than chainlink's heartbeat
    */
   function getOraclePrice(address quote, address base) public view returns(uint256) {
     bool isInverted = false;
