@@ -6,7 +6,7 @@ import {BondToken} from "./BondToken.sol";
 import {Distributor} from "./Distributor.sol";
 import {LeverageToken} from "./LeverageToken.sol";
 import {Create3} from "@create3/contracts/Create3.sol";
-import {TokenDeployer} from "./utils/TokenDeployer.sol";
+import {Deployer} from "./utils/Deployer.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
@@ -42,18 +42,20 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   address[] public pools;
   /// @dev Address of the governance contract
   address public governance;
-  /// @dev Address of the distributor contract
-  address public distributor;
   /// @dev Address of the OracleFeeds contract
   address public oracleFeeds;
-  /// @dev Instance of the TokenDeployer contract
-  TokenDeployer private tokenDeployer;
+  /// @dev Instance of the Deployer contract
+  Deployer private deployer;
   /// @dev Address of the UpgradeableBeacon for Pool
   address public poolBeacon;
   /// @dev Address of the UpgradeableBeacon for BondToken
   address public bondBeacon;
   /// @dev Address of the UpgradeableBeacon for LeverageToken
   address public leverageBeacon;
+  /// @dev Address of the UpgradeableBeacon for Distributor
+  address public distributorBeacon;
+  /// @dev Mapping to store distributor addresses for each pool
+  mapping(address => address) public distributors;
 
   /// @dev Error thrown when bond amount is zero
   error ZeroDebtAmount();
@@ -80,28 +82,27 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
    * @dev Initializes the contract with the governance address and sets up roles.
    * This function is called once during deployment or upgrading to initialize state variables.
    * @param _governance Address of the governance account that will have the GOV_ROLE.
-   * @param _tokenDeployer Address of the TokenDeployer contract.
-   * @param _distributor Address of the Distributor contract.
+   * @param _deployer Address of the Deployer contract.
    * @param _oracleFeeds Address of the OracleFeeds contract.
    * @param _poolImplementation Address of the Pool implementation contract.
    * @param _bondImplementation Address of the BondToken implementation contract.
    * @param _leverageImplementation Address of the LeverageToken implementation contract.
+   * @param _distributorImplementation Address of the Distributor implementation contract.
    */
   function initialize(
     address _governance,
-    address _tokenDeployer,
-    address _distributor,
+    address _deployer,
     address _oracleFeeds,
     address _poolImplementation,
     address _bondImplementation,
-    address _leverageImplementation
+    address _leverageImplementation,
+    address _distributorImplementation
   ) initializer public {
     __UUPSUpgradeable_init();
     __Pausable_init();
 
-    tokenDeployer = TokenDeployer(_tokenDeployer);
+    deployer = Deployer(_deployer);
     governance = _governance;
-    distributor = _distributor;
     oracleFeeds = _oracleFeeds;
     _grantRole(GOV_ROLE, _governance);
 
@@ -109,6 +110,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     poolBeacon = _poolImplementation;
     bondBeacon = _bondImplementation;
     leverageBeacon = _leverageImplementation;
+    distributorBeacon = _distributorImplementation;
   }
 
   /**
@@ -143,18 +145,17 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
     
     // Deploy Bond token
-    BondToken bondToken = BondToken(tokenDeployer.deployBondToken(
+    BondToken bondToken = BondToken(deployer.deployBondToken(
       bondBeacon,
       bondName,
       bondSymbol,
       address(this),
       address(this),
-      distributor,
       params.sharesPerToken
     ));
 
     // Deploy Leverage token
-    LeverageToken lToken = LeverageToken(tokenDeployer.deployLeverageToken(
+    LeverageToken lToken = LeverageToken(deployer.deployLeverageToken(
       leverageBeacon,
       leverageName,
       leverageSymbol,
@@ -194,12 +195,20 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
       )
     );
 
-    Distributor(distributor).registerPool(pool, params.couponToken);
+    // Deploy Distributor contract
+    Distributor distributor = Distributor(deployer.deployDistributor(
+      distributorBeacon,
+      governance,
+      pool
+    ));
+
+    distributors[pool] = address(distributor);
 
     bondToken.grantRole(MINTER_ROLE, pool);
     lToken.grantRole(MINTER_ROLE, pool);
 
     bondToken.grantRole(bondToken.DISTRIBUTOR_ROLE(), pool);
+    bondToken.grantRole(bondToken.DISTRIBUTOR_ROLE(), address(distributor));
     
     // set token governance
     bondToken.grantRole(GOV_ROLE, governance);

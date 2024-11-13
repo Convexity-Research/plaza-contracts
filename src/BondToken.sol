@@ -83,7 +83,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * @param symbol The symbol of the token
    * @param minter The address that will have minting privileges
    * @param governance The address that will have governance privileges
-   * @param distributor The address that will have distributor privileges
    * @param sharesPerToken The initial number of shares per token
    */
   function initialize(
@@ -91,7 +90,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     string memory symbol, 
     address minter, 
     address governance, 
-    address distributor,
     uint256 sharesPerToken
     ) initializer public {
 
@@ -104,7 +102,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
-    _grantRole(DISTRIBUTOR_ROLE, distributor);
   }
 
   /**

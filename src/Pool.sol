@@ -102,9 +102,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   error DistributionPeriodNotPassed();
 
   // Events
-  event Distributed(uint256 amount);
   event MerchantApproved(address merchant);
   event SharesPerTokenChanged(uint256 sharesPerToken);
+  event Distributed(uint256 amount, address distributor);
   event AuctionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event DistributionRollOver(uint256 period, uint256 sharesPerToken);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
@@ -560,7 +560,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       return;
     }
 
-    Distributor distributor = Distributor(poolFactory.distributor());
+    address distributor = poolFactory.distributors(address(this));
 
     // Update last distribution time
     lastDistribution = block.timestamp;
@@ -580,12 +580,12 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
     // Transfer coupon tokens to the distributor
-    IERC20(couponToken).safeTransfer(address(distributor), couponAmountToDistribute);
+    IERC20(couponToken).safeTransfer(distributor, couponAmountToDistribute);
 
     // Update distributor with the amount to distribute
-    distributor.allocate(address(this), couponAmountToDistribute);
+    Distributor(distributor).allocate(couponAmountToDistribute);
 
-    emit Distributed(couponAmountToDistribute);
+    emit Distributed(couponAmountToDistribute, distributor);
   }
 
   /**
