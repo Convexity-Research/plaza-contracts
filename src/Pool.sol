@@ -321,6 +321,9 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 creationRate = BOND_TARGET_PRICE * PRECISION;
 
     if (collateralLevel <= COLLATERAL_THRESHOLD) {
+      if (tokenType == TokenType.LEVERAGE && assetSupply == 0) {
+        revert ZeroLeverageSupply();
+      }
       creationRate = (tvl * multiplier) / assetSupply;
     } else if (tokenType == TokenType.LEVERAGE) {
       if (assetSupply == 0) {

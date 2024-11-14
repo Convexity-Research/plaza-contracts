@@ -169,6 +169,13 @@ contract PoolTest is Test, TestCases {
     pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 10000, 30000000 * CHAINLINK_DECIMAL_PRECISION, CHAINLINK_DECIMAL);
   }
 
+    function testGetCreateAmountZeroLeverageSupplyCollatLower() public {
+    Pool pool = new Pool();
+    vm.expectRevert(Pool.ZeroLeverageSupply.selector);
+    // collateral level is 1/10000000, less than threshold
+    pool.getCreateAmount(Pool.TokenType.LEVERAGE, 10, 100000, 0, 1, 1, CHAINLINK_DECIMAL);
+  }
+
   function testCreate() public {
     initializeTestCasesFixedEth();
     vm.startPrank(governance);
@@ -1232,5 +1239,5 @@ contract PoolTest is Test, TestCases {
 
     uint256 price2 = _pool.getOraclePrice(params.reserveToken, _pool.USD());
     assertEq(price2, 27887401483629120000);
-  }
+  }  
 }
