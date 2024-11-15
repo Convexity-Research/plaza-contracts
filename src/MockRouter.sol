@@ -86,12 +86,24 @@ contract Router is OracleReader {
       ethPrice = ethPrice.normalizeAmount(oracleDecimals, usdcDecimals);
       oracleDecimals = usdcDecimals;
     }
-    
-    // Calculate the amount of reserveToken based on the price
-    uint256 reserveAmount = depositAmount / ethPrice;
 
-    // Normalize the reserve amount to its decimals
-    reserveAmount = reserveAmount.normalizeAmount(usdcDecimals-oracleDecimals, IERC20(reserveToken).safeDecimals());
+    // Ensure deposit amount is not zero
+    require(depositAmount > 0, "Deposit amount must be greater than 0");
+
+    // depositAmount is in USDC (18 decimals)
+    // ethPrice is in USDC per ETH (8 decimals)
+    // We want reserveAmount in ETH (18 decimals)
+    
+    // First scale up depositAmount by 8 decimals to match price feed precision
+    uint256 scaledDepositAmount = depositAmount / (10 ** (usdcDecimals - oracleDecimals));
+    
+    // Divide by price to get ETH amount (result will have 18 decimals)
+    // depositAmount(18) / 10^10 = scaledDepositAmount(8)
+    // scaledDepositAmount(8) / ethPrice(8) * 10^18 = reserveAmount(18) 
+    uint256 reserveAmount = (scaledDepositAmount * (10 ** IERC20(reserveToken).safeDecimals())) / ethPrice;
+
+    // Ensure we don't get 0 reserveAmount due to rounding
+    require(reserveAmount > 0, "Deposit amount too small");
 
     // Burn depositAmount from contract
     Token(USDC).burn(address(this), depositAmount);
