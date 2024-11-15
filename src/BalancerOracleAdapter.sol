@@ -103,12 +103,15 @@ contract BalancerOracleAdapter is Initializable, OwnableUpgradeable, UUPSUpgrade
     //get weights
     uint256[] memory weights = pool.getNormalizedWeights(); // 18 dec fractions
     uint256[] memory prices = new uint256[](tokens.length);
+    uint8 oracleDecimals;
     for(uint8 i = 0; i < tokens.length; i++) {
-      prices[i] = getOraclePrice(address(tokens[i]), ETH).toBaseUnit(decimals); // balancer math works with 18 dec
+      oracleDecimals = getOracleDecimals(address(tokens[i]), ETH);
+      prices[i] = getOraclePrice(address(tokens[i]), ETH).normalizeAmount(oracleDecimals, decimals); // balancer math works with 18 dec
     }
 
     uint256 fairUintETHPrice = _calculateFairUintPrice(prices, weights, pool.getInvariant(), pool.getActualSupply());
-    uint256 fairUintUSDPrice = fairUintETHPrice.mulDown(getOraclePrice(ETH, USD));
+    uint256 ethPrice = getOraclePrice(ETH, USD).normalizeAmount(getOracleDecimals(ETH, USD), decimals);
+    uint256 fairUintUSDPrice = fairUintETHPrice.mulDown(ethPrice);
 
     if (fairUintUSDPrice > uint256(type(int256).max)) {
       revert PriceTooLargeForIntConversion();
