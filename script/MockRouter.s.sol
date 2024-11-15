@@ -19,7 +19,7 @@ contract MockRouterScript is Script {
     OracleFeeds oracleFeeds = new OracleFeeds();
     oracleFeeds.setPriceFeed(reserveToken, USD, ethPriceFeed, 1 days);
 
-    new Router(oracleFeeds);
+    new Router(address(oracleFeeds));
     vm.stopBroadcast();
   }
 }
