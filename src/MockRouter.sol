@@ -170,7 +170,7 @@ contract Router is OracleReader {
     }
     IERC20(tokenToTransfer).safeTransferFrom(msg.sender, address(this), depositAmount);
 
-    uint256 redeemAmount = Pool(_pool).redeem(tokenType, depositAmount, 0, deadline, address(this));
+    uint256 redeemAmount = Pool(_pool).redeem(tokenType, depositAmount, 0, deadline, onBehalfOf);
 
     // Get ETH price from OracleReader
     uint256 ethPrice = getOraclePrice(reserveToken, USD);
