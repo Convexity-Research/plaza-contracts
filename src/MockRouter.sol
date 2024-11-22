@@ -185,7 +185,7 @@ contract Router is OracleReader {
     }
 
     // Burn depositAmount from contract
-    Token(reserveToken).burn(address(this), redeemAmount);
+    Token(reserveToken).burn(msg.sender, redeemAmount);
 
     if (onBehalfOf == address(0)) {
       onBehalfOf = msg.sender;
