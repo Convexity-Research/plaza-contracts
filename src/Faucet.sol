@@ -8,7 +8,9 @@ import {Token} from "../test/mocks/Token.sol";
 /// @dev This contract creates and distributes two types of ERC20 tokens for testing purposes
 contract Faucet {
   /// @notice The reserve token (WETH)
-  Token public reserveToken;
+  Token public wstETH;
+  /// @notice The second reserve token (CBETH)
+  Token public cbETH;
   /// @notice The coupon token (USDC)
   Token public couponToken;
   /// @notice The address of the deployer
@@ -17,14 +19,20 @@ contract Faucet {
   mapping(address => bool) private whitelist;
 
   /// @notice Initializes the contract by creating new instances of reserve and coupon tokens
-  constructor(address _reserveToken, address _couponToken) {
+  constructor(address _wstETH, address _cbETH, address _couponToken) {
     deployer = msg.sender;
     whitelist[deployer] = true;
 
-    if (_reserveToken != address(0)) {
-      reserveToken = Token(_reserveToken);
+    if (_wstETH != address(0)) {
+      wstETH = Token(_wstETH);
     } else {
-      reserveToken = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
+      wstETH = new Token("Wrapped fake liquid staked Ether 2.0", "wstETH", true);
+    }
+
+    if (_cbETH != address(0)) {
+      cbETH = Token(_cbETH);
+    } else {
+      cbETH = new Token("Coinbase Wrapped Fake Staked ETH", "cbETH", true);
     }
 
     if (_couponToken != address(0)) {
@@ -37,19 +45,24 @@ contract Faucet {
   /// @notice Distributes a fixed amount of both reserve and coupon tokens to the caller
   /// @dev Mints 1 WETH and 5000 USDC to the caller's address
   function faucet() public isWhitelisted() {
-    reserveToken.mint(msg.sender, 1 ether);
+    wstETH.mint(msg.sender, 1 ether);
+    cbETH.mint(msg.sender, 1 ether);
     couponToken.mint(msg.sender, 5000 ether);
   }
 
   /// @notice Distributes a specified amount of both reserve and coupon tokens to the caller
-  /// @param amountReserve The amount of reserve tokens to mint
+  /// @param amountWstETH The amount of WstETH to mint
+  /// @param amountCbETH The amount of cbETH to mint
   /// @param amountCoupon The amount of coupon tokens to mint
   /// @param amountEth The amount of ETH to send to the caller
   /// @param onBehalfOf The address to mint the tokens on behalf of
-  function faucet(uint256 amountReserve, uint256 amountCoupon, uint256 amountEth, address onBehalfOf) public isWhitelisted() {
+  function faucet(uint256 amountWstETH, uint256 amountCbETH, uint256 amountCoupon, uint256 amountEth, address onBehalfOf) public isWhitelisted() {
     address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
-    if (amountReserve > 0) {
-      reserveToken.mint(user, amountReserve);
+    if (amountWstETH > 0) {
+      wstETH.mint(user, amountWstETH);
+    }
+    if (amountCbETH > 0) {
+      cbETH.mint(user, amountCbETH);
     }
     if (amountCoupon > 0) {
       couponToken.mint(user, amountCoupon);
@@ -65,7 +78,7 @@ contract Faucet {
   /// @param onBehalfOf The address to mint the tokens on behalf of
   function faucetReserve(uint256 amount, address onBehalfOf) public isWhitelisted() {
     address user = onBehalfOf == address(0) ? msg.sender : onBehalfOf;
-    reserveToken.mint(user, amount);
+    wstETH.mint(user, amount);
   }
 
   /// @notice Distributes a specified amount of coupon tokens to the caller
