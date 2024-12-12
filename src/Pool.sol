@@ -141,7 +141,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
     address _feeBeneficiary,
-    address _oracleFeeds
+    address _oracleFeeds,
+    bool _pauseOnCreation
   ) initializer public {
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
@@ -161,6 +162,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     feeBeneficiary = _feeBeneficiary;
     lastFeeClaimTime = block.timestamp;
     liquidationThreshold = MIN_LIQUIDATION_THRESHOLD;
+
+    if (_pauseOnCreation) {
+      _pause();
+    }
   }
 
   /**

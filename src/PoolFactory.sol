@@ -176,7 +176,8 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         params.sharesPerToken,
         params.distributionPeriod,
         params.feeBeneficiary,
-        oracleFeeds
+        oracleFeeds,
+        msg.sender == governance ? false : true
       )
     );
 
