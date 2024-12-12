@@ -15,7 +15,6 @@ import {LeverageToken} from "../src/LeverageToken.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {console} from "forge-std/console.sol";
 contract PreDepositTest is Test {
   PreDeposit public preDeposit;
   Token public reserveToken;
