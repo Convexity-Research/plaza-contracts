@@ -596,7 +596,7 @@ contract PreDepositTest is Test {
     preDeposit.setDepositStartTime(block.timestamp + 1 days);
   }
 
-  function testPoolPauseOnCreation() public {
+  function testPoolPausedOnCreation() public {
     vm.startPrank(user1);
     reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
     preDeposit.deposit(DEPOSIT_AMOUNT);

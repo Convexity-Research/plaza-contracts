@@ -66,7 +66,7 @@ contract DistributorTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(_pool)));
 
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), governance);
@@ -209,7 +209,7 @@ contract DistributorTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(pool)));
 
     pool.bondToken().grantRole(pool.bondToken().MINTER_ROLE(), minter);
@@ -253,7 +253,7 @@ contract DistributorTest is Test {
     Token(params.reserveToken).approve(address(poolFactory), 10000000000);
 
     params.couponToken = address(0);
-    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(_pool)));
     vm.stopPrank();
 

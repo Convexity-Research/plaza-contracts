@@ -151,7 +151,7 @@ contract PreDeposit is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     if (bondAmount == 0 || leverageAmount == 0) revert InvalidBondOrLeverageAmount();
     if (poolCreated) revert PoolAlreadyCreated();
     IERC20(params.reserveToken).approve(address(factory), reserveAmount);
-    pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, bondName, bondSymbol, leverageName, leverageSymbol);
+    pool = factory.createPool(params, reserveAmount, bondAmount, leverageAmount, bondName, bondSymbol, leverageName, leverageSymbol, true);
 
     emit PoolCreated(pool);
     poolCreated = true;

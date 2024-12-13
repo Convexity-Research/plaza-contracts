@@ -73,7 +73,7 @@ contract PoolFactoryTest is Test {
     emit PoolFactory.PoolCreated(address(0), 10000000000, 10000, 20000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", "", false));
     uint256 endLength = poolFactory.poolsLength();
 
     assertEq(1, endLength-startLength);
@@ -117,7 +117,7 @@ contract PoolFactoryTest is Test {
     )))));
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH"));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH", false));
 
     assertEq(address(_pool), poolAddress);
 
@@ -130,16 +130,16 @@ contract PoolFactoryTest is Test {
     vm.startPrank(governance);
 
     vm.expectRevert(bytes4(keccak256("ZeroReserveAmount()")));
-    poolFactory.createPool(params, 0, 10000, 20000, "", "", "", "");
+    poolFactory.createPool(params, 0, 10000, 20000, "", "", "", "", false);
 
     vm.expectRevert(bytes4(keccak256("ZeroDebtAmount()")));
-    poolFactory.createPool(params, 10000000000, 0, 20000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 0, 20000, "", "", "", "", false);
 
     vm.expectRevert(bytes4(keccak256("ZeroLeverageAmount()")));
-    poolFactory.createPool(params, 10000000000, 10000, 0, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 0, "", "", "", "", false);
 
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
     
   }
 
@@ -148,10 +148,10 @@ contract PoolFactoryTest is Test {
     poolFactory.pause();
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
     
     poolFactory.unpause();
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
   }
 }
