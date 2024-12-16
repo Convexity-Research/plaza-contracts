@@ -668,6 +668,12 @@ contract PoolTest is Test, TestCases {
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.redeem(Pool.TokenType.BOND, 0, 0);
 
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.startAuction();
+
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.distribute();
+
     _pool.unpause();
     _pool.setFee(100);
 

@@ -507,7 +507,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   /**
    * @dev Starts an auction for the current period.
    */
-  function startAuction() external {
+  function startAuction() external whenNotPaused() {
     // Check if distribution period has passed
     require(lastDistribution + distributionPeriod < block.timestamp, DistributionPeriodNotPassed());
 
