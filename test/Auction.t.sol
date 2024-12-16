@@ -80,7 +80,7 @@ contract AuctionTest is Test {
     Token(reserve).mint(governance, 500000000000000000000000000000);
     Token(reserve).approve(address(poolFactory), 500000000000000000000000000000);
     
-    return poolFactory.createPool(params, 500000000000000000000000000000, 10000, 10000, "Bond ETH", "bondETH", "Leverage ETH", "levETH");
+    return poolFactory.createPool(params, 500000000000000000000000000000, 10000, 10000, "Bond ETH", "bondETH", "Leverage ETH", "levETH", false);
   }
 
   function useMockPool(address poolAddress) public {

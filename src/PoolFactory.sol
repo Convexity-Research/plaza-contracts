@@ -129,7 +129,8 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     string memory bondName,
     string memory bondSymbol,
     string memory leverageName,
-    string memory leverageSymbol
+    string memory leverageSymbol,
+    bool pauseOnCreation
   ) external whenNotPaused() onlyRole(POOL_ROLE) returns (address) {
 
     if (reserveAmount == 0) {
@@ -176,7 +177,8 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         params.sharesPerToken,
         params.distributionPeriod,
         params.feeBeneficiary,
-        oracleFeeds
+        oracleFeeds,
+        pauseOnCreation
       )
     );
 
