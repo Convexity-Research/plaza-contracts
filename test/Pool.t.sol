@@ -754,7 +754,7 @@ contract PoolTest is Test, TestCases {
     assertEq(sharesToken.balanceOf(distributor), expectedDistribution);
   }
 
-  function testDistributeFailedLiquidation() public {
+  function testDistributeFailedPoolSale() public {
     Token rToken = Token(params.reserveToken);
 
     vm.startPrank(governance);
@@ -772,7 +772,7 @@ contract PoolTest is Test, TestCases {
 
     fakeSucceededAuction(address(_pool), 0);
 
-    // Force auction to fail for liquidation
+    // Force auction to fail during pool sale
     vm.mockCall(
       address(0),
       abi.encodeWithSignature("state()"),
@@ -812,7 +812,7 @@ contract PoolTest is Test, TestCases {
 
     fakeSucceededAuction(address(_pool), 0);
 
-    // Force auction to fail for liquidation
+    // Force auction to fail during pool sale
     vm.mockCall(
       address(0),
       abi.encodeWithSignature("state()"),

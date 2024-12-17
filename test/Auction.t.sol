@@ -204,7 +204,7 @@ contract AuctionTest is Test {
     assertEq(uint256(auction.state()), uint256(Auction.State.FAILED_UNDERSOLD));
   }
 
-  function testEndAuctionFailedLiquidation() public {
+  function testEndAuctionFailedPoolSale() public {
     // Place a bid that would require too much of the reserve
     vm.startPrank(bidder);
     usdc.mint(bidder, 1000000000000 ether);
@@ -216,13 +216,13 @@ contract AuctionTest is Test {
     vm.warp(block.timestamp + 15 days);
     vm.prank(pool);
 
-    uint256 liquidationThresholdSlot = 6;
-    vm.store(address(auction), bytes32(liquidationThresholdSlot), bytes32(uint256(95)));
+    uint256 poolSaleLimitSlot = 6;
+    vm.store(address(auction), bytes32(poolSaleLimitSlot), bytes32(uint256(95)));
 
     auction.endAuction();
 
-    // Check that auction failed due to liquidation
-    assertEq(uint256(auction.state()), uint256(Auction.State.FAILED_LIQUIDATION));
+    // Check that auction failed due to too much of the reserve being sold
+    assertEq(uint256(auction.state()), uint256(Auction.State.FAILED_POOL_SALE_LIMIT));
   }
 
   function testEndAuctionStillOngoing() public {

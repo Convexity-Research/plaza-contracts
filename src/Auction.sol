@@ -25,13 +25,13 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
   // Auction end time and total buy amount
   uint256 public endTime;
   uint256 public totalBuyCouponAmount;
-  uint256 public liquidationThreshold;
+  uint256 public poolSaleLimit;
 
   enum State {
     BIDDING,
     SUCCEEDED,
     FAILED_UNDERSOLD,
-    FAILED_LIQUIDATION
+    FAILED_POOL_SALE_LIMIT
   }
 
   State public state;
@@ -85,7 +85,7 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
    * @param _endTime The end time of the auction.
    * @param _maxBids The maximum number of bids allowed in the auction.
    * @param _beneficiary The address of the auction beneficiary.
-   * @param _liquidationThreshold The percentage threshold for liquidation (e.g. 95000 = 95%).
+   * @param _poolSaleLimit The percentage threshold auctions should respect when selling reserves (e.g. 95000 = 95%).
    */
   function initialize(
     address _buyCouponToken, 
@@ -94,7 +94,7 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
     uint256 _endTime, 
     uint256 _maxBids, 
     address _beneficiary, 
-    uint256 _liquidationThreshold
+    uint256 _poolSaleLimit
   ) initializer public {
     __UUPSUpgradeable_init();
 
@@ -104,7 +104,7 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
     endTime = _endTime;
     maxBids = _maxBids;
     pool = msg.sender;
-    liquidationThreshold = _liquidationThreshold;
+    poolSaleLimit = _poolSaleLimit;
 
     if (_beneficiary == address(0)) {
       beneficiary = msg.sender;
@@ -333,8 +333,8 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
 
     if (currentCouponAmount < totalBuyCouponAmount) {
       state = State.FAILED_UNDERSOLD;
-    } else if (totalSellReserveAmount >= (IERC20(sellReserveToken).balanceOf(pool) * liquidationThreshold) / 100) {
-        state = State.FAILED_LIQUIDATION;
+    } else if (totalSellReserveAmount >= (IERC20(sellReserveToken).balanceOf(pool) * poolSaleLimit) / 100) {
+        state = State.FAILED_POOL_SALE_LIMIT;
     } else {
       state = State.SUCCEEDED;
       Pool(pool).transferReserveToAuction(totalSellReserveAmount);
