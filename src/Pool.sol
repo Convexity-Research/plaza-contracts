@@ -704,14 +704,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   /**
    * @dev Pauses the contract. Reverts any interaction except upgrade.
    */
-  function pause() external onlyRole(poolFactory.GOV_ROLE()) {
+  function pause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _pause();
   }
 
   /**
    * @dev Unpauses the contract.
    */
-  function unpause() external onlyRole(poolFactory.GOV_ROLE()) {
+  function unpause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _unpause();
   }
 

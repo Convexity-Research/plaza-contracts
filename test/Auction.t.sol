@@ -16,6 +16,7 @@ import {LeverageToken} from "../src/LeverageToken.sol";
 import {Deployer} from "../src/utils/Deployer.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract AuctionTest is Test {
   Auction auction;
@@ -26,6 +27,7 @@ contract AuctionTest is Test {
   address house = address(0x2);
   address minter = address(0x3);
   address governance = address(0x4);
+  address securityCouncil = address(0x5);
 
   address pool;
 
@@ -76,6 +78,7 @@ contract AuctionTest is Test {
     params.couponToken = coupon;
     
     poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
     
     Token(reserve).mint(governance, 500000000000000000000000000000);
     Token(reserve).approve(address(poolFactory), 500000000000000000000000000000);
@@ -97,6 +100,32 @@ contract AuctionTest is Test {
     assertEq(auction.totalBuyCouponAmount(), 1000000000000);
     assertEq(auction.endTime(), block.timestamp + 10 days);
     assertEq(auction.beneficiary(), house);
+  }
+
+
+  function testPause() public {
+    vm.startPrank(securityCouncil);
+    auction.pause();
+    
+    vm.startPrank(bidder);
+    vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+    auction.bid(100 ether, 1000000000);
+
+    vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+    vm.warp(block.timestamp + 15 days);
+    auction.endAuction();
+
+    vm.startPrank(securityCouncil);
+    auction.unpause();
+
+    vm.warp(block.timestamp - 14 days);
+
+    vm.startPrank(bidder);
+    usdc.mint(bidder, 1000 ether);
+    usdc.approve(address(auction), 1000 ether);
+    auction.bid(100 ether, 1000000000);
+
+    assertEq(auction.bidCount(), 1);
   }
 
   function testBidSuccess() public {

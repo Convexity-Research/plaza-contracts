@@ -23,6 +23,8 @@ contract Distributor is Initializable, AccessControlUpgradeable, PausableUpgrade
 
   /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  /// @dev Role identifier for the security council (emergency privileges)
+  bytes32 public constant SECURITY_COUNCIL_ROLE = keccak256("SECURITY_COUNCIL_ROLE");
   
   /// @dev Pool address
   Pool public pool;
@@ -148,18 +150,18 @@ contract Distributor is Initializable, AccessControlUpgradeable, PausableUpgrade
   /**
    * @dev Pauses all contract functions except for upgrades.
    * Requirements:
-   * - the caller must have the `GOV_ROLE`.
+   * - the caller must have the `SECURITY_COUNCIL_ROLE`.
    */
-  function pause() external onlyRole(GOV_ROLE) {
+  function pause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _pause();
   }
 
   /**
    * @dev Unpauses all contract functions.
    * Requirements:
-   * - the caller must have the `GOV_ROLE`.
+   * - the caller must have the `SECURITY_COUNCIL_ROLE`.
    */
-  function unpause() external onlyRole(GOV_ROLE) {
+  function unpause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _unpause();
   }
 }

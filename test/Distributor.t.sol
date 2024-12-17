@@ -23,8 +23,7 @@ contract DistributorTest is Test {
   address public user = address(0x1);
   address public sharesTokenOwner = address(0x2);
   address private deployer = address(0x3);
-  address private minter = address(0x4);
-  address private governance = address(0x5);
+  address private governance = address(0x4);
 
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
@@ -71,8 +70,6 @@ contract DistributorTest is Test {
 
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), governance);
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
-    _pool.bondToken().grantRole(_pool.bondToken().MINTER_ROLE(), minter);
-    _pool.lToken().grantRole(_pool.lToken().MINTER_ROLE(), minter);
   }
 
   function fakeSucceededAuction(address poolAddress, uint256 period) public {
@@ -89,7 +86,7 @@ contract DistributorTest is Test {
   function testClaimShares() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1*10**18);
     sharesToken.mint(address(_pool), 50*(1+10000)*10**18);
     vm.stopPrank();
@@ -119,7 +116,7 @@ contract DistributorTest is Test {
   function testClaimSharesCheckPoolInfo() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1*10**18);
     sharesToken.mint(address(_pool), 50*(1+10000)*10**18);
     vm.stopPrank();
@@ -155,7 +152,7 @@ contract DistributorTest is Test {
       address user2 = address(0x62);
       Token sharesToken = Token(_pool.couponToken());
 
-      vm.startPrank(minter);
+      vm.startPrank(address(_pool));
       _pool.bondToken().mint(user1, 1*10**18);
       _pool.bondToken().mint(user2, 1*10**18);
 
@@ -212,12 +209,9 @@ contract DistributorTest is Test {
     Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(pool)));
 
-    pool.bondToken().grantRole(pool.bondToken().MINTER_ROLE(), minter);
-    pool.lToken().grantRole(pool.lToken().MINTER_ROLE(), minter);
-
     vm.stopPrank();
 
-    vm.startPrank(minter);
+    vm.startPrank(address(pool));
     pool.bondToken().mint(user, 1*10**18);
     
     sharesToken.mint(address(pool), 50*(1+10000)*10**6);
@@ -266,7 +260,7 @@ contract DistributorTest is Test {
   function testClaimAfterMultiplePeriods() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1000*10**18);
     sharesToken.mint(address(_pool), (3 * (params.sharesPerToken * 1000 + params.sharesPerToken * 10000) / 10**_pool.bondToken().SHARES_DECIMALS()) * 10**sharesToken.decimals()); //instantiate value + minted value right above
     vm.stopPrank();
@@ -298,7 +292,7 @@ contract DistributorTest is Test {
   function testClaimNotEnoughSharesToDistribute() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1*10**18);
     // Mint enough shares but don't allocate them
     sharesToken.mint(address(distributor), 50*10**sharesToken.decimals());
@@ -318,7 +312,7 @@ contract DistributorTest is Test {
   function testClaimNotEnoughDistributorBalance() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1000*10**18);
     // Mint shares but transfer them away from the distributor
     sharesToken.mint(address(distributor), 50*10**18);

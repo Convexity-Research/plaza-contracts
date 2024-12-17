@@ -7,8 +7,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract Auction is Initializable, UUPSUpgradeable {
+contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
   using SafeERC20 for IERC20;
 
   // Pool contract
@@ -118,7 +119,7 @@ contract Auction is Initializable, UUPSUpgradeable {
    * @param sellCouponAmount The amount of sell tokens (coupon) to bid.
    * @return The index of the bid.
    */
-  function bid(uint256 buyReserveAmount, uint256 sellCouponAmount) external auctionActive returns(uint256) {
+  function bid(uint256 buyReserveAmount, uint256 sellCouponAmount) external auctionActive whenNotPaused returns(uint256) {
     if (sellCouponAmount == 0 || sellCouponAmount > totalBuyCouponAmount) revert InvalidSellAmount();
     if (sellCouponAmount % slotSize() != 0) revert InvalidSellAmount();
     if (buyReserveAmount == 0) revert BidAmountTooLow();
@@ -327,7 +328,7 @@ contract Auction is Initializable, UUPSUpgradeable {
   /**
    * @dev Ends the auction and transfers the reserve to the auction.
    */
-  function endAuction() external auctionExpired {
+  function endAuction() external auctionExpired whenNotPaused {
     if (state != State.BIDDING) revert AuctionAlreadyEnded();
 
     if (currentCouponAmount < totalBuyCouponAmount) {
@@ -347,7 +348,7 @@ contract Auction is Initializable, UUPSUpgradeable {
    * @dev Claims the tokens for a winning bid.
    * @param bidIndex The index of the bid to claim.
    */
-  function claimBid(uint256 bidIndex) auctionExpired auctionSucceeded external {
+  function claimBid(uint256 bidIndex) auctionExpired auctionSucceeded whenNotPaused external {
     Bid storage bidInfo = bids[bidIndex];
     if (bidInfo.bidder != msg.sender) revert NothingToClaim();
     if (bidInfo.claimed) revert AlreadyClaimed();
@@ -358,7 +359,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.buyReserveAmount);
   }
 
-  function claimRefund(uint256 bidIndex) auctionExpired auctionFailed external {
+  function claimRefund(uint256 bidIndex) auctionExpired auctionFailed whenNotPaused external {
     Bid storage bidInfo = bids[bidIndex];
     if (bidInfo.bidder != msg.sender) revert NothingToClaim();
     if (bidInfo.claimed) revert AlreadyClaimed();
@@ -415,6 +416,14 @@ contract Auction is Initializable, UUPSUpgradeable {
       revert AccessDenied();
     }
     _;
+  }
+
+  function pause() external onlyRole(PoolFactory(Pool(pool).poolFactory()).SECURITY_COUNCIL_ROLE()) {
+    _pause();
+  }
+
+  function unpause() external onlyRole(PoolFactory(Pool(pool).poolFactory()).SECURITY_COUNCIL_ROLE()) {
+    _unpause();
   }
 
   /**

@@ -28,7 +28,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant POOL_ROLE = keccak256("POOL_ROLE");
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-
+  bytes32 public constant SECURITY_COUNCIL_ROLE = keccak256("SECURITY_COUNCIL_ROLE");
   struct PoolParams {
     uint256 fee;
     address reserveToken;
@@ -229,6 +229,10 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // Mint seed amounts
     bondToken.mint(msg.sender, bondAmount);
     lToken.mint(msg.sender, leverageAmount);
+    
+    // Revoke minter role from factory
+    bondToken.revokeRole(MINTER_ROLE, address(this));
+    lToken.revokeRole(MINTER_ROLE, address(this));
 
     return pool;
   }
@@ -264,14 +268,14 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   /**
    * @dev Pauses contract. Reverts any interaction except upgrade.
    */
-  function pause() external onlyRole(GOV_ROLE) {
+  function pause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _pause();
   }
 
   /**
    * @dev Unpauses contract.
    */
-  function unpause() external onlyRole(GOV_ROLE) {
+  function unpause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _unpause();
   }
 

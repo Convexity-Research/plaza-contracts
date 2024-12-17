@@ -23,8 +23,9 @@ contract PoolFactoryTest is Test {
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
-  address private user = address(0x4);
-  address private user2 = address(0x5);
+  address private securityCouncil = address(0x4);
+  address private user = address(0x5);
+  address private user2 = address(0x6);
 
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
@@ -52,7 +53,7 @@ contract PoolFactoryTest is Test {
 
     vm.startPrank(governance);
     poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
-
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.distributionPeriod = 0;
@@ -144,13 +145,17 @@ contract PoolFactoryTest is Test {
   }
 
   function testPause() public {
-    vm.startPrank(governance);
+    vm.startPrank(securityCouncil);
     poolFactory.pause();
 
+    vm.startPrank(governance);
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
-    
+
+    vm.startPrank(securityCouncil);
     poolFactory.unpause();
+
+    vm.startPrank(governance);
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
     poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
   }

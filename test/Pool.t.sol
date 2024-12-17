@@ -35,8 +35,9 @@ contract PoolTest is Test, TestCases {
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
-  address private user = address(0x4);
-  address private user2 = address(0x5);
+  address private securityCouncil = address(0x4);
+  address private user = address(0x5);
+  address private user2 = address(0x6);
 
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
   uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
@@ -87,6 +88,7 @@ contract PoolTest is Test, TestCases {
 
     vm.startPrank(governance);
     poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
     vm.stopPrank();
   }
 
@@ -660,8 +662,10 @@ contract PoolTest is Test, TestCases {
     Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", "", false));
     rToken.burn(address(_pool), 1);
 
+    vm.startPrank(securityCouncil);
     _pool.pause();
 
+    vm.startPrank(governance);
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.create(Pool.TokenType.BOND, 0, 0);
 
@@ -674,7 +678,10 @@ contract PoolTest is Test, TestCases {
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.distribute();
 
+    vm.startPrank(securityCouncil);
     _pool.unpause();
+
+    vm.startPrank(governance);
     _pool.setFee(100);
 
     Pool.PoolInfo memory info = _pool.getPoolInfo();
