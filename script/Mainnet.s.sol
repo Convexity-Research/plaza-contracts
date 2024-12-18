@@ -11,6 +11,7 @@ import {PoolFactory} from "../src/PoolFactory.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {Deployer} from "../src/utils/Deployer.sol";
+import {PreDepositScript} from "./PreDeposit.s.sol";
 import {Upgrades} from "@openzeppelin/foundry-upgrades/Upgrades.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -30,6 +31,7 @@ contract MainnetScript is Script {
   uint256 private constant fee = 0;
 
   function run() public {
+    PreDepositScript preDepositScript = new PreDepositScript();
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
     
@@ -70,6 +72,8 @@ contract MainnetScript is Script {
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
     factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH", false);
+
+    preDepositScript.run(reserveToken, couponToken, address(factory), deployerAddress, distributionPeriod, sharesPerToken);
     
     vm.stopBroadcast();
   }
