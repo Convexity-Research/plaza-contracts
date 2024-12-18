@@ -46,13 +46,14 @@ contract Deployer {
     string memory name,
     string memory symbol,
     address minter,
-    address governance
+    address governance,
+    address poolFactory
   ) external returns(address) {
 
     return address(new BeaconProxy(
       address(leverageBeacon),
       abi.encodeCall(
-        LeverageToken.initialize, (name, symbol, minter, governance)
+        LeverageToken.initialize, (name, symbol, minter, governance, poolFactory)
       )
     ));
   }

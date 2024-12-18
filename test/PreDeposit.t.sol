@@ -106,7 +106,7 @@ contract PreDepositTest is Test {
     ))));
     
     LeverageToken lToken = LeverageToken(Utils.deploy(address(new LeverageToken()), abi.encodeCall(LeverageToken.initialize, (
-      "", "", governance, governance
+      "", "", governance, governance, address(poolFactory)
     ))));
 
     Pool pool = Pool(Utils.deploy(address(new Pool()), abi.encodeCall(Pool.initialize, 
