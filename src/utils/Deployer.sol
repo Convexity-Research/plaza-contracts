@@ -59,20 +59,19 @@ contract Deployer {
 
   /**
    * @dev Deploys a new Distributor contract
-   * @param governance The address with governance privileges
    * @param pool The address of the pool
    * @return address of the deployed Distributor contract
    */
   function deployDistributor(
     address distributorBeacon,
-    address governance,
-    address pool
+    address pool,
+    address poolFactory
   ) external returns(address) {
 
     return address(new BeaconProxy(
       address(distributorBeacon),
       abi.encodeCall(
-        Distributor.initialize, (governance, pool)
+        Distributor.initialize, (pool, poolFactory)
       )
     ));
   }
