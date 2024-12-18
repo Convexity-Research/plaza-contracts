@@ -100,8 +100,9 @@ contract DistributorTest is Test {
     distributor.unpause();
 
     vm.startPrank(address(_pool));
-    vm.expectCall(address(distributor), abi.encodeWithSelector(Distributor.allocate.selector, amountToDistribute));
     distributor.allocate(amountToDistribute);
+    uint256 storedAmountToDistribute = distributor.couponAmountToDistribute();
+    assertEq(storedAmountToDistribute, amountToDistribute);
   }
 
   function testClaimShares() public {
