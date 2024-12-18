@@ -102,7 +102,7 @@ contract PreDepositTest is Test {
 
   function deployFakePool() public returns(address, address, address) {
     BondToken bondToken = BondToken(Utils.deploy(address(new BondToken()), abi.encodeCall(BondToken.initialize, (
-      "", "", governance, governance, 0
+      "", "", governance, governance, address(poolFactory), 0
     ))));
     
     LeverageToken lToken = LeverageToken(Utils.deploy(address(new LeverageToken()), abi.encodeCall(LeverageToken.initialize, (

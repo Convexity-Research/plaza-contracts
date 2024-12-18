@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Decimals} from "./lib/Decimals.sol";
+import {PoolFactory} from "./PoolFactory.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -53,6 +54,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /// @dev The global asset pool
   IndexedGlobalAssetPool public globalPool;
+  /// @dev Pool factory address
+  PoolFactory public poolFactory;
 
   /// @dev Mapping of user addresses to their indexed assets
   mapping(address => IndexedUserAssets) public userAssets;
@@ -63,11 +66,12 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   /// @dev Role identifier for the distributor
   bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
-  /// @dev Role identifier for the security council (emergency privileges)
-  bytes32 public constant SECURITY_COUNCIL_ROLE = keccak256("SECURITY_COUNCIL_ROLE");
 
   /// @dev The number of decimals for shares
   uint8 public constant SHARES_DECIMALS = 6;
+
+  /// @dev Error thrown when the caller is not the security council
+  error CallerIsNotSecurityCouncil();
 
   /// @dev Emitted when the asset period is increased
   event IncreasedAssetPeriod(uint256 currentPeriod, uint256 sharesPerToken);
@@ -91,7 +95,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     string memory name, 
     string memory symbol, 
     address minter, 
-    address governance, 
+    address governance,
+    address _poolFactory,
     uint256 sharesPerToken
     ) initializer public {
 
@@ -100,6 +105,7 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     __UUPSUpgradeable_init();
     __Pausable_init();
 
+    poolFactory = PoolFactory(_poolFactory);
     globalPool.sharesPerToken = sharesPerToken;
 
     _grantRole(MINTER_ROLE, minter);
@@ -107,7 +113,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
     _setRoleAdmin(GOV_ROLE, GOV_ROLE);
     _setRoleAdmin(DISTRIBUTOR_ROLE, GOV_ROLE);
-    _setRoleAdmin(SECURITY_COUNCIL_ROLE, GOV_ROLE);
     _setRoleAdmin(MINTER_ROLE, MINTER_ROLE);
   }
 
@@ -225,18 +230,27 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
   /**
    * @dev Pauses all contract functions except for upgrades.
-   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE.
+   * Requirements:
+   * - the caller must have the `SECURITY_COUNCIL_ROLE` from the pool factory.
    */
-  function pause() external onlyRole(SECURITY_COUNCIL_ROLE) {
+  function pause() external onlySecurityCouncil() {
     _pause();
   }
 
   /**
    * @dev Unpauses all contract functions.
-   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE.
+   * Requirements:
+   * - the caller must have the `SECURITY_COUNCIL_ROLE`.
    */
-  function unpause() external onlyRole(SECURITY_COUNCIL_ROLE) {
+  function unpause() external onlySecurityCouncil() {
     _unpause();
+  }
+
+  modifier onlySecurityCouncil() {
+    if (!poolFactory.hasRole(poolFactory.SECURITY_COUNCIL_ROLE(), msg.sender)) {
+      revert CallerIsNotSecurityCouncil();
+    }
+    _;
   }
 
   /**
