@@ -1151,6 +1151,9 @@ contract PoolTest is Test, TestCases {
 
     Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", "", false));
 
+    vm.stopPrank();
+    vm.startPrank(user);
+    
     // Claim fees
     vm.expectRevert(Pool.NotBeneficiary.selector);
     pool.claimFees();
