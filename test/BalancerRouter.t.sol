@@ -76,6 +76,7 @@ contract MockBalancerVault {
     }
   }
 }
+
 contract BalancerRouterTest is Test {
   BalancerRouter public router;
   MockBalancerVault public vault;
