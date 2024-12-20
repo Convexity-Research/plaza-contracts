@@ -105,7 +105,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   event Distributed(uint256 period, uint256 amount);
   event SharesPerTokenChanged(uint256 sharesPerToken);
   event AuctionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
-  event DistributionRollOver(uint256 period, uint256 sharesPerToken);
+  event DistributionRollOver(uint256 period, uint256 shares);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
@@ -506,10 +506,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     require(lastDistribution + distributionPeriod + auctionPeriod >= block.timestamp, AuctionPeriodPassed());
 
     // Check if auction for current period has already started
-    (uint256 currentPeriod, uint256 _sharesPerToken) = bondToken.globalPool();
+    (uint256 currentPeriod,) = bondToken.globalPool();
     require(auctions[currentPeriod] == address(0), AuctionAlreadyStarted());
 
-      uint8 bondDecimals = bondToken.decimals();
+    uint8 bondDecimals = bondToken.decimals();
     uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
     uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
 
