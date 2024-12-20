@@ -10,8 +10,8 @@ import {BondToken} from "../src/BondToken.sol";
 import {PreDeposit} from "../src/PreDeposit.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -85,28 +85,24 @@ contract PreDepositTest is Test {
   function setUp_PoolFactory() internal {
     vm.startPrank(deployer);
 
-    address tokenDeployer = address(new TokenDeployer());
-    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+    address contractDeployer = address(new Deployer());
+    
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
-    PoolFactory.initialize, 
-    (governance, tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      PoolFactory.initialize, 
+      (governance, contractDeployer, ethPriceFeed, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
-    vm.stopPrank();
-
-    vm.startPrank(governance);
-    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
-    
     vm.stopPrank();
   }
 
   function deployFakePool() public returns(address, address, address) {
     BondToken bondToken = BondToken(Utils.deploy(address(new BondToken()), abi.encodeCall(BondToken.initialize, (
-      "", "", governance, governance, governance, 0
+      "", "", governance, governance, 0
     ))));
     
     LeverageToken lToken = LeverageToken(Utils.deploy(address(new LeverageToken()), abi.encodeCall(LeverageToken.initialize, (
@@ -114,7 +110,7 @@ contract PreDepositTest is Test {
     ))));
 
     Pool pool = Pool(Utils.deploy(address(new Pool()), abi.encodeCall(Pool.initialize, 
-      (address(poolFactory), 0, address(reserveToken), address(bondToken), address(lToken), address(couponToken), 0, 0, address(0), address(0))
+      (address(poolFactory), 0, address(reserveToken), address(bondToken), address(lToken), address(couponToken), 0, 0, address(0), address(0), false)
     )));
 
     // Adds fake pool to preDeposit contract
@@ -598,5 +594,25 @@ contract PreDepositTest is Test {
     vm.prank(governance);
     vm.expectRevert(PreDeposit.DepositAlreadyStarted.selector);
     preDeposit.setDepositStartTime(block.timestamp + 1 days);
+  }
+
+  function testPoolPausedOnCreation() public {
+    vm.startPrank(user1);
+    reserveToken.approve(address(preDeposit), DEPOSIT_AMOUNT);
+    preDeposit.deposit(DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    vm.startPrank(governance);
+    preDeposit.setBondAndLeverageAmount(BOND_AMOUNT, LEVERAGE_AMOUNT);
+    vm.warp(block.timestamp + 8 days); // After deposit period
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), address(preDeposit));
+
+    vm.recordLogs();
+    preDeposit.createPool();
+    Vm.Log[] memory entries = vm.getRecordedLogs();
+    
+    Pool pool = Pool(address(uint160(uint256(entries[entries.length - 1].topics[1])))); // last log is the pool created address
+    assertEq(pool.paused(), true);
+    vm.stopPrank();
   }
 }

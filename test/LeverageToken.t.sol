@@ -14,7 +14,7 @@ contract LeverageTokenTest is Test {
   address private governance = address(0x3);
   address private user = address(0x4);
   address private user2 = address(0x5);
-
+  address private securityCouncil = address(0x6);
   /**
    * @dev Sets up the testing environment.
    * Deploys the LeverageToken contract and a proxy, then initializes them.
@@ -31,7 +31,10 @@ contract LeverageTokenTest is Test {
     // Attach the LeverageToken interface to the deployed proxy
     token = LeverageToken(address(proxy));
     vm.stopPrank();
-    
+
+    vm.startPrank(governance);
+    token.grantRole(token.SECURITY_COUNCIL_ROLE(), securityCouncil);
+
     // Mint some initial tokens to the minter for testing
     vm.startPrank(minter);
     token.mint(minter, 1000);
@@ -47,7 +50,7 @@ contract LeverageTokenTest is Test {
     token.mint(user, 1000);
 
     // pause contract
-    vm.startPrank(governance);
+    vm.startPrank(securityCouncil);
     token.pause();
 
     // check it reverts on minting
@@ -67,7 +70,7 @@ contract LeverageTokenTest is Test {
     // token._authorizeUpgrade(address(0));
 
     // unpause contract
-    vm.startPrank(governance);
+    vm.startPrank(securityCouncil);
     token.unpause();
 
     // make sure you can now do stuff

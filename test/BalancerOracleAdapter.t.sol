@@ -44,7 +44,7 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
     vm.stopPrank();
   }
 
-  function testOwner() public {
+  function testOwner() public view {
     assertEq(adapter.owner(), deployer);
   }
 

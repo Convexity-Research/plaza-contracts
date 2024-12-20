@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Unlicensed
 pragma solidity ^0.8.26;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {IVault} from "@balancer/contracts/interfaces/contracts/vault/IVault.sol";
-import {IAsset} from "@balancer/contracts/interfaces/contracts/vault/IAsset.sol";
 import {Pool} from "./Pool.sol";
 import {PreDeposit} from "./PreDeposit.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IVault} from "@balancer/contracts/interfaces/contracts/vault/IVault.sol";
+import {IAsset} from "@balancer/contracts/interfaces/contracts/vault/IAsset.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract BalancerRouter is ReentrancyGuardUpgradeable {
+contract BalancerRouter is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IVault public immutable balancerVault;

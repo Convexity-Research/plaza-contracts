@@ -7,8 +7,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract Auction is Initializable, UUPSUpgradeable {
+contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
   using SafeERC20 for IERC20;
 
   // Pool contract
@@ -24,13 +25,13 @@ contract Auction is Initializable, UUPSUpgradeable {
   // Auction end time and total buy amount
   uint256 public endTime;
   uint256 public totalBuyCouponAmount;
-  uint256 public liquidationThreshold;
+  uint256 public poolSaleLimit;
 
   enum State {
     BIDDING,
     SUCCEEDED,
     FAILED_UNDERSOLD,
-    FAILED_LIQUIDATION
+    FAILED_POOL_SALE_LIMIT
   }
 
   State public state;
@@ -84,7 +85,7 @@ contract Auction is Initializable, UUPSUpgradeable {
    * @param _endTime The end time of the auction.
    * @param _maxBids The maximum number of bids allowed in the auction.
    * @param _beneficiary The address of the auction beneficiary.
-   * @param _liquidationThreshold The percentage threshold for liquidation (e.g. 95000 = 95%).
+   * @param _poolSaleLimit The percentage threshold auctions should respect when selling reserves (e.g. 95000 = 95%).
    */
   function initialize(
     address _buyCouponToken, 
@@ -93,7 +94,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     uint256 _endTime, 
     uint256 _maxBids, 
     address _beneficiary, 
-    uint256 _liquidationThreshold
+    uint256 _poolSaleLimit
   ) initializer public {
     __UUPSUpgradeable_init();
 
@@ -103,7 +104,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     endTime = _endTime;
     maxBids = _maxBids;
     pool = msg.sender;
-    liquidationThreshold = _liquidationThreshold;
+    poolSaleLimit = _poolSaleLimit;
 
     if (_beneficiary == address(0)) {
       beneficiary = msg.sender;
@@ -118,7 +119,7 @@ contract Auction is Initializable, UUPSUpgradeable {
    * @param sellCouponAmount The amount of sell tokens (coupon) to bid.
    * @return The index of the bid.
    */
-  function bid(uint256 buyReserveAmount, uint256 sellCouponAmount) external auctionActive returns(uint256) {
+  function bid(uint256 buyReserveAmount, uint256 sellCouponAmount) external auctionActive whenNotPaused returns(uint256) {
     if (sellCouponAmount == 0 || sellCouponAmount > totalBuyCouponAmount) revert InvalidSellAmount();
     if (sellCouponAmount % slotSize() != 0) revert InvalidSellAmount();
     if (buyReserveAmount == 0) revert BidAmountTooLow();
@@ -271,7 +272,10 @@ contract Auction is Initializable, UUPSUpgradeable {
         
         // Reduce the current bid's amounts
         currentBid.sellCouponAmount = sellCouponAmount - amountToRemove;
-        currentBid.buyReserveAmount = currentBid.buyReserveAmount - ((currentBid.buyReserveAmount * proportion) / 1e18);
+
+        uint256 reserveReduction = ((currentBid.buyReserveAmount * proportion) / 1e18);
+        currentBid.buyReserveAmount = currentBid.buyReserveAmount - reserveReduction;
+        totalSellReserveAmount -= reserveReduction;
         
         // Refund the proportional sellAmount
         IERC20(buyCouponToken).safeTransfer(currentBid.bidder, amountToRemove);
@@ -324,13 +328,13 @@ contract Auction is Initializable, UUPSUpgradeable {
   /**
    * @dev Ends the auction and transfers the reserve to the auction.
    */
-  function endAuction() external auctionExpired {
+  function endAuction() external auctionExpired whenNotPaused {
     if (state != State.BIDDING) revert AuctionAlreadyEnded();
 
     if (currentCouponAmount < totalBuyCouponAmount) {
       state = State.FAILED_UNDERSOLD;
-    } else if (totalSellReserveAmount >= (IERC20(sellReserveToken).balanceOf(pool) * liquidationThreshold) / 100) {
-        state = State.FAILED_LIQUIDATION;
+    } else if (totalSellReserveAmount >= (IERC20(sellReserveToken).balanceOf(pool) * poolSaleLimit) / 100) {
+        state = State.FAILED_POOL_SALE_LIMIT;
     } else {
       state = State.SUCCEEDED;
       Pool(pool).transferReserveToAuction(totalSellReserveAmount);
@@ -344,7 +348,7 @@ contract Auction is Initializable, UUPSUpgradeable {
    * @dev Claims the tokens for a winning bid.
    * @param bidIndex The index of the bid to claim.
    */
-  function claimBid(uint256 bidIndex) auctionExpired auctionSucceeded external {
+  function claimBid(uint256 bidIndex) auctionExpired auctionSucceeded whenNotPaused external {
     Bid storage bidInfo = bids[bidIndex];
     if (bidInfo.bidder != msg.sender) revert NothingToClaim();
     if (bidInfo.claimed) revert AlreadyClaimed();
@@ -355,7 +359,7 @@ contract Auction is Initializable, UUPSUpgradeable {
     emit BidClaimed(bidIndex, bidInfo.bidder, bidInfo.buyReserveAmount);
   }
 
-  function claimRefund(uint256 bidIndex) auctionExpired auctionFailed external {
+  function claimRefund(uint256 bidIndex) auctionExpired auctionFailed whenNotPaused external {
     Bid storage bidInfo = bids[bidIndex];
     if (bidInfo.bidder != msg.sender) revert NothingToClaim();
     if (bidInfo.claimed) revert AlreadyClaimed();
@@ -412,6 +416,14 @@ contract Auction is Initializable, UUPSUpgradeable {
       revert AccessDenied();
     }
     _;
+  }
+
+  function pause() external onlyRole(PoolFactory(Pool(pool).poolFactory()).SECURITY_COUNCIL_ROLE()) {
+    _pause();
+  }
+
+  function unpause() external onlyRole(PoolFactory(Pool(pool).poolFactory()).SECURITY_COUNCIL_ROLE()) {
+    _unpause();
   }
 
   /**

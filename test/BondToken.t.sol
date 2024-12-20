@@ -15,6 +15,8 @@ contract BondTokenTest is Test {
   address private user = address(0x4);
   address private user2 = address(0x5);
   address private distributor = address(0x6);
+  address private securityCouncil = address(0x7);
+
   /**
    * @dev Sets up the testing environment.
    * Deploys the BondToken contract and a proxy, then initializes them.
@@ -26,7 +28,7 @@ contract BondTokenTest is Test {
     BondToken implementation = new BondToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, distributor, 50*10**18)));
+    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("BondToken", "BOND", minter, governance, 50*10**18)));
 
     // Attach the BondToken interface to the deployed proxy
     token = BondToken(address(proxy));
@@ -40,6 +42,8 @@ contract BondTokenTest is Test {
     // Increase the indexed asset period for testing
     vm.startPrank(governance);
     token.grantRole(token.DISTRIBUTOR_ROLE(), governance);
+    token.grantRole(token.DISTRIBUTOR_ROLE(), distributor);
+    token.grantRole(token.SECURITY_COUNCIL_ROLE(), securityCouncil);
     token.increaseIndexedAssetPeriod(20000);
     vm.stopPrank();
   }
@@ -53,7 +57,7 @@ contract BondTokenTest is Test {
     token.mint(user, 1000);
 
     // pause contract
-    vm.startPrank(governance);
+    vm.startPrank(securityCouncil);
     token.pause();
 
     // check it reverts on minting
@@ -87,6 +91,7 @@ contract BondTokenTest is Test {
     // token._authorizeUpgrade(address(0));
 
     // unpause contract
+    vm.startPrank(securityCouncil);
     token.unpause();
 
     // make sure you can now do stuff
