@@ -681,7 +681,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @dev Allows the fee beneficiary to claim the accumulated protocol fees.
    */
   function claimFees() public nonReentrant {
-    require(msg.sender == feeBeneficiary, NotBeneficiary());
+    require(msg.sender == feeBeneficiary || poolFactory.hasRole(poolFactory.GOV_ROLE(), msg.sender), NotBeneficiary());
     uint256 feeAmount = getFeeAmount();
     
     if (feeAmount == 0) {
