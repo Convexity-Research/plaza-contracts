@@ -40,8 +40,10 @@ contract BalancerOracleAdapter is Initializable, OwnableUpgradeable, UUPSUpgrade
   function initialize(
     address _poolAddress,
     uint8 _decimals,
-    address _oracleFeeds
+    address _oracleFeeds,
+    address _owner
   ) initializer external {
+    __Ownable_init(_owner);
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
     __Pausable_init();

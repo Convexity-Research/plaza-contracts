@@ -18,6 +18,8 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
   /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  /// @dev Role identifier for the security council (emergency privileges)
+  bytes32 public constant SECURITY_COUNCIL_ROLE = keccak256("SECURITY_COUNCIL_ROLE");
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -44,6 +46,10 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
 
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
+
+    _setRoleAdmin(GOV_ROLE, GOV_ROLE);
+    _setRoleAdmin(SECURITY_COUNCIL_ROLE, GOV_ROLE);
+    _setRoleAdmin(MINTER_ROLE, MINTER_ROLE);
   }
 
   /**
@@ -78,38 +84,18 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
   }
 
   /**
-   * @dev Grants a role to an account.
-   * @param role The role being granted
-   * @param account The account receiving the role
-   * @notice Can only be called by addresses with the GOV_ROLE.
-   */
-  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _grantRole(role, account);
-  }
-
-  /**
-   * @dev Revokes a role from an account.
-   * @param role The role being revoked
-   * @param account The account losing the role
-   * @notice Can only be called by addresses with the GOV_ROLE.
-   */
-  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _revokeRole(role, account);
-  }
-
-  /**
    * @dev Pauses all token transfers, mints, burns, and indexing updates.
-   * @notice Can only be called by addresses with the GOV_ROLE. Does not prevent contract upgrades.
+   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE. Does not prevent contract upgrades.
    */
-  function pause() external onlyRole(GOV_ROLE) {
+  function pause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _pause();
   }
 
   /**
    * @dev Unpauses all token transfers, mints, burns, and indexing updates.
-   * @notice Can only be called by addresses with the GOV_ROLE.
+   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE.
    */
-  function unpause() external onlyRole(GOV_ROLE) {
+  function unpause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _unpause();
   }
 

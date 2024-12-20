@@ -63,6 +63,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   /// @dev Role identifier for the distributor
   bytes32 public constant DISTRIBUTOR_ROLE = keccak256("DISTRIBUTOR_ROLE");
+  /// @dev Role identifier for the security council (emergency privileges)
+  bytes32 public constant SECURITY_COUNCIL_ROLE = keccak256("SECURITY_COUNCIL_ROLE");
 
   /// @dev The number of decimals for shares
   uint8 public constant SHARES_DECIMALS = 6;
@@ -83,7 +85,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    * @param symbol The symbol of the token
    * @param minter The address that will have minting privileges
    * @param governance The address that will have governance privileges
-   * @param distributor The address that will have distributor privileges
    * @param sharesPerToken The initial number of shares per token
    */
   function initialize(
@@ -91,7 +92,6 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
     string memory symbol, 
     address minter, 
     address governance, 
-    address distributor,
     uint256 sharesPerToken
     ) initializer public {
 
@@ -104,7 +104,11 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
 
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
-    _grantRole(DISTRIBUTOR_ROLE, distributor);
+
+    _setRoleAdmin(GOV_ROLE, GOV_ROLE);
+    _setRoleAdmin(DISTRIBUTOR_ROLE, GOV_ROLE);
+    _setRoleAdmin(SECURITY_COUNCIL_ROLE, GOV_ROLE);
+    _setRoleAdmin(MINTER_ROLE, MINTER_ROLE);
   }
 
   /**
@@ -220,38 +224,18 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
   }
 
   /**
-   * @dev Grants a role to an account.
-   * @param role The role to grant
-   * @param account The account to grant the role to
-   * @notice Can only be called by addresses with the GOV_ROLE.
-   */
-  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _grantRole(role, account);
-  }
-
-  /**
-   * @dev Revokes a role from an account.
-   * @param role The role to revoke
-   * @param account The account to revoke the role from
-   * @notice Can only be called by addresses with the GOV_ROLE.
-   */
-  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _revokeRole(role, account);
-  }
-
-  /**
    * @dev Pauses all contract functions except for upgrades.
-   * @notice Can only be called by addresses with the GOV_ROLE.
+   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE.
    */
-  function pause() external onlyRole(GOV_ROLE) {
+  function pause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _pause();
   }
 
   /**
    * @dev Unpauses all contract functions.
-   * @notice Can only be called by addresses with the GOV_ROLE.
+   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE.
    */
-  function unpause() external onlyRole(GOV_ROLE) {
+  function unpause() external onlyRole(SECURITY_COUNCIL_ROLE) {
     _unpause();
   }
 
