@@ -702,6 +702,8 @@ contract PoolTest is Test, TestCases {
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
     Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), governance);
+
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
     uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
@@ -716,8 +718,6 @@ contract PoolTest is Test, TestCases {
     vm.stopPrank();
 
     vm.startPrank(governance);
-    vm.expectEmit(true, true, true, true);
-    emit Pool.Distributed(1, expectedDistribution);
 
     fakeSucceededAuction(address(_pool), 0);
 
@@ -726,6 +726,18 @@ contract PoolTest is Test, TestCases {
       abi.encodeWithSignature("state()"),
       abi.encode(uint256(1))
     );
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(expectedDistribution)
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
+    vm.expectEmit(true, true, true, true);
+    emit Pool.Distributed(0, expectedDistribution);
 
     _pool.distribute();
     vm.stopPrank();
@@ -756,18 +768,26 @@ contract PoolTest is Test, TestCases {
       abi.encode(uint256(3))
     );
 
-    vm.expectEmit(true, true, true, true);
-    emit Pool.DistributionRollOver(0, params.sharesPerToken);
-
     // Fast forward 5 days
     vm.warp(block.timestamp + 5 days);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(0))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
+    vm.expectEmit(true, true, true, true);
+    emit Pool.DistributionRollOver(0, 0);
 
     _pool.distribute();
     vm.stopPrank();
 
     Pool.PoolInfo memory info = _pool.getPoolInfo();
     assertEq(info.currentPeriod, 1);
-    assertEq(info.lastDistribution, block.timestamp);
     assertEq(sharesToken.balanceOf(address(distributor)), 0);
   }
 
@@ -794,8 +814,17 @@ contract PoolTest is Test, TestCases {
       abi.encode(uint256(2))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(0))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
     vm.expectEmit(true, true, true, true);
-    emit Pool.DistributionRollOver(0, params.sharesPerToken);
+    emit Pool.DistributionRollOver(0, 0);
 
     // Fast forward 5 days
     vm.warp(block.timestamp + 5 days);
@@ -805,48 +834,7 @@ contract PoolTest is Test, TestCases {
 
     Pool.PoolInfo memory info = _pool.getPoolInfo();
     assertEq(info.currentPeriod, 1);
-    assertEq(info.lastDistribution, block.timestamp);
     assertEq(sharesToken.balanceOf(address(distributor)), 0);
-  }
-
-  function testDistributeMultiplePeriods() public {
-    Token rToken = Token(params.reserveToken);
-
-    vm.startPrank(governance);
-    rToken.mint(governance, 10000001000);
-    rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
-
-    Token sharesToken = Token(_pool.couponToken());
-    uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
-    vm.stopPrank();
-    
-    vm.startPrank(address(_pool));
-    _pool.bondToken().mint(user, initialBalance);
-    vm.stopPrank();
-
-    vm.startPrank(minter);
-    sharesToken.mint(address(_pool), expectedDistribution * 3);
-    vm.stopPrank();
-
-    vm.startPrank(governance);
-    fakeSucceededAuction(address(_pool), 0);
-    fakeSucceededAuction(address(_pool), 1);
-    fakeSucceededAuction(address(_pool), 2);
-
-    vm.mockCall(
-      address(0),
-      abi.encodeWithSignature("state()"),
-      abi.encode(uint256(1))
-    );
-
-    _pool.distribute();
-    _pool.distribute();
-    _pool.distribute();
-    vm.stopPrank();
-
-    assertEq(sharesToken.balanceOf(address(distributor)), expectedDistribution * 3);
   }
 
   function testDistributeNoShares() public {

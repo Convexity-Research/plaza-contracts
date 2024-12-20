@@ -105,6 +105,15 @@ contract DistributorTest is Test {
       abi.encode(uint256(1))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(50*(1+10000)*10**18))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
     _pool.distribute();
     vm.stopPrank();
 
@@ -135,6 +144,15 @@ contract DistributorTest is Test {
       abi.encode(uint256(1))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(50*(1+10000)*10**18))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
     _pool.distribute();
     vm.stopPrank();
 
@@ -152,41 +170,49 @@ contract DistributorTest is Test {
     vm.stopPrank();
   }
 
-    function testAllBondHoldersCanClaim() public {
-      address user1 = address(0x61);
-      address user2 = address(0x62);
-      Token sharesToken = Token(_pool.couponToken());
+  function testAllBondHoldersCanClaim() public {
+    address user1 = address(0x61);
+    address user2 = address(0x62);
+    Token sharesToken = Token(_pool.couponToken());
 
-      vm.startPrank(minter);
-      _pool.bondToken().mint(user1, 1*10**18);
-      _pool.bondToken().mint(user2, 1*10**18);
+    vm.startPrank(minter);
+    _pool.bondToken().mint(user1, 1*10**18);
+    _pool.bondToken().mint(user2, 1*10**18);
 
-      sharesToken.mint(address(_pool), 500100000000000000000000);
-      vm.stopPrank();
+    sharesToken.mint(address(_pool), 500100000000000000000000);
+    vm.stopPrank();
 
-      vm.startPrank(governance);
-      fakeSucceededAuction(address(_pool), 0);
+    vm.startPrank(governance);
+    fakeSucceededAuction(address(_pool), 0);
 
-      vm.mockCall(
-          address(0),
-          abi.encodeWithSignature("state()"),
-          abi.encode(uint256(1))
-      );
+    vm.mockCall(
+        address(0),
+        abi.encodeWithSignature("state()"),
+        abi.encode(uint256(1))
+    );
 
-      vm.warp(block.timestamp + params.distributionPeriod);
-      _pool.distribute();
-      vm.stopPrank();
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(500100000000000000000000))
+    );
 
-      vm.startPrank(user1);
-      distributor.claim(address(_pool));
-      assertEq(sharesToken.balanceOf(user1), 50 * 10**18);
-      vm.stopPrank();
+    vm.warp(block.timestamp + params.distributionPeriod);
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+    _pool.distribute();
+    vm.stopPrank();
 
-      vm.startPrank(user2);
-      distributor.claim(address(_pool));
-      assertEq(sharesToken.balanceOf(user2), 50 * 10**18);
-      vm.stopPrank();
-    }
+    vm.startPrank(user1);
+    distributor.claim(address(_pool));
+    assertEq(sharesToken.balanceOf(user1), 50 * 10**18);
+    vm.stopPrank();
+
+    vm.startPrank(user2);
+    distributor.claim(address(_pool));
+    assertEq(sharesToken.balanceOf(user2), 50 * 10**18);
+    vm.stopPrank();
+  }
 
   function testClaimSharesDifferentDecimals() public {
     vm.startPrank(governance);
@@ -214,6 +240,7 @@ contract DistributorTest is Test {
     Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
 
     pool.bondToken().grantRole(pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
+    pool.bondToken().grantRole(pool.bondToken().DISTRIBUTOR_ROLE(), governance);
     pool.bondToken().grantRole(pool.bondToken().MINTER_ROLE(), minter);
     pool.lToken().grantRole(pool.lToken().MINTER_ROLE(), minter);
 
@@ -233,6 +260,15 @@ contract DistributorTest is Test {
       abi.encodeWithSignature("state()"),
       abi.encode(uint256(1))
     );
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(50*(1+10000)*10**6))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
 
     pool.distribute();
     vm.stopPrank();
@@ -260,7 +296,8 @@ contract DistributorTest is Test {
 
     vm.startPrank(minter);
     _pool.bondToken().mint(user, 1000*10**18);
-    sharesToken.mint(address(_pool), (3 * (params.sharesPerToken * 1000 + params.sharesPerToken * 10000) / 10**_pool.bondToken().SHARES_DECIMALS()) * 10**sharesToken.decimals()); //instantiate value + minted value right above
+    uint256 coupons = params.sharesPerToken * 1000 + params.sharesPerToken * 10000 / 10**_pool.bondToken().SHARES_DECIMALS();
+    sharesToken.mint(address(_pool), 3 * coupons * 10**sharesToken.decimals()); //instantiate value + minted value right above
     vm.stopPrank();
 
     vm.startPrank(governance);
@@ -274,8 +311,22 @@ contract DistributorTest is Test {
       abi.encode(uint256(1))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(coupons * 10**sharesToken.decimals())
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
     _pool.distribute();
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
     _pool.distribute();
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
     _pool.distribute();
     vm.stopPrank();
 
