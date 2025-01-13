@@ -73,17 +73,18 @@ contract AuctionTest is Test {
     PoolFactory.PoolParams memory params;
     params.fee = 0;
     params.reserveToken = reserve;
-    params.sharesPerToken = 50 * 10 ** 18;
-    params.distributionPeriod = 10;
+    params.sharesPerToken = 2500000;
+    params.distributionPeriod = 90 days;
     params.couponToken = coupon;
     
+    poolFactory.grantRole(poolFactory.GOV_ROLE(), governance);
     poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
     poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
     
     Token(reserve).mint(governance, 500000000000000000000000000000);
     Token(reserve).approve(address(poolFactory), 500000000000000000000000000000);
     
-    return poolFactory.createPool(params, 500000000000000000000000000000, 10000, 10000, "Bond ETH", "bondETH", "Leverage ETH", "levETH", false);
+    return poolFactory.createPool(params, 500000000000000000000000000000, 10000*10**18, 10000*10**18, "Bond ETH", "bondETH", "Leverage ETH", "levETH", false);
   }
 
   function useMockPool(address poolAddress) public {
@@ -606,5 +607,41 @@ contract AuctionTest is Test {
     (, uint256 amount2, , , ,) = auction.bids(2);
 
     assertEq(amount1 + amount2, auction.totalSellReserveAmount());
+  }
+
+  function testAuctionBidOverflow() public {
+    address user1 = address(1001);
+    vm.startPrank(governance);
+
+    Pool(pool).setAuctionPeriod(10 days);
+    vm.stopPrank();
+
+    vm.warp(95 days);
+    Pool(pool).startAuction();
+
+    (uint256 currentPeriod,) = Pool(pool).bondToken().globalPool();
+    address auctionAddress = Pool(pool).auctions(currentPeriod);
+    Auction _auction = Auction(auctionAddress);
+
+    Token usdcToken = Token(Pool(pool).couponToken());
+
+    vm.startPrank(bidder);
+    uint256 initialBidAmount = 25000000000000000000;
+    usdcToken.mint(bidder, initialBidAmount);
+    usdcToken.approve(auctionAddress, initialBidAmount);
+
+    uint256 target_amount = type(uint256).max / initialBidAmount;
+
+    vm.expectRevert(Auction.BidAmountTooHigh.selector);
+    _auction.bid(target_amount, 25000000000000000000);
+    vm.stopPrank();
+
+    vm.startPrank(user1);
+    uint256 newBidderBid = 25000000000000000000 * 2;
+    usdcToken.mint(user1, newBidderBid);
+    usdcToken.approve(auctionAddress, newBidderBid);
+
+    _auction.bid(1 ether, newBidderBid);
+    vm.stopPrank();
   }
 }
