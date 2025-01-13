@@ -25,12 +25,13 @@ contract Deployer {
     string memory symbol,
     address minter,
     address governance,
+    address poolFactory,
     uint256 sharesPerToken
   ) external returns(address) {
     return address(new BeaconProxy(
       address(bondBeacon),
       abi.encodeCall(
-        BondToken.initialize, (name, symbol, minter, governance, sharesPerToken)
+        BondToken.initialize, (name, symbol, minter, governance, poolFactory, sharesPerToken)
       )
     ));
   }
