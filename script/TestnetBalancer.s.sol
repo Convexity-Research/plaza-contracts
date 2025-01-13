@@ -94,8 +94,9 @@ contract TestnetBalancerScript is Script {
 
     // Set price feeds
     OracleFeeds(oracleFeeds).setPriceFeed(balancerPoolToken, address(0), balancerOracleAdapter, 1 days);
-    OracleFeeds(oracleFeeds).setPriceFeed(cbEthToken, address(0), cbEthPriceFeed, 1 days);
-    OracleFeeds(oracleFeeds).setPriceFeed(wstEthToken, address(0), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeeds).setPriceFeed(cbEthToken, address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), cbEthPriceFeed, 1 days);
+    OracleFeeds(oracleFeeds).setPriceFeed(wstEthToken, address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeeds).setPriceFeed(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0), ethPriceFeed, 1 days);
     
     Token(params.reserveToken).approve(address(factory), reserveAmount);
     

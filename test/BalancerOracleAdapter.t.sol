@@ -20,7 +20,7 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
 
   address private poolAddr = address(0x1);
   address private oracleFeed;
-  address private priceFeed = address(0x18);
+  address private ethPriceFeed = address(0x18);
   address private deployer = address(0x3);
 
   /**
@@ -93,6 +93,78 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
       priceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
       abi.encode(uint80(0), int256(100 ether), uint256(0), block.timestamp, uint80(0))
+    );
+
+    // Mock decimals call
+    vm.mockCall(
+      priceFeed,
+      abi.encodeWithSelector(AggregatorV3Interface.decimals.selector),
+      abi.encode(uint8(18))
+    );
+
+    // Mock getInvariant and getActualSupply
+    vm.mockCall(
+      poolAddr,
+      abi.encodeWithSelector(IBalancerV2WeightedPool.getInvariant.selector),
+      abi.encode(1000000000000000000)
+    );
+
+    vm.mockCall(
+      poolAddr,
+      abi.encodeWithSelector(IBalancerV2WeightedPool.getActualSupply.selector),
+      abi.encode(1000000000000000000)
+    );
+
+    // Get latest round data
+    (,int256 answer,,,) = adapter.latestRoundData();
+    assertEq(answer, 19900);
+  }
+
+  function testLatestRoundDataRealData() public {
+    // Mock required external calls
+    vm.mockCall(
+      poolAddr,
+      abi.encodeWithSelector(IBalancerV2WeightedPool.getVault.selector),
+      abi.encode(address(0x4))
+    );
+
+    vm.mockCall(
+      address(0x4),
+      abi.encodeWithSelector(IVault.manageUserBalance.selector),
+      bytes("")
+    );
+
+    vm.mockCall(
+      poolAddr,
+      abi.encodeWithSelector(IBalancerV2WeightedPool.getPoolId.selector),
+      abi.encode(bytes32(0))
+    );
+
+    // Mock getPoolTokens call
+    IERC20[] memory tokens = new IERC20[](2);
+    tokens[0] = IERC20(address(0x5));
+    tokens[1] = IERC20(address(0x6));
+    vm.mockCall(
+      address(0x4),
+      abi.encodeWithSelector(IVault.getPoolTokens.selector),
+      abi.encode(tokens, new uint256[](2), block.timestamp)
+    );
+
+    // Mock getNormalizedWeights call
+    uint256[] memory weights = new uint256[](2);
+    weights[0] = 800000000000000000; // 0.8
+    weights[1] = 200000000000000000; // 0.2
+    vm.mockCall(
+      poolAddr,
+      abi.encodeWithSelector(IBalancerV2WeightedPool.getNormalizedWeights.selector),
+      abi.encode(weights)
+    );
+
+    // Mock latestRoundData call for oracle feed
+    vm.mockCall(
+      priceFeed,
+      abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+      abi.encode(uint80(0), int256(348539000000), uint256(0), block.timestamp, uint80(0))
     );
 
     // Mock decimals call
