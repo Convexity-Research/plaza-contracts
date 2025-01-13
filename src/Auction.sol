@@ -276,6 +276,7 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
         
         // Reduce the current bid's amounts
         currentBid.sellCouponAmount = sellCouponAmount - amountToRemove;
+        currentCouponAmount -= amountToRemove;
 
         uint256 reserveReduction = ((currentBid.buyReserveAmount * proportion) / 1e18);
         currentBid.buyReserveAmount = currentBid.buyReserveAmount - reserveReduction;
