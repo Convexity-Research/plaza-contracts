@@ -30,7 +30,6 @@ contract PoolTest is Test, TestCases {
   PoolFactory.PoolParams private params;
 
   MockPriceFeed private mockPriceFeed;
-  address private oracleFeeds;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
@@ -52,7 +51,7 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(deployer);
 
     address contractDeployer = address(new Deployer());
-    address oracleFeeds = address(new OracleFeeds());
+    address oracleFeed = address(new OracleFeeds());
 
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
@@ -61,7 +60,7 @@ contract PoolTest is Test, TestCases {
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance, contractDeployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
+      (governance, contractDeployer, oracleFeed, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
     params.fee = 0;
@@ -71,7 +70,7 @@ contract PoolTest is Test, TestCases {
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
     
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeed).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
     // Deploy the mock price feed
     mockPriceFeed = new MockPriceFeed();
