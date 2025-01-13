@@ -3,6 +3,8 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "../src/LeverageToken.sol";
+import {Utils} from "../src/lib/Utils.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
@@ -15,25 +17,34 @@ contract LeverageTokenTest is Test {
   address private user = address(0x4);
   address private user2 = address(0x5);
   address private securityCouncil = address(0x6);
+  
+  PoolFactory private poolFactory;
+
   /**
    * @dev Sets up the testing environment.
    * Deploys the LeverageToken contract and a proxy, then initializes them.
    * Grants the minter and governance roles and mints initial tokens.
    */
   function setUp() public {
+    vm.startPrank(governance);
+    poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
+      PoolFactory.initialize, 
+      (governance, address(0), address(0), address(0), address(0), address(0), address(0))
+    )));
+
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
+    vm.stopPrank();
+  
     vm.startPrank(deployer);
     // Deploy and initialize LeverageToken
     LeverageToken implementation = new LeverageToken();
 
     // Deploy the proxy and initialize the contract through the proxy
-    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("LeverageToken", "LEVR", minter, governance)));
+    proxy = new ERC1967Proxy(address(implementation), abi.encodeCall(implementation.initialize, ("LeverageToken", "LEVR", minter, governance, address(poolFactory))));
 
     // Attach the LeverageToken interface to the deployed proxy
     token = LeverageToken(address(proxy));
     vm.stopPrank();
-
-    vm.startPrank(governance);
-    token.grantRole(token.SECURITY_COUNCIL_ROLE(), securityCouncil);
 
     // Mint some initial tokens to the minter for testing
     vm.startPrank(minter);

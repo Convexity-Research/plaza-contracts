@@ -162,6 +162,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
       leverageName,
       leverageSymbol,
       address(this),
+      address(this),
       address(this)
     ));
 
