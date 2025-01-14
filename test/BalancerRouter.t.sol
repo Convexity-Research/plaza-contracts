@@ -41,7 +41,7 @@ contract MockBalancerVault {
   }
 
   function joinPool(
-    bytes32 poolId,
+    bytes32 /*poolId*/,
     address sender,
     address recipient,
     JoinPoolRequest memory request
@@ -60,7 +60,7 @@ contract MockBalancerVault {
   }
 
   function exitPool(
-    bytes32 poolId,
+    bytes32 /*poolId*/,
     address sender,
     address payable recipient,
     ExitPoolRequest memory request
@@ -76,6 +76,7 @@ contract MockBalancerVault {
     }
   }
 }
+
 contract BalancerRouterTest is Test {
   BalancerRouter public router;
   MockBalancerVault public vault;
@@ -148,7 +149,7 @@ contract BalancerRouterTest is Test {
     poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
 
     balancerPoolToken.approve(address(poolFactory), 100 ether);
-    _pool = Pool(poolFactory.createPool(params, 100 ether, 10000*10**18, 10000*10**18, "", "", "", ""));
+    _pool = Pool(poolFactory.createPool(params, 100 ether, 10000*10**18, 10000*10**18, "", "", "", "", false));
     vm.stopPrank();
 
     vm.startPrank(deployer);

@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Pool} from "./Pool.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -16,14 +17,13 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
  * @title Distributor
  * @dev This contract manages the distribution of coupon shares to users based on their bond token balances.
  */
-contract Distributor is Initializable, AccessControlUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+contract Distributor is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable {
   using SafeERC20 for IERC20;
   using ERC20Extensions for IERC20;
   using Decimals for uint256;
-
-  /// @dev Role identifier for accounts with governance privileges
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   
+  /// @dev Pool factory address
+  PoolFactory public poolFactory;
   /// @dev Pool address
   Pool public pool;
   /// @dev Coupon token total amount to be distributed
@@ -43,6 +43,8 @@ contract Distributor is Initializable, AccessControlUpgradeable, PausableUpgrade
   error InvalidPoolAddress();
   /// @dev error thrown when the caller is not the pool
   error CallerIsNotPool();
+  /// @dev error thrown when the caller does not have the required role
+  error AccessDenied();
 
   /// @dev Event emitted when a user claims their shares
   event ClaimedShares(address user, uint256 period, uint256 shares);
@@ -55,16 +57,17 @@ contract Distributor is Initializable, AccessControlUpgradeable, PausableUpgrade
   }
 
   /**
-   * @dev Initializes the contract with the governance address and sets up roles.
+   * @dev Initializes the contract with the pool address and pool factory address.
    * This function is called once during deployment or upgrading to initialize state variables.
-   * @param _governance Address of the governance account that will have the GOV_ROLE.
+   * @param _pool Address of the pool.
+   * @param _poolFactory Address of the pool factory.
    */
-  function initialize(address _governance, address _pool) initializer public {
+  function initialize(address _pool, address _poolFactory) initializer public {
     __ReentrancyGuard_init();
     __Pausable_init();
 
-    _grantRole(GOV_ROLE, _governance);
     pool = Pool(_pool);
+    poolFactory = PoolFactory(_poolFactory);
   }
 
   /**
@@ -122,44 +125,27 @@ contract Distributor is Initializable, AccessControlUpgradeable, PausableUpgrade
   }
 
   /**
-   * @dev Grants `role` to `account`.
-   * If `account` had not been already granted `role`, emits a {RoleGranted} event.
-   * Requirements:
-   * - the caller must have ``role``'s admin role.
-   * @param role The role to grant
-   * @param account The account to grant the role to
+   * @dev Pauses the contract. Reverts any interaction except upgrade.
    */
-  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _grantRole(role, account);
-  }
-
-  /**
-   * @dev Revokes `role` from `account`.
-   * If `account` had been granted `role`, emits a {RoleRevoked} event.
-   * Requirements:
-   * - the caller must have ``role``'s admin role.
-   * @param role The role to revoke
-   * @param account The account to revoke the role from
-   */
-  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _revokeRole(role, account);
-  }
-
-  /**
-   * @dev Pauses all contract functions except for upgrades.
-   * Requirements:
-   * - the caller must have the `GOV_ROLE`.
-   */
-  function pause() external onlyRole(GOV_ROLE) {
+  function pause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _pause();
   }
 
   /**
-   * @dev Unpauses all contract functions.
-   * Requirements:
-   * - the caller must have the `GOV_ROLE`.
+   * @dev Unpauses the contract.
    */
-  function unpause() external onlyRole(GOV_ROLE) {
+  function unpause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _unpause();
+  }
+
+  /**
+   * @dev Modifier to check if the caller has the specified role.
+   * @param role The role to check for.
+   */
+  modifier onlyRole(bytes32 role) {
+    if (!poolFactory.hasRole(role, msg.sender)) {
+      revert AccessDenied();
+    }
+    _;
   }
 }

@@ -12,6 +12,7 @@ import {Distributor} from "../src/Distributor.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {Deployer} from "../src/utils/Deployer.sol";
+import {PreDepositScript} from "./PreDeposit.s.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract TestnetScript is Script {

@@ -35,14 +35,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   uint256 private constant BOND_TARGET_PRICE = 100;
   uint8 private constant COMMON_DECIMALS = 18;
   uint256 private constant SECONDS_PER_YEAR = 365 days;
-  uint256 private constant MIN_LIQUIDATION_THRESHOLD = 90; // 90%
+  uint256 private constant MIN_POOL_SALE_LIMIT = 90; // 90%
 
   // Protocol
   PoolFactory public poolFactory;
   uint256 private fee;
   address public feeBeneficiary;
   uint256 private lastFeeClaimTime;
-  uint256 private liquidationThreshold;
+  uint256 private poolSaleLimit;
 
   // Tokens
   address public reserveToken;
@@ -98,21 +98,21 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   error AuctionPeriodPassed();
   error AuctionNotSucceeded();
   error AuctionAlreadyStarted();
-  error LiquidationThresholdTooLow();
+  error PoolSaleLimitTooLow();
   error DistributionPeriodNotPassed();
 
   // Events
-  event MerchantApproved(address merchant);
+  event Distributed(uint256 period, uint256 amount);
   event SharesPerTokenChanged(uint256 sharesPerToken);
-  event Distributed(uint256 amount, address distributor);
+  event Distributed(uint256 period, uint256 amount, address distributor);
   event AuctionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
-  event DistributionRollOver(uint256 period, uint256 sharesPerToken);
+  event DistributionRollOver(uint256 period, uint256 shares);
   event DistributionPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
   event TokensCreated(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 mintedAmount);
   event TokensRedeemed(address caller, address onBehalfOf, TokenType tokenType, uint256 depositedAmount, uint256 redeemedAmount);
   event FeeClaimed(address beneficiary, uint256 amount);
   event FeeChanged(uint256 oldFee, uint256 newFee);
-  event LiquidationThresholdChanged(uint256 oldThreshold, uint256 newThreshold);
+  event PoolSaleLimitChanged(uint256 oldThreshold, uint256 newThreshold);
   
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -141,7 +141,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 _sharesPerToken,
     uint256 _distributionPeriod,
     address _feeBeneficiary,
-    address _oracleFeeds
+    address _oracleFeeds,
+    bool _pauseOnCreation
   ) initializer public {
     __OracleReader_init(_oracleFeeds);
     __ReentrancyGuard_init();
@@ -160,20 +161,24 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     lastDistribution = block.timestamp;
     feeBeneficiary = _feeBeneficiary;
     lastFeeClaimTime = block.timestamp;
-    liquidationThreshold = MIN_LIQUIDATION_THRESHOLD;
+    poolSaleLimit = MIN_POOL_SALE_LIMIT;
+
+    if (_pauseOnCreation) {
+      _pause();
+    }
   }
 
   /**
-   * @dev Sets the liquidation threshold. Cannot be set below 90%.
-   * @param _liquidationThreshold The new liquidation threshold value.
+   * @dev Sets the pool sale limit. Cannot be set below 90%.
+   * @param _poolSaleLimit The new pool sale limit value.
    */
-  function setLiquidationThreshold(uint256 _liquidationThreshold) external onlyRole(poolFactory.GOV_ROLE()) {
-    if (_liquidationThreshold < MIN_LIQUIDATION_THRESHOLD) {
-      revert LiquidationThresholdTooLow();
+  function setPoolSaleLimit(uint256 _poolSaleLimit) external onlyRole(poolFactory.GOV_ROLE()) {
+    if (_poolSaleLimit < MIN_POOL_SALE_LIMIT) {
+      revert PoolSaleLimitTooLow();
     }
-    uint256 oldThreshold = liquidationThreshold;
-    liquidationThreshold = _liquidationThreshold;
-    emit LiquidationThresholdChanged(oldThreshold, _liquidationThreshold);
+    uint256 oldThreshold = poolSaleLimit;
+    poolSaleLimit = _poolSaleLimit;
+    emit PoolSaleLimitChanged(oldThreshold, _poolSaleLimit);
   }
 
   /**
@@ -502,7 +507,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   /**
    * @dev Starts an auction for the current period.
    */
-  function startAuction() external {
+  function startAuction() external whenNotPaused() {
     // Check if distribution period has passed
     require(lastDistribution + distributionPeriod < block.timestamp, DistributionPeriodNotPassed());
 
@@ -510,8 +515,19 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     require(lastDistribution + distributionPeriod + auctionPeriod >= block.timestamp, AuctionPeriodPassed());
 
     // Check if auction for current period has already started
-    (uint256 currentPeriod, uint256 _sharesPerToken) = bondToken.globalPool();
+    (uint256 currentPeriod,) = bondToken.globalPool();
     require(auctions[currentPeriod] == address(0), AuctionAlreadyStarted());
+
+    uint8 bondDecimals = bondToken.decimals();
+    uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
+    uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
+
+    uint256 normalizedTotalSupply = bondToken.totalSupply().normalizeAmount(bondDecimals, maxDecimals);
+    uint256 normalizedShares = sharesPerToken.normalizeAmount(sharesDecimals, maxDecimals);
+
+    // Calculate the coupon amount to distribute
+    uint256 couponAmountToDistribute = (normalizedTotalSupply * normalizedShares)
+        .toBaseUnit(maxDecimals * 2 - IERC20(couponToken).safeDecimals());
 
     auctions[currentPeriod] = Utils.deploy(
       address(new Auction()),
@@ -519,13 +535,19 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
         Auction.initialize.selector,
         address(couponToken),
         address(reserveToken),
-        (bondToken.totalSupply() * _sharesPerToken).toBaseUnit(bondToken.SHARES_DECIMALS()),
+        couponAmountToDistribute,
         block.timestamp + auctionPeriod,
         1000,
         address(this),
-        liquidationThreshold
+        poolSaleLimit
       )
     );
+
+    // Increase the bond token period
+    bondToken.increaseIndexedAssetPeriod(sharesPerToken);
+
+    // Update last distribution time
+    lastDistribution = block.timestamp;
   }
 
   /**
@@ -545,42 +567,22 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * Can only be called after the distribution period has passed.
    */
   function distribute() external whenNotPaused {
-    if (block.timestamp - lastDistribution < distributionPeriod) {
-      revert DistributionPeriod();
-    }
+    (uint256 currentPeriod,) = bondToken.globalPool();
+    require(currentPeriod > 0, AccessDenied());
 
-    (uint256 currentPeriod, uint256 periodShares) = bondToken.globalPool();
-    if (Auction(auctions[currentPeriod]).state() == Auction.State.FAILED_LIQUIDATION || 
-        Auction(auctions[currentPeriod]).state() == Auction.State.FAILED_UNDERSOLD) {
-      
-      // Increase the bond token period
-      bondToken.increaseIndexedAssetPeriod(sharesPerToken);
+    // Period is increased when auction starts, we want to distribute for the previous period
+    uint256 previousPeriod = currentPeriod - 1;
+    uint256 couponAmountToDistribute = Auction(auctions[previousPeriod]).totalBuyCouponAmount();
 
-      // Update last distribution time
-      lastDistribution = block.timestamp;
+    if (Auction(auctions[previousPeriod]).state() == Auction.State.FAILED_POOL_SALE_LIMIT ||
+        Auction(auctions[previousPeriod]).state() == Auction.State.FAILED_UNDERSOLD) {
 
-      emit DistributionRollOver(currentPeriod, periodShares);
+      emit DistributionRollOver(previousPeriod, couponAmountToDistribute);
       return;
     }
 
+    // Get Distributor
     address distributor = poolFactory.distributors(address(this));
-
-    // Update last distribution time
-    lastDistribution = block.timestamp;
-
-    uint8 bondDecimals = bondToken.decimals();
-    uint8 sharesDecimals = bondToken.SHARES_DECIMALS();
-    uint8 maxDecimals = bondDecimals > sharesDecimals ? bondDecimals : sharesDecimals;
-
-    uint256 normalizedTotalSupply = bondToken.totalSupply().normalizeAmount(bondDecimals, maxDecimals);
-    uint256 normalizedShares = sharesPerToken.normalizeAmount(sharesDecimals, maxDecimals);
-
-    // Calculate the coupon amount to distribute
-    uint256 couponAmountToDistribute = (normalizedTotalSupply * normalizedShares)
-        .toBaseUnit(maxDecimals * 2 - IERC20(couponToken).safeDecimals());
-    
-    // Increase the bond token period
-    bondToken.increaseIndexedAssetPeriod(sharesPerToken);
 
     // Transfer coupon tokens to the distributor
     IERC20(couponToken).safeTransfer(distributor, couponAmountToDistribute);
@@ -588,12 +590,13 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     // Update distributor with the amount to distribute
     Distributor(distributor).allocate(couponAmountToDistribute);
 
-    emit Distributed(couponAmountToDistribute, distributor);
+    emit Distributed(previousPeriod, couponAmountToDistribute, distributor);
   }
 
   /**
    * @dev Returns the current pool information.
-   * @return info A struct containing various pool parameters and balances.
+   * @return info A struct containing various pool parameters and balances in the following order:
+   * {fee, distributionPeriod, reserve, bondSupply, levSupply, sharesPerToken, currentPeriod, lastDistribution, auctionPeriod, feeBeneficiary}
    */
   function getPoolInfo() external view returns (PoolInfo memory info) {
     (uint256 currentPeriod, uint256 _sharesPerToken) = bondToken.globalPool();
@@ -675,7 +678,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @dev Allows the fee beneficiary to claim the accumulated protocol fees.
    */
   function claimFees() public nonReentrant {
-    require(msg.sender == feeBeneficiary, NotBeneficiary());
+    require(msg.sender == feeBeneficiary || poolFactory.hasRole(poolFactory.GOV_ROLE(), msg.sender), NotBeneficiary());
     uint256 feeAmount = getFeeAmount();
     
     if (feeAmount == 0) {
@@ -699,14 +702,14 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
   /**
    * @dev Pauses the contract. Reverts any interaction except upgrade.
    */
-  function pause() external onlyRole(poolFactory.GOV_ROLE()) {
+  function pause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _pause();
   }
 
   /**
    * @dev Unpauses the contract.
    */
-  function unpause() external onlyRole(poolFactory.GOV_ROLE()) {
+  function unpause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _unpause();
   }
 

@@ -8,3 +8,4 @@ ffi = true
 ast = true
 extra_output = ["storageLayout"]
 auto_detect_solc = true
+gas_limit = "18446744073709551615"

@@ -23,9 +23,8 @@ contract DistributorTest is Test {
   address public user = address(0x1);
   address public sharesTokenOwner = address(0x2);
   address private deployer = address(0x3);
-  address private minter = address(0x4);
-  address private governance = address(0x5);
-
+  address private governance = address(0x4);
+  address private securityCouncil = address(0x5);
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
   function setUp() public {
@@ -66,13 +65,12 @@ contract DistributorTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(_pool)));
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
 
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), governance);
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
-    _pool.bondToken().grantRole(_pool.bondToken().MINTER_ROLE(), minter);
-    _pool.lToken().grantRole(_pool.lToken().MINTER_ROLE(), minter);
   }
 
   function fakeSucceededAuction(address poolAddress, uint256 period) public {
@@ -86,10 +84,31 @@ contract DistributorTest is Test {
     vm.store(auction, bytes32(stateSlot), bytes32(uint256(1)));
   }
 
+  function testPause() public {
+    uint256 amountToDistribute = 10000000;
+    Token couponToken = Token(_pool.couponToken());
+    couponToken.mint(address(distributor), amountToDistribute);
+
+    vm.startPrank(securityCouncil);
+    distributor.pause();
+
+    vm.startPrank(address(_pool));
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    distributor.allocate(amountToDistribute);
+
+    vm.startPrank(securityCouncil);
+    distributor.unpause();
+
+    vm.startPrank(address(_pool));
+    distributor.allocate(amountToDistribute);
+    uint256 storedAmountToDistribute = distributor.couponAmountToDistribute();
+    assertEq(storedAmountToDistribute, amountToDistribute);
+  }
+
   function testClaimShares() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1*10**18);
     sharesToken.mint(address(_pool), 50*(1+10000)*10**18);
     vm.stopPrank();
@@ -102,6 +121,15 @@ contract DistributorTest is Test {
       abi.encodeWithSignature("state()"),
       abi.encode(uint256(1))
     );
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(50*(1+10000)*10**18))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
 
     _pool.distribute();
     vm.stopPrank();
@@ -119,7 +147,7 @@ contract DistributorTest is Test {
   function testClaimSharesCheckPoolInfo() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1*10**18);
     sharesToken.mint(address(_pool), 50*(1+10000)*10**18);
     vm.stopPrank();
@@ -132,6 +160,15 @@ contract DistributorTest is Test {
       abi.encodeWithSignature("state()"),
       abi.encode(uint256(1))
     );
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(50*(1+10000)*10**18))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
 
     _pool.distribute();
     vm.stopPrank();
@@ -150,41 +187,49 @@ contract DistributorTest is Test {
     vm.stopPrank();
   }
 
-    function testAllBondHoldersCanClaim() public {
-      address user1 = address(0x61);
-      address user2 = address(0x62);
-      Token sharesToken = Token(_pool.couponToken());
+  function testAllBondHoldersCanClaim() public {
+    address user1 = address(0x61);
+    address user2 = address(0x62);
+    Token sharesToken = Token(_pool.couponToken());
 
-      vm.startPrank(minter);
-      _pool.bondToken().mint(user1, 1*10**18);
-      _pool.bondToken().mint(user2, 1*10**18);
+    vm.startPrank(address(_pool));
+    _pool.bondToken().mint(user1, 1*10**18);
+    _pool.bondToken().mint(user2, 1*10**18);
 
-      sharesToken.mint(address(_pool), 500100000000000000000000);
-      vm.stopPrank();
+    sharesToken.mint(address(_pool), 500100000000000000000000);
+    vm.stopPrank();
 
-      vm.startPrank(governance);
-      fakeSucceededAuction(address(_pool), 0);
+    vm.startPrank(governance);
+    fakeSucceededAuction(address(_pool), 0);
 
-      vm.mockCall(
-          address(0),
-          abi.encodeWithSignature("state()"),
-          abi.encode(uint256(1))
-      );
+    vm.mockCall(
+        address(0),
+        abi.encodeWithSignature("state()"),
+        abi.encode(uint256(1))
+    );
 
-      vm.warp(block.timestamp + params.distributionPeriod);
-      _pool.distribute();
-      vm.stopPrank();
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(500100000000000000000000))
+    );
 
-      vm.startPrank(user1);
-      distributor.claim();
-      assertEq(sharesToken.balanceOf(user1), 50 * 10**18);
-      vm.stopPrank();
+    vm.warp(block.timestamp + params.distributionPeriod);
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+    _pool.distribute();
+    vm.stopPrank();
 
-      vm.startPrank(user2);
-      distributor.claim();
-      assertEq(sharesToken.balanceOf(user2), 50 * 10**18);
-      vm.stopPrank();
-    }
+    vm.startPrank(user1);
+    distributor.claim();
+    assertEq(sharesToken.balanceOf(user1), 50 * 10**18);
+    vm.stopPrank();
+
+    vm.startPrank(user2);
+    distributor.claim();
+    assertEq(sharesToken.balanceOf(user2), 50 * 10**18);
+    vm.stopPrank();
+  }
 
   function testClaimSharesDifferentDecimals() public {
     vm.startPrank(governance);
@@ -209,15 +254,12 @@ contract DistributorTest is Test {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    Pool pool = Pool(poolFactory.createPool(poolParams, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(pool)));
-
-    pool.bondToken().grantRole(pool.bondToken().MINTER_ROLE(), minter);
-    pool.lToken().grantRole(pool.lToken().MINTER_ROLE(), minter);
 
     vm.stopPrank();
 
-    vm.startPrank(minter);
+    vm.startPrank(address(pool));
     pool.bondToken().mint(user, 1*10**18);
     
     sharesToken.mint(address(pool), 50*(1+10000)*10**6);
@@ -232,6 +274,20 @@ contract DistributorTest is Test {
       abi.encode(uint256(1))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(50*(1+10000)*10**6))
+    );
+
+    vm.stopPrank();
+    vm.startPrank(address(distributor));
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
+    vm.stopPrank();
+
+    vm.startPrank(governance);
     pool.distribute();
     vm.stopPrank();
 
@@ -253,7 +309,7 @@ contract DistributorTest is Test {
     Token(params.reserveToken).approve(address(poolFactory), 10000000000);
 
     params.couponToken = address(0);
-    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", ""));
+    _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(_pool)));
     vm.stopPrank();
 
@@ -266,9 +322,10 @@ contract DistributorTest is Test {
   function testClaimAfterMultiplePeriods() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1000*10**18);
-    sharesToken.mint(address(_pool), (3 * (params.sharesPerToken * 1000 + params.sharesPerToken * 10000) / 10**_pool.bondToken().SHARES_DECIMALS()) * 10**sharesToken.decimals()); //instantiate value + minted value right above
+    uint256 coupons = params.sharesPerToken * 1000 + params.sharesPerToken * 10000 / 10**_pool.bondToken().SHARES_DECIMALS();
+    sharesToken.mint(address(_pool), 3 * coupons * 10**sharesToken.decimals()); //instantiate value + minted value right above
     vm.stopPrank();
 
     vm.startPrank(governance);
@@ -282,8 +339,22 @@ contract DistributorTest is Test {
       abi.encode(uint256(1))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(coupons * 10**sharesToken.decimals())
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
     _pool.distribute();
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
     _pool.distribute();
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
     _pool.distribute();
     vm.stopPrank();
 
@@ -298,7 +369,7 @@ contract DistributorTest is Test {
   function testClaimNotEnoughSharesToDistribute() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1*10**18);
     // Mint enough shares but don't allocate them
     sharesToken.mint(address(distributor), 50*10**sharesToken.decimals());
@@ -318,7 +389,7 @@ contract DistributorTest is Test {
   function testClaimNotEnoughDistributorBalance() public {
     Token sharesToken = Token(_pool.couponToken());
 
-    vm.startPrank(minter);
+    vm.startPrank(address(_pool));
     _pool.bondToken().mint(user, 1000*10**18);
     // Mint shares but transfer them away from the distributor
     sharesToken.mint(address(distributor), 50*10**18);
