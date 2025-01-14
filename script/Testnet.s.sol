@@ -12,6 +12,7 @@ import {Distributor} from "../src/Distributor.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {Deployer} from "../src/utils/Deployer.sol";
+import {PreDepositScript} from "./PreDeposit.s.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract TestnetScript is Script {
@@ -30,6 +31,7 @@ contract TestnetScript is Script {
   uint256 private constant fee = 0;
 
   function run() public {
+    PreDepositScript preDepositScript = new PreDepositScript();
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
     
@@ -68,6 +70,8 @@ contract TestnetScript is Script {
     Token(params.reserveToken).approve(address(factory), reserveAmount);
     
     factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH", false);
+
+    preDepositScript.run(reserveToken, couponToken, address(factory), deployerAddress, distributionPeriod, sharesPerToken);
     
     vm.stopBroadcast();
   }

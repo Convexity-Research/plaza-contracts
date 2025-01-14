@@ -24,7 +24,7 @@ contract DistributorTest is Test {
   address public sharesTokenOwner = address(0x2);
   address private deployer = address(0x3);
   address private governance = address(0x4);
-
+  address private securityCouncil = address(0x5);
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
   function setUp() public {
@@ -67,6 +67,7 @@ contract DistributorTest is Test {
     // Create pool and approve deposit amount
     _pool = Pool(poolFactory.createPool(params, 10000000000, 10000*10**18, 10000*10**18, "", "", "", "", false));
     distributor = Distributor(poolFactory.distributors(address(_pool)));
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
 
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), governance);
     _pool.bondToken().grantRole(_pool.bondToken().DISTRIBUTOR_ROLE(), address(distributor));
@@ -81,6 +82,27 @@ contract DistributorTest is Test {
 
     uint256 stateSlot = 6;
     vm.store(auction, bytes32(stateSlot), bytes32(uint256(1)));
+  }
+
+  function testPause() public {
+    uint256 amountToDistribute = 10000000;
+    Token couponToken = Token(_pool.couponToken());
+    couponToken.mint(address(distributor), amountToDistribute);
+
+    vm.startPrank(securityCouncil);
+    distributor.pause();
+
+    vm.startPrank(address(_pool));
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    distributor.allocate(amountToDistribute);
+
+    vm.startPrank(securityCouncil);
+    distributor.unpause();
+
+    vm.startPrank(address(_pool));
+    distributor.allocate(amountToDistribute);
+    uint256 storedAmountToDistribute = distributor.couponAmountToDistribute();
+    assertEq(storedAmountToDistribute, amountToDistribute);
   }
 
   function testClaimShares() public {

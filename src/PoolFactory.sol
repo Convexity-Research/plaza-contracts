@@ -152,6 +152,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
       bondSymbol,
       address(this),
       address(this),
+      address(this),
       params.sharesPerToken
     ));
 
@@ -160,6 +161,7 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
       leverageBeacon,
       leverageName,
       leverageSymbol,
+      address(this),
       address(this),
       address(this)
     ));
@@ -200,8 +202,8 @@ contract PoolFactory is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // Deploy Distributor contract
     Distributor distributor = Distributor(deployer.deployDistributor(
       distributorBeacon,
-      governance,
-      pool
+      pool,
+      address(this)
     ));
 
     distributors[pool] = address(distributor);

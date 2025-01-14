@@ -25,12 +25,13 @@ contract Deployer {
     string memory symbol,
     address minter,
     address governance,
+    address poolFactory,
     uint256 sharesPerToken
   ) external returns(address) {
     return address(new BeaconProxy(
       address(bondBeacon),
       abi.encodeCall(
-        BondToken.initialize, (name, symbol, minter, governance, sharesPerToken)
+        BondToken.initialize, (name, symbol, minter, governance, poolFactory, sharesPerToken)
       )
     ));
   }
@@ -46,33 +47,33 @@ contract Deployer {
     string memory name,
     string memory symbol,
     address minter,
-    address governance
+    address governance,
+    address poolFactory
   ) external returns(address) {
 
     return address(new BeaconProxy(
       address(leverageBeacon),
       abi.encodeCall(
-        LeverageToken.initialize, (name, symbol, minter, governance)
+        LeverageToken.initialize, (name, symbol, minter, governance, poolFactory)
       )
     ));
   }
 
   /**
    * @dev Deploys a new Distributor contract
-   * @param governance The address with governance privileges
    * @param pool The address of the pool
    * @return address of the deployed Distributor contract
    */
   function deployDistributor(
     address distributorBeacon,
-    address governance,
-    address pool
+    address pool,
+    address poolFactory
   ) external returns(address) {
 
     return address(new BeaconProxy(
       address(distributorBeacon),
       abi.encodeCall(
-        Distributor.initialize, (governance, pool)
+        Distributor.initialize, (pool, poolFactory)
       )
     ));
   }

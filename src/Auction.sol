@@ -68,9 +68,12 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
   error AuctionHasEnded();
   error AuctionNotEnded();
   error BidAmountTooLow();
+  error BidAmountTooHigh();
   error InvalidSellAmount();
   error AuctionStillOngoing();
   error AuctionAlreadyEnded();
+
+  uint256 public constant MAX_BID_AMOUNT = 1e50;
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -123,6 +126,7 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
     if (sellCouponAmount == 0 || sellCouponAmount > totalBuyCouponAmount) revert InvalidSellAmount();
     if (sellCouponAmount % slotSize() != 0) revert InvalidSellAmount();
     if (buyReserveAmount == 0) revert BidAmountTooLow();
+    if (buyReserveAmount > MAX_BID_AMOUNT) revert BidAmountTooHigh();
 
     // Transfer buy tokens to contract
     IERC20(buyCouponToken).safeTransferFrom(msg.sender, address(this), sellCouponAmount);
@@ -272,6 +276,7 @@ contract Auction is Initializable, UUPSUpgradeable, PausableUpgradeable {
         
         // Reduce the current bid's amounts
         currentBid.sellCouponAmount = sellCouponAmount - amountToRemove;
+        currentCouponAmount -= amountToRemove;
 
         uint256 reserveReduction = ((currentBid.buyReserveAmount * proportion) / 1e18);
         currentBid.buyReserveAmount = currentBid.buyReserveAmount - reserveReduction;
