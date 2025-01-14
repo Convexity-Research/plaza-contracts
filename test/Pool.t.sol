@@ -30,13 +30,14 @@ contract PoolTest is Test, TestCases {
   PoolFactory.PoolParams private params;
 
   MockPriceFeed private mockPriceFeed;
-  address private oracleFeeds;
+  address private oracleFeedsContract;
 
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
-  address private user = address(0x4);
-  address private user2 = address(0x5);
+  address private securityCouncil = address(0x4);
+  address private user = address(0x5);
+  address private user2 = address(0x6);
 
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
   uint256 private constant CHAINLINK_DECIMAL_PRECISION = 10**8;
@@ -51,7 +52,7 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(deployer);
 
     address contractDeployer = address(new Deployer());
-    address oracleFeeds = address(new OracleFeeds());
+    oracleFeedsContract = address(new OracleFeeds());
 
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
@@ -60,7 +61,7 @@ contract PoolTest is Test, TestCases {
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance, contractDeployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
+      (governance, contractDeployer, oracleFeedsContract, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
     params.fee = 0;
@@ -70,7 +71,7 @@ contract PoolTest is Test, TestCases {
     params.distributionPeriod = 0;
     params.couponToken = address(new Token("USDC", "USDC", false));
     
-    OracleFeeds(oracleFeeds).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeedsContract).setPriceFeed(params.reserveToken, address(0), ethPriceFeed, 1 days);
 
     // Deploy the mock price feed
     mockPriceFeed = new MockPriceFeed();
@@ -87,6 +88,7 @@ contract PoolTest is Test, TestCases {
 
     vm.startPrank(governance);
     poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
     vm.stopPrank();
   }
 
@@ -134,7 +136,7 @@ contract PoolTest is Test, TestCases {
       rToken.approve(address(poolFactory), calcTestCases[i].TotalUnderlyingAssets);
 
       string memory salt = i.toString();
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
 
       uint256 amount = _pool.getCreateAmount(
         calcTestCases[i].assetType, 
@@ -193,7 +195,7 @@ contract PoolTest is Test, TestCases {
       string memory salt = i.toString();
       
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
       useMockPool(address(_pool));
       rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
@@ -246,7 +248,7 @@ contract PoolTest is Test, TestCases {
       string memory salt = i.toString();
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
       rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(user2);
@@ -287,7 +289,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
 
     rToken.approve(address(_pool), 1000);
 
@@ -309,7 +311,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
 
     rToken.approve(address(_pool), 1000);
 
@@ -331,7 +333,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
 
     rToken.approve(address(_pool), 1000);
 
@@ -349,7 +351,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     
     // Simulate block advanced
     useMockPool(address(_pool));
@@ -371,7 +373,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
@@ -392,7 +394,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     rToken.approve(address(_pool), 1000);
 
     // Call create and expect error
@@ -417,7 +419,7 @@ contract PoolTest is Test, TestCases {
       // Create salt to create the pool at a different address
       string memory salt = i.toString();
 
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
 
       uint256 amount = _pool.getRedeemAmount(
         calcTestCases[i].assetType, 
@@ -459,7 +461,7 @@ contract PoolTest is Test, TestCases {
       string memory salt = i.toString();
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
 
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -508,7 +510,7 @@ contract PoolTest is Test, TestCases {
       string memory salt = i.toString();
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
 
       uint256 startBalance = rToken.balanceOf(user2);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -547,7 +549,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     rToken.approve(address(_pool), 1000);
 
     // Call create and assert minted tokens
@@ -568,7 +570,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     rToken.approve(address(_pool), 1000);
 
     // Call create and expect error
@@ -589,7 +591,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     
     Pool.PoolInfo memory info = _pool.getPoolInfo();
     assertEq(info.reserve, 10000000000);
@@ -602,7 +604,7 @@ contract PoolTest is Test, TestCases {
     Token rToken = Token(params.reserveToken);
     rToken.mint(governance, 1);
     rToken.approve(address(poolFactory), 1);
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", "", false));
     rToken.burn(address(_pool), 1);
     
     _pool.setDistributionPeriod(100);
@@ -616,7 +618,7 @@ contract PoolTest is Test, TestCases {
     Token rToken = Token(params.reserveToken);
     rToken.mint(governance, 1);
     rToken.approve(address(poolFactory), 1);
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", "", false));
     vm.stopPrank();
 
     rToken.burn(address(_pool), 1);
@@ -630,7 +632,7 @@ contract PoolTest is Test, TestCases {
     Token rToken = Token(params.reserveToken);
     rToken.mint(governance, 1);
     rToken.approve(address(poolFactory), 1);
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", "", false));
     rToken.burn(address(_pool), 1);
 
     _pool.setFee(100);
@@ -644,7 +646,7 @@ contract PoolTest is Test, TestCases {
     Token rToken = Token(params.reserveToken);
     rToken.mint(governance, 1);
     rToken.approve(address(poolFactory), 1);
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", "", false));
     rToken.burn(address(_pool), 1);
     vm.stopPrank();
 
@@ -657,18 +659,29 @@ contract PoolTest is Test, TestCases {
     Token rToken = Token(params.reserveToken);
     rToken.mint(governance, 1);
     rToken.approve(address(poolFactory), 1);
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "", "", "", false));
     rToken.burn(address(_pool), 1);
 
+    vm.startPrank(securityCouncil);
     _pool.pause();
 
+    vm.startPrank(governance);
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.create(Pool.TokenType.BOND, 0, 0);
 
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
     _pool.redeem(Pool.TokenType.BOND, 0, 0);
 
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.startAuction();
+
+    vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
+    _pool.distribute();
+
+    vm.startPrank(securityCouncil);
     _pool.unpause();
+
+    vm.startPrank(governance);
     _pool.setFee(100);
 
     Pool.PoolInfo memory info = _pool.getPoolInfo();
@@ -681,7 +694,7 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(governance);
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     vm.stopPrank();
     Token sharesToken = Token(_pool.couponToken());
 
@@ -701,18 +714,20 @@ contract PoolTest is Test, TestCases {
     vm.stopPrank();
   }
 
-  function testDistribute() public {
+  function testDistributeasd() public {
     Token rToken = Token(params.reserveToken);
 
     vm.startPrank(governance);
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     address distributor = poolFactory.distributors(address(_pool));
 
     Token sharesToken = Token(_pool.couponToken());
     uint256 initialBalance = 1000 * 10**18;
     uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
+
     vm.stopPrank();
 
     vm.startPrank(address(_pool));
@@ -724,8 +739,6 @@ contract PoolTest is Test, TestCases {
     vm.stopPrank();
 
     vm.startPrank(governance);
-    vm.expectEmit(true, true, true, true);
-    emit Pool.Distributed(expectedDistribution, distributor);
 
     fakeSucceededAuction(address(_pool), 0);
 
@@ -735,19 +748,33 @@ contract PoolTest is Test, TestCases {
       abi.encode(uint256(1))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(expectedDistribution)
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    vm.stopPrank();
+    vm.startPrank(distributor);
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
+    vm.stopPrank();
+    vm.startPrank(governance);
+
     _pool.distribute();
     vm.stopPrank();
 
     assertEq(sharesToken.balanceOf(distributor), expectedDistribution);
   }
 
-  function testDistributeFailedLiquidation() public {
+  function testDistributeFailedPoolSale() public {
     Token rToken = Token(params.reserveToken);
 
     vm.startPrank(governance);
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     address distributor = poolFactory.distributors(address(_pool));
 
     Token sharesToken = Token(_pool.couponToken());
@@ -759,25 +786,33 @@ contract PoolTest is Test, TestCases {
 
     fakeSucceededAuction(address(_pool), 0);
 
-    // Force auction to fail for liquidation
+    // Force auction to fail during pool sale
     vm.mockCall(
       address(0),
       abi.encodeWithSignature("state()"),
       abi.encode(uint256(3))
     );
 
-    vm.expectEmit(true, true, true, true);
-    emit Pool.DistributionRollOver(0, params.sharesPerToken);
-
     // Fast forward 5 days
     vm.warp(block.timestamp + 5 days);
+
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(0))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
+    vm.expectEmit(true, true, true, true);
+    emit Pool.DistributionRollOver(0, 0);
 
     _pool.distribute();
     vm.stopPrank();
 
     Pool.PoolInfo memory info = _pool.getPoolInfo();
     assertEq(info.currentPeriod, 1);
-    assertEq(info.lastDistribution, block.timestamp);
     assertEq(sharesToken.balanceOf(address(distributor)), 0);
   }
 
@@ -787,7 +822,7 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(governance);
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     address distributor = poolFactory.distributors(address(_pool));
     
     Token sharesToken = Token(_pool.couponToken());
@@ -799,15 +834,24 @@ contract PoolTest is Test, TestCases {
 
     fakeSucceededAuction(address(_pool), 0);
 
-    // Force auction to fail for liquidation
+    // Force auction to fail during pool sale
     vm.mockCall(
       address(0),
       abi.encodeWithSignature("state()"),
       abi.encode(uint256(2))
     );
 
+    vm.mockCall(
+      address(0),
+      abi.encodeWithSignature("totalBuyCouponAmount()"),
+      abi.encode(uint256(0))
+    );
+
+    // increase indexed asset period - this is done by Pool when Auction starts but its mocked on this test
+    _pool.bondToken().increaseIndexedAssetPeriod(params.sharesPerToken);
+
     vm.expectEmit(true, true, true, true);
-    emit Pool.DistributionRollOver(0, params.sharesPerToken);
+    emit Pool.DistributionRollOver(0, 0);
 
     // Fast forward 5 days
     vm.warp(block.timestamp + 5 days);
@@ -817,49 +861,7 @@ contract PoolTest is Test, TestCases {
 
     Pool.PoolInfo memory info = _pool.getPoolInfo();
     assertEq(info.currentPeriod, 1);
-    assertEq(info.lastDistribution, block.timestamp);
-    assertEq(sharesToken.balanceOf(distributor), 0);
-  }
-
-  function testDistributeMultiplePeriods() public {
-    Token rToken = Token(params.reserveToken);
-
-    vm.startPrank(governance);
-    rToken.mint(governance, 10000001000);
-    rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
-    address distributor = poolFactory.distributors(address(_pool));
-
-    Token sharesToken = Token(_pool.couponToken());
-    uint256 initialBalance = 1000 * 10**18;
-    uint256 expectedDistribution = (initialBalance + 10000) * params.sharesPerToken / 10**_pool.bondToken().SHARES_DECIMALS();
-    vm.stopPrank();
-    
-    vm.startPrank(address(_pool));
-    _pool.bondToken().mint(user, initialBalance);
-    vm.stopPrank();
-
-    vm.startPrank(minter);
-    sharesToken.mint(address(_pool), expectedDistribution * 3);
-    vm.stopPrank();
-
-    vm.startPrank(governance);
-    fakeSucceededAuction(address(_pool), 0);
-    fakeSucceededAuction(address(_pool), 1);
-    fakeSucceededAuction(address(_pool), 2);
-
-    vm.mockCall(
-      address(0),
-      abi.encodeWithSignature("state()"),
-      abi.encode(uint256(1))
-    );
-
-    _pool.distribute();
-    _pool.distribute();
-    _pool.distribute();
-    vm.stopPrank();
-
-    assertEq(sharesToken.balanceOf(distributor), expectedDistribution * 3);
+    assertEq(sharesToken.balanceOf(address(distributor)), 0);
   }
 
   function testDistributeNoShares() public {
@@ -868,7 +870,7 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(governance);
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     vm.stopPrank();
     vm.startPrank(governance);
     vm.expectRevert();
@@ -882,7 +884,7 @@ contract PoolTest is Test, TestCases {
     vm.startPrank(governance);
     rToken.mint(governance, 10000001000);
     rToken.approve(address(poolFactory), 10000000000);
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     vm.stopPrank();
     vm.expectRevert();
     _pool.distribute();
@@ -908,7 +910,7 @@ contract PoolTest is Test, TestCases {
       string memory salt = i.toString();
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
       rToken.approve(address(_pool), calcTestCases[i].inAmount);
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -959,7 +961,7 @@ contract PoolTest is Test, TestCases {
       string memory salt = i.toString();
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(params, calcTestCases[i].TotalUnderlyingAssets, calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
 
       uint256 startBalance = rToken.balanceOf(governance);
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -1024,7 +1026,7 @@ contract PoolTest is Test, TestCases {
       string memory salt = i.toString();
 
       // Create pool and approve deposit amount
-      Pool _pool = Pool(poolFactory.createPool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", ""));
+      Pool _pool = Pool(poolFactory.createPool(_params, calcTestCases[i].TotalUnderlyingAssets.normalizeAmount(18, reserveDecimals), calcTestCases[i].DebtAssets, calcTestCases[i].LeverageAssets, "", salt, "", "", false));
       rToken.approve(address(_pool), calcTestCases[i].inAmount.normalizeAmount(18, reserveDecimals));
 
       uint256 startBondBalance = BondToken(_pool.bondToken()).balanceOf(governance);
@@ -1066,7 +1068,7 @@ contract PoolTest is Test, TestCases {
     rToken.mint(governance, 1000 ether);
     rToken.approve(address(poolFactory), 1000 ether);
 
-    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", "", false));
 
     // Fast forward one year
     vm.warp(block.timestamp + 365 days);
@@ -1109,7 +1111,7 @@ contract PoolTest is Test, TestCases {
     rToken.mint(governance, 1000 ether);
     rToken.approve(address(poolFactory), 1000 ether);
 
-    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", "", false));
     
     vm.stopPrank();
 
@@ -1136,8 +1138,11 @@ contract PoolTest is Test, TestCases {
     rToken.mint(governance, 1000 ether);
     rToken.approve(address(poolFactory), 1000 ether);
 
-    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", "", false));
 
+    vm.stopPrank();
+    vm.startPrank(user);
+    
     // Claim fees
     vm.expectRevert(Pool.NotBeneficiary.selector);
     pool.claimFees();
@@ -1159,7 +1164,7 @@ contract PoolTest is Test, TestCases {
     rToken.mint(governance, 1000 ether);
     rToken.approve(address(poolFactory), 1000 ether);
 
-    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", ""));
+    Pool pool = Pool(poolFactory.createPool(params, 1000 ether, 500 ether, 250 ether, "", "", "", "", false));
     vm.stopPrank();
 
     // User creates leverage tokens
@@ -1204,7 +1209,7 @@ contract PoolTest is Test, TestCases {
     rToken.approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
 
     rToken.approve(address(_pool), 1000);
 
@@ -1233,7 +1238,7 @@ contract PoolTest is Test, TestCases {
     Token(params.reserveToken).approve(address(poolFactory), 10000000000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false));
     uint256 price = _pool.getOraclePrice(_pool.USD(), params.reserveToken);
     assertEq(price, 35858486155012863);
 

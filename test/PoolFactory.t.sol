@@ -23,8 +23,9 @@ contract PoolFactoryTest is Test {
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
-  address private user = address(0x4);
-  address private user2 = address(0x5);
+  address private securityCouncil = address(0x4);
+  address private user = address(0x5);
+  address private user2 = address(0x6);
 
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
@@ -52,7 +53,7 @@ contract PoolFactoryTest is Test {
 
     vm.startPrank(governance);
     poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
-
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.distributionPeriod = 0;
@@ -73,7 +74,7 @@ contract PoolFactoryTest is Test {
     emit PoolFactory.PoolCreated(address(0), 10000000000, 10000, 20000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", "", false));
     uint256 endLength = poolFactory.poolsLength();
 
     assertEq(1, endLength-startLength);
@@ -117,7 +118,7 @@ contract PoolFactoryTest is Test {
     )))));
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH"));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH", false));
 
     assertEq(address(_pool), poolAddress);
 
@@ -130,28 +131,32 @@ contract PoolFactoryTest is Test {
     vm.startPrank(governance);
 
     vm.expectRevert(bytes4(keccak256("ZeroReserveAmount()")));
-    poolFactory.createPool(params, 0, 10000, 20000, "", "", "", "");
+    poolFactory.createPool(params, 0, 10000, 20000, "", "", "", "", false);
 
     vm.expectRevert(bytes4(keccak256("ZeroDebtAmount()")));
-    poolFactory.createPool(params, 10000000000, 0, 20000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 0, 20000, "", "", "", "", false);
 
     vm.expectRevert(bytes4(keccak256("ZeroLeverageAmount()")));
-    poolFactory.createPool(params, 10000000000, 10000, 0, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 0, "", "", "", "", false);
 
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
     
   }
 
   function testPause() public {
-    vm.startPrank(governance);
+    vm.startPrank(securityCouncil);
     poolFactory.pause();
 
+    vm.startPrank(governance);
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
-    
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
+
+    vm.startPrank(securityCouncil);
     poolFactory.unpause();
+
+    vm.startPrank(governance);
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
   }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
+import {PoolFactory} from "./PoolFactory.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -19,6 +20,12 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
   /// @dev Role identifier for accounts with governance privileges
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
+  /// @dev The pool factory
+  PoolFactory public poolFactory;
+
+  /// @dev Error thrown when the caller is not the security council
+  error CallerIsNotSecurityCouncil();
+
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
@@ -35,15 +42,20 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
     string memory name, 
     string memory symbol, 
     address minter, 
-    address governance
+    address governance,
+    address _poolFactory
     ) initializer public {
     __ERC20_init(name, symbol);
     __ERC20Permit_init(name);
     __UUPSUpgradeable_init();
     __Pausable_init();
 
+    poolFactory = PoolFactory(_poolFactory);
+
     _grantRole(MINTER_ROLE, minter);
     _grantRole(GOV_ROLE, governance);
+    _setRoleAdmin(GOV_ROLE, GOV_ROLE);
+    _setRoleAdmin(MINTER_ROLE, MINTER_ROLE);
   }
 
   /**
@@ -78,39 +90,26 @@ contract LeverageToken is Initializable, ERC20Upgradeable, AccessControlUpgradea
   }
 
   /**
-   * @dev Grants a role to an account.
-   * @param role The role being granted
-   * @param account The account receiving the role
-   * @notice Can only be called by addresses with the GOV_ROLE.
-   */
-  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _grantRole(role, account);
-  }
-
-  /**
-   * @dev Revokes a role from an account.
-   * @param role The role being revoked
-   * @param account The account losing the role
-   * @notice Can only be called by addresses with the GOV_ROLE.
-   */
-  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _revokeRole(role, account);
-  }
-
-  /**
    * @dev Pauses all token transfers, mints, burns, and indexing updates.
-   * @notice Can only be called by addresses with the GOV_ROLE. Does not prevent contract upgrades.
+   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE. Does not prevent contract upgrades.
    */
-  function pause() external onlyRole(GOV_ROLE) {
+  function pause() external onlySecurityCouncil {
     _pause();
   }
 
   /**
    * @dev Unpauses all token transfers, mints, burns, and indexing updates.
-   * @notice Can only be called by addresses with the GOV_ROLE.
+   * @notice Can only be called by addresses with the SECURITY_COUNCIL_ROLE.
    */
-  function unpause() external onlyRole(GOV_ROLE) {
+  function unpause() external onlySecurityCouncil {
     _unpause();
+  }
+
+  modifier onlySecurityCouncil() {
+    if (!poolFactory.hasRole(poolFactory.SECURITY_COUNCIL_ROLE(), msg.sender)) {
+      revert CallerIsNotSecurityCouncil();
+    }
+    _;
   }
 
   /**
