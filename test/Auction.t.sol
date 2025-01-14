@@ -620,7 +620,7 @@ contract AuctionTest is Test {
     Pool(pool).startAuction();
 
     (uint256 currentPeriod,) = Pool(pool).bondToken().globalPool();
-    address auctionAddress = Pool(pool).auctions(currentPeriod);
+    address auctionAddress = Pool(pool).auctions(currentPeriod-1);
     Auction _auction = Auction(auctionAddress);
 
     Token usdcToken = Token(Pool(pool).couponToken());
