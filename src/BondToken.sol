@@ -189,8 +189,8 @@ contract BondToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable,
    */
   function getIndexedUserAmount(address user, uint256 balance, uint256 period) public view returns(uint256) {
     IndexedUserAssets memory userPool = userAssets[user];
-    uint256 shares = userAssets[user].indexedAmountShares;
-    
+    uint256 shares = userPool.indexedAmountShares;
+
     for (uint256 i = userPool.lastUpdatedPeriod; i < period; i++) {
       shares += (balance * globalPool.previousPoolAmounts[i].sharesPerToken).toBaseUnit(SHARES_DECIMALS);
     }
