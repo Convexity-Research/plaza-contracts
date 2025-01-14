@@ -100,7 +100,7 @@ contract TestnetBalancerScript is Script {
     
     Token(params.reserveToken).approve(address(factory), reserveAmount);
     
-    factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
+    factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH", false);
     
     vm.stopBroadcast();
   }

@@ -38,9 +38,11 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
       abi.encodeCall(BalancerOracleAdapter.initialize, (poolAddr, 18, oracleFeed, deployer))
     ));
 
-    OracleFeeds(oracleFeed).setPriceFeed(adapter.ETH(), adapter.USD(), priceFeed, 1 days);
-    OracleFeeds(oracleFeed).setPriceFeed(address(0x5), adapter.ETH(), priceFeed, 1 days);
-    OracleFeeds(oracleFeed).setPriceFeed(address(0x6), adapter.ETH(), priceFeed, 1 days);
+    OracleFeeds(oracleFeed).setPriceFeed(adapter.ETH(), adapter.USD(), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeed).setPriceFeed(address(0x5), adapter.ETH(), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeed).setPriceFeed(address(0x6), adapter.ETH(), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeed).setPriceFeed(address(0x5), adapter.USD(), ethPriceFeed, 1 days);
+    OracleFeeds(oracleFeed).setPriceFeed(address(0x6), adapter.USD(), ethPriceFeed, 1 days);
     vm.stopPrank();
   }
 
@@ -90,14 +92,14 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
 
     // Mock latestRoundData call for oracle feed
     vm.mockCall(
-      priceFeed,
+      ethPriceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
       abi.encode(uint80(0), int256(100 ether), uint256(0), block.timestamp, uint80(0))
     );
 
     // Mock decimals call
     vm.mockCall(
-      priceFeed,
+      ethPriceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.decimals.selector),
       abi.encode(uint8(18))
     );
@@ -117,7 +119,7 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
 
     // Get latest round data
     (,int256 answer,,,) = adapter.latestRoundData();
-    assertEq(answer, 19900);
+    assertEq(answer, 199);
   }
 
   function testLatestRoundDataRealData() public {
@@ -162,14 +164,14 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
 
     // Mock latestRoundData call for oracle feed
     vm.mockCall(
-      priceFeed,
+      ethPriceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
       abi.encode(uint80(0), int256(348539000000), uint256(0), block.timestamp, uint80(0))
     );
 
     // Mock decimals call
     vm.mockCall(
-      priceFeed,
+      ethPriceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.decimals.selector),
       abi.encode(uint8(18))
     );
@@ -189,7 +191,7 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
 
     // Get latest round data
     (,int256 answer,,,) = adapter.latestRoundData();
-    assertEq(answer, 19900);
+    assertEq(answer, 0);
   }
 
   function testCalculateFairUintPrice() public pure {

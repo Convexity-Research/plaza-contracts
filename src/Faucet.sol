@@ -74,14 +74,15 @@ contract Faucet {
   }
 
   /// @notice Distributes a specified amount of both reserve and coupon tokens to the caller
-  /// @param amountReserve The amount of reserve tokens to mint
+  /// @param amountWstETH The amount of WstETH to mint
+  /// @param amountCbETH The amount of cbETH to mint
   /// @param amountCoupon The amount of coupon tokens to mint
   /// @param amountEth The amount of ETH to send to the caller
   /// @param users The addresses to mint the tokens on behalf of
-  function faucet(uint256 amountReserve, uint256 amountCoupon, uint256 amountEth, address[] memory users) public isWhitelisted() {
+  function faucet(uint256 amountWstETH, uint256 amountCbETH, uint256 amountCoupon, uint256 amountEth, address[] memory users) public isWhitelisted() {
     for (uint256 i = 0; i < users.length; i++) {
       address user = users[i];
-      faucet(amountReserve, amountCoupon, amountEth, user);
+      faucet(amountWstETH, amountCbETH, amountCoupon, amountEth, user);
     }
   }
 
