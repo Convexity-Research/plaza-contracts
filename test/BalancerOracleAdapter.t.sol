@@ -119,7 +119,7 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
 
     // Get latest round data
     (,int256 answer,,,) = adapter.latestRoundData();
-    assertEq(answer, 199);
+    assertEq(answer, 199999999999995999641);
   }
 
   function testLatestRoundDataRealData() public {
@@ -191,7 +191,7 @@ contract BalancerOracleAdapterTest is Test, BalancerOracleAdapter {
 
     // Get latest round data
     (,int256 answer,,,) = adapter.latestRoundData();
-    assertEq(answer, 0);
+    assertEq(answer, 574874959640);
   }
 
   function testCalculateFairUintPrice() public pure {
