@@ -14,7 +14,7 @@ import {PoolFactory} from "../src/PoolFactory.sol";
 import {Validator} from "../src/utils/Validator.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {MockPriceFeed} from "./mocks/MockPriceFeed.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract MockRouterTest is Test {
@@ -40,17 +40,16 @@ contract MockRouterTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
-    address tokenDeployer = address(new TokenDeployer());
-    Distributor distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
-
+    address contractDeployer = address(new Deployer());
     address oracleFeeds = address(new OracleFeeds());
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
-
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
+    
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance,tokenDeployer, address(distributor), oracleFeeds, poolBeacon, bondBeacon, levBeacon)
+      (governance, contractDeployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
     PoolFactory.PoolParams memory params;
@@ -78,8 +77,7 @@ contract MockRouterTest is Test {
 
     vm.startPrank(governance);
 
-    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
-
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
     Token rToken = Token(params.reserveToken);
 
     // Mint reserve tokens
@@ -87,7 +85,7 @@ contract MockRouterTest is Test {
     rToken.approve(address(poolFactory), 1000000000000000000000000);
 
     // Create pool and approve deposit amount
-    pool = Pool(poolFactory.createPool(params, 1000000000000000000000000, 25000000000000000000000000, 1000000000000000000000000, "", "", "", ""));
+    pool = Pool(poolFactory.createPool(params, 1000000000000000000000000, 25000000000000000000000000, 1000000000000000000000000, "", "", "", "", false));
     vm.stopPrank();
   }
 

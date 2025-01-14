@@ -10,7 +10,7 @@ import {PoolFactory} from "../src/PoolFactory.sol";
 import {Distributor} from "../src/Distributor.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
 import {Create3} from "@create3/contracts/Create3.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -23,8 +23,9 @@ contract PoolFactoryTest is Test {
   address private deployer = address(0x1);
   address private minter = address(0x2);
   address private governance = address(0x3);
-  address private user = address(0x4);
-  address private user2 = address(0x5);
+  address private securityCouncil = address(0x4);
+  address private user = address(0x5);
+  address private user2 = address(0x6);
 
   address public constant ethPriceFeed = address(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
 
@@ -36,27 +37,26 @@ contract PoolFactoryTest is Test {
   function setUp() public {
     vm.startPrank(deployer);
 
-    address tokenDeployer = address(new TokenDeployer());
-    distributor = Distributor(Utils.deploy(address(new Distributor()), abi.encodeCall(Distributor.initialize, (governance))));
+    address contractDeployer = address(new Deployer());
+
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), governance));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), governance));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), governance));
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), governance));
 
     poolFactory = PoolFactory(Utils.deploy(address(new PoolFactory()), abi.encodeCall(
       PoolFactory.initialize, 
-      (governance, tokenDeployer, address(distributor), ethPriceFeed, poolBeacon, bondBeacon, levBeacon)
+      (governance, contractDeployer, ethPriceFeed, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
 
     vm.stopPrank();
 
     vm.startPrank(governance);
-    distributor.grantRole(distributor.POOL_FACTORY_ROLE(), address(poolFactory));
-
+    poolFactory.grantRole(poolFactory.POOL_ROLE(), governance);
+    poolFactory.grantRole(poolFactory.SECURITY_COUNCIL_ROLE(), securityCouncil);
     params.fee = 0;
     params.reserveToken = address(new Token("Wrapped ETH", "WETH", false));
     params.distributionPeriod = 0;
-    
-    vm.stopPrank();
   }
   
   function testCreatePool() public {
@@ -74,7 +74,7 @@ contract PoolFactoryTest is Test {
     emit PoolFactory.PoolCreated(address(0), 10000000000, 10000, 20000);
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", ""));
+    Pool _pool = Pool(poolFactory.createPool(params, 10000000000, 10000, 20000, "", "", "", "", false));
     uint256 endLength = poolFactory.poolsLength();
 
     assertEq(1, endLength-startLength);
@@ -118,7 +118,7 @@ contract PoolFactoryTest is Test {
     )))));
 
     // Create pool and approve deposit amount
-    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH"));
+    Pool _pool = Pool(poolFactory.createPool(params, 1, 1, 1, "", "bondWETH", "", "levWETH", false));
 
     assertEq(address(_pool), poolAddress);
 
@@ -131,28 +131,32 @@ contract PoolFactoryTest is Test {
     vm.startPrank(governance);
 
     vm.expectRevert(bytes4(keccak256("ZeroReserveAmount()")));
-    poolFactory.createPool(params, 0, 10000, 20000, "", "", "", "");
+    poolFactory.createPool(params, 0, 10000, 20000, "", "", "", "", false);
 
     vm.expectRevert(bytes4(keccak256("ZeroDebtAmount()")));
-    poolFactory.createPool(params, 10000000000, 0, 20000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 0, 20000, "", "", "", "", false);
 
     vm.expectRevert(bytes4(keccak256("ZeroLeverageAmount()")));
-    poolFactory.createPool(params, 10000000000, 10000, 0, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 0, "", "", "", "", false);
 
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
     
   }
 
   function testPause() public {
-    vm.startPrank(governance);
+    vm.startPrank(securityCouncil);
     poolFactory.pause();
 
+    vm.startPrank(governance);
     vm.expectRevert(bytes4(keccak256("EnforcedPause()")));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
-    
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
+
+    vm.startPrank(securityCouncil);
     poolFactory.unpause();
+
+    vm.startPrank(governance);
     vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(poolFactory), 0, 10000000000));
-    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "");
+    poolFactory.createPool(params, 10000000000, 10000, 10000, "", "", "", "", false);
   }
 }

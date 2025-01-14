@@ -10,7 +10,8 @@ import {Distributor} from "../src/Distributor.sol";
 import {PoolFactory} from "../src/PoolFactory.sol";
 import {OracleFeeds} from "../src/OracleFeeds.sol";
 import {LeverageToken} from "../src/LeverageToken.sol";
-import {TokenDeployer} from "../src/utils/TokenDeployer.sol";
+import {Deployer} from "../src/utils/Deployer.sol";
+import {PreDepositScript} from "./PreDeposit.s.sol";
 import {Upgrades} from "@openzeppelin/foundry-upgrades/Upgrades.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -30,17 +31,15 @@ contract MainnetScript is Script {
   uint256 private constant fee = 0;
 
   function run() public {
+    PreDepositScript preDepositScript = new PreDepositScript();
     vm.startBroadcast(vm.envUint("PRIVATE_KEY"));
     address deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY"));
     
     // Deploys LifiRouter
     new LifiRouter();
 
-    // Deploys TokenDeployer
-    address tokenDeployer = address(new TokenDeployer());
-
-    // Deploys Distributor
-    address distributor = Upgrades.deployUUPSProxy("Distributor.sol", abi.encodeCall(Distributor.initialize, (deployerAddress)));
+    // Deploys Deployer
+    address contractDeployer = address(new Deployer());
 
     // Deploys OracleFeeds
     address oracleFeeds = address(new OracleFeeds());
@@ -49,15 +48,13 @@ contract MainnetScript is Script {
     address poolBeacon = address(new UpgradeableBeacon(address(new Pool()), deployerAddress));
     address bondBeacon = address(new UpgradeableBeacon(address(new BondToken()), deployerAddress));
     address levBeacon = address(new UpgradeableBeacon(address(new LeverageToken()), deployerAddress));
-    
+    address distributorBeacon = address(new UpgradeableBeacon(address(new Distributor()), deployerAddress));
+
     // Deploys PoolFactory
     PoolFactory factory = PoolFactory(Upgrades.deployUUPSProxy("PoolFactory.sol", abi.encodeCall(
       PoolFactory.initialize,
-      (deployerAddress, tokenDeployer, distributor, oracleFeeds, poolBeacon, bondBeacon, levBeacon)
+      (deployerAddress, contractDeployer, oracleFeeds, poolBeacon, bondBeacon, levBeacon, distributorBeacon)
     )));
-
-    // Grant pool factory role to factory
-    Distributor(distributor).grantRole(Distributor(distributor).POOL_FACTORY_ROLE(), address(factory));
 
     PoolFactory.PoolParams memory params = PoolFactory.PoolParams({
       fee: fee,
@@ -74,7 +71,9 @@ contract MainnetScript is Script {
     // Approve the factory the seed deposit
     IERC20(reserveToken).approve(address(factory), reserveAmount);
 
-    factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH");
+    factory.createPool(params, reserveAmount, bondAmount, leverageAmount, "Bond ETH", "bondETH", "Levered ETH", "levETH", false);
+
+    preDepositScript.run(reserveToken, couponToken, address(factory), deployerAddress, distributionPeriod, sharesPerToken);
     
     vm.stopBroadcast();
   }

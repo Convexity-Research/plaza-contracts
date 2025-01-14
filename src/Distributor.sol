@@ -4,11 +4,11 @@ pragma solidity ^0.8.26;
 import {Pool} from "./Pool.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
+import {PoolFactory} from "../src/PoolFactory.sol";
 import {ERC20Extensions} from "./lib/ERC20Extensions.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -17,26 +17,17 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
  * @title Distributor
  * @dev This contract manages the distribution of coupon shares to users based on their bond token balances.
  */
-contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+contract Distributor is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable {
   using SafeERC20 for IERC20;
   using ERC20Extensions for IERC20;
   using Decimals for uint256;
-
-  /// @dev Role identifier for accounts with governance privileges
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  /// @dev Role identifier for the pool factory
-  bytes32 public constant POOL_FACTORY_ROLE = keccak256("POOL_FACTORY_ROLE");
-
-  struct PoolInfo {
-    address couponToken;
-    uint256 amountToDistribute;
-  }
-
-  /// @dev Mapping of pool addresses to their respective PoolInfo
-  mapping(address => PoolInfo) public poolInfos;
-
-  /// @dev Mapping of coupon token addresses to their total amount to be distributed
-  mapping(address => uint256) public couponAmountsToDistribute;
+  
+  /// @dev Pool factory address
+  PoolFactory public poolFactory;
+  /// @dev Pool address
+  Pool public pool;
+  /// @dev Coupon token total amount to be distributed
+  uint256 public couponAmountToDistribute;
 
   /// @dev Error thrown when there are not enough shares in the contract's balance
   error NotEnoughSharesBalance();
@@ -52,6 +43,8 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   error InvalidPoolAddress();
   /// @dev error thrown when the caller is not the pool
   error CallerIsNotPool();
+  /// @dev error thrown when the caller does not have the required role
+  error AccessDenied();
 
   /// @dev Event emitted when a user claims their shares
   event ClaimedShares(address user, uint256 period, uint256 shares);
@@ -64,41 +57,27 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
   }
 
   /**
-   * @dev Initializes the contract with the governance address and sets up roles.
+   * @dev Initializes the contract with the pool address and pool factory address.
    * This function is called once during deployment or upgrading to initialize state variables.
-   * @param _governance Address of the governance account that will have the GOV_ROLE.
+   * @param _pool Address of the pool.
+   * @param _poolFactory Address of the pool factory.
    */
-  function initialize(address _governance) initializer public {
-    __UUPSUpgradeable_init();
+  function initialize(address _pool, address _poolFactory) initializer public {
     __ReentrancyGuard_init();
+    __Pausable_init();
 
-    _grantRole(GOV_ROLE, _governance);
-  }
-
-  /**
-   * @dev Allows the pool factory to register a pool in the distributor.
-   * @param _pool Address of the pool to be registered
-   * @param _couponToken Address of the coupon token associated with the pool
-   */
-  function registerPool(address _pool, address _couponToken) external onlyRole(POOL_FACTORY_ROLE) {
-    require(_pool != address(0), InvalidPoolAddress());
-    
-    poolInfos[_pool] = PoolInfo(_couponToken, 0);
-    emit PoolRegistered(_pool, _couponToken);
+    pool = Pool(_pool);
+    poolFactory = PoolFactory(_poolFactory);
   }
 
   /**
    * @dev Allows a user to claim their shares from a specific pool.
    * Calculates the number of shares based on the user's bond token balance and the shares per token.
    * Transfers the calculated shares to the user's address.
-   * @param _pool Address of the pool from which to claim shares.
    */
-  function claim(address _pool) external whenNotPaused() nonReentrant() {
-    require(_pool != address(0), UnsupportedPool());
-    
-    Pool pool = Pool(_pool);
-    BondToken bondToken = pool.bondToken();
-    address couponToken = pool.couponToken();
+  function claim() external whenNotPaused nonReentrant {
+    BondToken bondToken = Pool(pool).bondToken();
+    address couponToken = Pool(pool).couponToken();
 
     if (address(bondToken) == address(0) || couponToken == address(0)){
       revert UnsupportedPool();
@@ -112,22 +91,18 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     if (IERC20(couponToken).balanceOf(address(this)) < shares) {
       revert NotEnoughSharesBalance();
     }
-
-    PoolInfo memory poolInfo = poolInfos[_pool];
-
+    
     // check if pool has enough *allocated* shares to distribute
-    if (poolInfo.amountToDistribute < shares) {
+    if (couponAmountToDistribute < shares) {
       revert NotEnoughSharesToDistribute();
     }
 
     // check if the distributor has enough shares tokens as the amount to distribute
-    if (IERC20(couponToken).balanceOf(address(this)) < poolInfo.amountToDistribute) {
+    if (IERC20(couponToken).balanceOf(address(this)) < couponAmountToDistribute) {
       revert NotEnoughSharesToDistribute();
     }
-    
-    poolInfo.amountToDistribute -= shares;
-    couponAmountsToDistribute[couponToken] -= shares;
-    
+
+    couponAmountToDistribute -= shares;    
     bondToken.resetIndexedUserAssets(msg.sender);
     IERC20(couponToken).safeTransfer(msg.sender, shares);
     
@@ -136,74 +111,41 @@ contract Distributor is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
   /**
    * @dev Allocates shares to a pool.
-   * @param _pool Address of the pool to allocate shares to.
    * @param _amountToDistribute Amount of shares to allocate.
    */
-  function allocate(address _pool, uint256 _amountToDistribute) external whenNotPaused() {
-    require(_pool == msg.sender, CallerIsNotPool());
-
-    Pool pool = Pool(_pool);
+  function allocate(uint256 _amountToDistribute) external whenNotPaused {
+    require(address(pool) == msg.sender, CallerIsNotPool());
 
     address couponToken = pool.couponToken();
+    couponAmountToDistribute += _amountToDistribute;
 
-    couponAmountsToDistribute[couponToken] += _amountToDistribute;
-    poolInfos[_pool].amountToDistribute += _amountToDistribute;
-
-    if (IERC20(couponToken).balanceOf(address(this)) < couponAmountsToDistribute[couponToken]) {
+    if (IERC20(couponToken).balanceOf(address(this)) < couponAmountToDistribute) {
       revert NotEnoughCouponBalance();
     }
   }
 
   /**
-   * @dev Grants `role` to `account`.
-   * If `account` had not been already granted `role`, emits a {RoleGranted} event.
-   * Requirements:
-   * - the caller must have ``role``'s admin role.
-   * @param role The role to grant
-   * @param account The account to grant the role to
+   * @dev Pauses the contract. Reverts any interaction except upgrade.
    */
-  function grantRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _grantRole(role, account);
-  }
-
-  /**
-   * @dev Revokes `role` from `account`.
-   * If `account` had been granted `role`, emits a {RoleRevoked} event.
-   * Requirements:
-   * - the caller must have ``role``'s admin role.
-   * @param role The role to revoke
-   * @param account The account to revoke the role from
-   */
-  function revokeRole(bytes32 role, address account) public virtual override onlyRole(GOV_ROLE) {
-    _revokeRole(role, account);
-  }
-
-  /**
-   * @dev Pauses all contract functions except for upgrades.
-   * Requirements:
-   * - the caller must have the `GOV_ROLE`.
-   */
-  function pause() external onlyRole(GOV_ROLE) {
+  function pause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _pause();
   }
 
   /**
-   * @dev Unpauses all contract functions.
-   * Requirements:
-   * - the caller must have the `GOV_ROLE`.
+   * @dev Unpauses the contract.
    */
-  function unpause() external onlyRole(GOV_ROLE) {
+  function unpause() external onlyRole(poolFactory.SECURITY_COUNCIL_ROLE()) {
     _unpause();
   }
 
   /**
-   * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
-   * {upgradeTo} and {upgradeToAndCall}.
-   * @param newImplementation Address of the new implementation contract
+   * @dev Modifier to check if the caller has the specified role.
+   * @param role The role to check for.
    */
-  function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(GOV_ROLE)
-    override
-  {}
+  modifier onlyRole(bytes32 role) {
+    if (!poolFactory.hasRole(role, msg.sender)) {
+      revert AccessDenied();
+    }
+    _;
+  }
 }

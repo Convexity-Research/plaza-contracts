@@ -11,6 +11,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 contract OracleReader {
 
   address public oracleFeeds;
+  uint256[49] private __gap;
 
   // @note: address(0) is a special address that represents USD (IRL asset)
   address public constant USD = address(0);
@@ -49,7 +50,7 @@ contract OracleReader {
   /**
    * @dev Retrieves the latest price from the oracle
    * @return price from the oracle
-   * @dev Reverts if the price data is older than 1 day
+   * @dev Reverts if the price data is older than chainlink's heartbeat
    */
   function getOraclePrice(address quote, address base) public view returns(uint256) {
     bool isInverted = false;
@@ -70,7 +71,8 @@ contract OracleReader {
       revert StalePrice();
     }
 
-    return isInverted ? uint256(10 ** AggregatorV3Interface(feed).decimals()) / uint256(answer) : uint256(answer);
+    uint256 decimals = uint256(AggregatorV3Interface(feed).decimals());
+    return isInverted ? (10 ** decimals * 10 ** decimals) / uint256(answer) : uint256(answer);
   }
 
   /**
