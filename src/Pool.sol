@@ -5,6 +5,7 @@ import {Utils} from "./lib/Utils.sol";
 import {Auction} from "./Auction.sol";
 import {BondToken} from "./BondToken.sol";
 import {Decimals} from "./lib/Decimals.sol";
+import {OracleFeeds} from "./OracleFeeds.sol";
 import {Distributor} from "./Distributor.sol";
 import {PoolFactory} from "./PoolFactory.sol";
 import {Validator} from "./utils/Validator.sol";
@@ -437,6 +438,18 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       depositAmount = depositAmount.normalizeTokenAmount(address(bondToken), COMMON_DECIMALS);
     }
 
+    uint8 oracleDecimals = getOracleDecimals(reserveToken, USD);
+
+    uint256 marketRate;
+    address feed = OracleFeeds(oracleFeeds).priceFeeds(address(bondToken), USD);
+    if (feed != address(0)) {
+      marketRate = getOraclePrice(address(bondToken), USD)
+        .normalizeAmount(
+          getOracleDecimals(address(bondToken), USD), 
+          oracleDecimals // this is the decimals of the reserve token chainlink feed
+        );
+    }
+
     return getRedeemAmount(
       tokenType,
       depositAmount,
@@ -444,7 +457,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       levSupply,
       poolReserves,
       getOraclePrice(reserveToken, USD),
-      getOracleDecimals(reserveToken, USD)
+      oracleDecimals,
+      marketRate
     ).normalizeAmount(COMMON_DECIMALS, IERC20(reserveToken).safeDecimals());
   }
 
@@ -457,6 +471,7 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
    * @param poolReserves The total amount of reserve tokens in the pool.
    * @param ethPrice The current ETH price from the oracle.
    * @param oracleDecimals The number of decimals used by the oracle.
+   * @param marketRate The current market rate of the bond token.
    * @return amount of reserve tokens to be redeemed.
    */
   function getRedeemAmount(
@@ -466,7 +481,8 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
     uint256 levSupply,
     uint256 poolReserves,
     uint256 ethPrice,
-    uint8 oracleDecimals
+    uint8 oracleDecimals,
+    uint256 marketRate
   ) public pure returns(uint256) {
     if (bondSupply == 0) {
       revert ZeroDebtSupply();
@@ -498,6 +514,10 @@ contract Pool is Initializable, PausableUpgradeable, ReentrancyGuardUpgradeable,
       redeemRate = ((tvl - (bondSupply * BOND_TARGET_PRICE)) / assetSupply) * PRECISION;
     } else {
       redeemRate = BOND_TARGET_PRICE * PRECISION;
+    }
+
+    if (marketRate != 0 && marketRate < redeemRate) {
+      redeemRate = marketRate;
     }
     
     // Calculate and return the final redeem amount

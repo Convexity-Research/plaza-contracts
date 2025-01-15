@@ -428,7 +428,8 @@ contract PoolTest is Test, TestCases {
         calcTestCases[i].LeverageAssets, 
         calcTestCases[i].TotalUnderlyingAssets, 
         calcTestCases[i].ethPrice * CHAINLINK_DECIMAL_PRECISION,
-        CHAINLINK_DECIMAL
+        CHAINLINK_DECIMAL,
+        0
       );
       assertEq(amount, calcTestCases[i].expectedRedeem);
 
