@@ -112,9 +112,11 @@ contract Distributor is Initializable, PausableUpgradeable, ReentrancyGuardUpgra
 
     couponAmountToDistribute -= shares;
     bondToken.resetIndexedUserAssets(msg.sender, isLastAuctionFinalized);
-    IERC20(couponToken).safeTransfer(msg.sender, shares);
 
     emit ClaimedShares(msg.sender, currentPeriod, shares);
+
+    IERC20(couponToken).safeTransfer(msg.sender, shares);
+
   }
 
   /**
